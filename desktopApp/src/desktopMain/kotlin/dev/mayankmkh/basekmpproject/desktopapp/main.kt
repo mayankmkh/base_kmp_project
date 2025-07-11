@@ -28,6 +28,7 @@ fun main() {
 
         Window(
             onCloseRequest = ::exitApplication,
+            alwaysOnTop = true,
             state = windowState,
             title = "base_kmp_project",
         ) {

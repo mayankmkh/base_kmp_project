@@ -14,6 +14,7 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(projects.shared.libs.prefs)
+                implementation(compose.materialIconsExtended)
             }
         }
     }

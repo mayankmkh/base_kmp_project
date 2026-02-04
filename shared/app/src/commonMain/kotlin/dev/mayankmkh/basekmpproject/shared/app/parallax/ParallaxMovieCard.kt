@@ -108,11 +108,25 @@ fun ParallaxMovieCard(
         ) {
             Box(Modifier.fillMaxSize()) {
                 // A. Poster Image
+                // A. Poster Image
+                // Parallax Effect: The poster is "deep" inside the card.
+                // It moves opposite to the Logo (which is "popping out").
+                // To do this, we scale it up (to avoid gaps) and translate it slightly.
+                val posterOffsetX = (-roll * 15f).coerceIn(-15f, 15f)
+                val posterOffsetY = (pitch * 15f).coerceIn(-15f, 15f)
+
                 Image(
                     painter = painterResource(Res.drawable.img_movie_poster),
                     contentDescription = "Movie Poster",
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = 1.25f
+                            scaleY = 1.25f
+                            translationX = posterOffsetX.dp.toPx()
+                            translationY = posterOffsetY.dp.toPx()
+                        }
                 )
                 
                 // B. Glossy Sheen (Radial/Spotlight)

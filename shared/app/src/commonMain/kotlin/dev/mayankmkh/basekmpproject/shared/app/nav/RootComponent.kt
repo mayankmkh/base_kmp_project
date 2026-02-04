@@ -11,6 +11,8 @@ import com.arkivanov.decompose.value.Value
 import dev.mayankmkh.basekmpproject.shared.app.nav.RootComponent.Child
 import dev.mayankmkh.basekmpproject.shared.app.nav.RootComponent.Child.DetailsChild
 import dev.mayankmkh.basekmpproject.shared.app.nav.RootComponent.Child.ListChild
+import dev.mayankmkh.basekmpproject.shared.app.nav.RootComponent.Child.ParallaxChild
+import dev.mayankmkh.basekmpproject.shared.app.parallax.ParallaxComponent
 import dev.mayankmkh.basekmpproject.shared.features.details.nav.DetailsComponent
 import dev.mayankmkh.basekmpproject.shared.features.list.nav.ListComponent
 import kotlinx.serialization.Serializable
@@ -25,8 +27,8 @@ interface RootComponent {
     // Defines all possible child components
     sealed class Child {
         class ListChild(val component: ListComponent) : Child()
-
         class DetailsChild(val component: DetailsComponent) : Child()
+        class ParallaxChild(val component: ParallaxComponent) : Child()
     }
 }
 
@@ -39,7 +41,7 @@ class DefaultRootComponent(componentContext: ComponentContext) :
         childStack(
             source = navigation,
             serializer = Config.serializer(),
-            initialConfiguration = Config.List, // The initial child component is List
+            initialConfiguration = Config.Parallax, // The initial child component is Parallax
             handleBackButton = true, // Automatically pop from the stack on back button presses
             childFactory = ::child,
         )
@@ -48,6 +50,7 @@ class DefaultRootComponent(componentContext: ComponentContext) :
         when (config) {
             is Config.List -> ListChild(listComponent(componentContext))
             is Config.Details -> DetailsChild(detailsComponent(componentContext, config))
+            is Config.Parallax -> ParallaxChild(ParallaxComponent(componentContext))
         }
 
     private fun listComponent(componentContext: ComponentContext): ListComponent =
@@ -74,6 +77,7 @@ class DefaultRootComponent(componentContext: ComponentContext) :
 
     @Serializable
     private sealed interface Config {
+        @Serializable data object Parallax : Config
         @Serializable data object List : Config
 
         @Serializable data class Details(val itemId: String) : Config

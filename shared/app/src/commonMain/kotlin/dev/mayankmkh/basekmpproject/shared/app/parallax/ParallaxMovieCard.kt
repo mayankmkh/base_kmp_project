@@ -19,7 +19,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -57,22 +56,17 @@ fun ParallaxMovieCard(
     // ------------------------------------------------------------------------
     
     // 1. Logo Offset (Parallax) - "Pop Out"
-    // Moves with the tilt direction to appear closer to camera
     val logoOffsetX = (roll * maxParallax * 2f).coerceIn(-maxParallax, maxParallax)
     val logoOffsetY = (-pitch * maxParallax * 2f).coerceIn(-maxParallax, maxParallax)
     
-    // 2. Shadow Logic - "Ground Distance"
-    // As we tilt, the edge lifts, distance increases -> Blur increases, Shadow moves away.
-    // Shadow moves OPPOSITE to the tilt to simulate the object moving above a fixed ground.
-    val shadowOffsetX = (roll * 30f).coerceIn(-30f, 30f)
-    val shadowOffsetY = (-pitch * 30f).coerceIn(-30f, 30f)
+    // 2. Glow / Ambilight Offset - Directional
+    // Slides out to reveal colored glow on the tilted side
+    val glowOffsetX = (roll * 220f).coerceIn(-220f, 220f)
+    val glowOffsetY = (-pitch * 220f).coerceIn(-220f, 220f)
     
-    // Dynamic Blur: More tilt = more average distance/apparent depth
-    val shadowBlur = 20.dp + (kotlin.math.abs(roll) * 10).dp + (kotlin.math.abs(pitch) * 10).dp
-
-    // 3. Natural Sheen / Reflection
-    // Simulating a Light Source at Top-Center (or slightly moving).
-    // Now calculated inside the drawWithContent block for perfect alignment.
+    // 3. Dynamic Glow Intensity
+    val tiltMagnitude = (kotlin.math.abs(roll) + kotlin.math.abs(pitch))
+    val glowAlpha = (tiltMagnitude * 3f).coerceIn(0f, 0.6f) 
 
     Box(
         modifier = modifier
@@ -84,19 +78,27 @@ fun ParallaxMovieCard(
             },
         contentAlignment = Alignment.Center
     ) {
-        // --- Layer 1: Shadow ---
-        // Soft, diffused shadow that reacts to tilt
-        Box(
+        // --- Layer 1: Glow / Ambilight ---
+        // A blurred copy of the poster that acts as a colored backlight.
+        // Scale 1.02f keeps it hidden at rest; large offset reveals it directionally.
+        Image(
+            painter = painterResource(Res.drawable.img_movie_poster),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .offset { IntOffset(shadowOffsetX.toInt(), shadowOffsetY.toInt()) }
+                .offset { IntOffset(glowOffsetX.toInt(), glowOffsetY.toInt()) }
                 .graphicsLayer {
-                    alpha = 0.5f
-                    scaleX = 0.95f
-                    scaleY = 0.95f // Shadow is slightly smaller
+//                    alpha = glowAlpha
+//                    scaleX = 1.2f
+//                    scaleY = 1.2f
+                    renderEffect = androidx.compose.ui.graphics.BlurEffect(
+                        radiusX = 150f,
+                        radiusY = 150f,
+                        edgeTreatment = androidx.compose.ui.graphics.TileMode.Decal
+                    )
                 }
-                .blur(radius = shadowBlur)
-                .background(Color.Black, RoundedCornerShape(24.dp))
+                .blur(radius = 60.dp)
         )
         
         // --- Layer 2: Card Container ---
@@ -107,13 +109,9 @@ fun ParallaxMovieCard(
             colors = CardDefaults.cardColors(containerColor = Color.Transparent)
         ) {
             Box(Modifier.fillMaxSize()) {
-                // A. Poster Image
-                // A. Poster Image
-                // Parallax Effect: The poster is "deep" inside the card.
-                // It moves opposite to the Logo (which is "popping out").
-                // To do this, we scale it up (to avoid gaps) and translate it slightly.
-                val posterOffsetX = (-roll * 15f).coerceIn(-15f, 15f)
-                val posterOffsetY = (pitch * 15f).coerceIn(-15f, 15f)
+                // A. Poster Image (Deep Parallax)
+                val posterOffsetX = (-roll * 25f).coerceIn(-25f, 25f)
+                val posterOffsetY = (pitch * 25f).coerceIn(-25f, 25f)
 
                 Image(
                     painter = painterResource(Res.drawable.img_movie_poster),
@@ -130,8 +128,6 @@ fun ParallaxMovieCard(
                 )
                 
                 // B. Glossy Sheen (Radial/Spotlight)
-                // A large radial gradient acting as a light spot
-                // We draw it directly with a calculated center to ensure perfect alignment
                 val density = LocalDensity.current
                 Box(
                    modifier = Modifier
@@ -142,21 +138,15 @@ fun ParallaxMovieCard(
                            val centerX = contentSize.width / 2f
                            val centerY = contentSize.height / 2f
                            
-                           // Move the center opposite to tilt (Light source reflection logic)
-                           // Max offset in pixels matching the visual range we want
-                           // Video Match: Speed increased (1.5 -> 2.5) to make it race across the surface
-                           val offsetX = -roll * contentSize.width * 2.5f 
-                           val offsetY = pitch * contentSize.height * 2.5f
+                           val offsetX = roll * contentSize.width * 2.5f
+                           val offsetY = -pitch * contentSize.height * 2.5f
                            
-                           // Use a tighter radius to simulate a spotlight, not a wash
-                           // Previously roughly 400-500px. On 300dp width (~600px+), that's roughly 0.6-0.8 of width?
-                           // Let's make it density aware: 300.dp magnitude.
-                           val radius =  maxOf(contentSize.width, contentSize.height) * 0.7f
+                           val radius = maxOf(contentSize.width, contentSize.height) * 0.7f
                            
                            drawRect(
                                brush = Brush.radialGradient(
-                                   0.0f to Color.White.copy(alpha = 0.4f), // Slightly brighter than original but much softer than 0.6
-                                   0.5f to Color.White.copy(alpha = 0.1f), // Smooth falloff
+                                   0.0f to Color.White.copy(alpha = 0.4f),
+                                   0.5f to Color.White.copy(alpha = 0.1f),
                                    1.0f to Color.Transparent,
                                    center = Offset(centerX + offsetX, centerY + offsetY),
                                    radius = radius
@@ -165,7 +155,7 @@ fun ParallaxMovieCard(
                        }
                 )
                 
-                // C. Subtle Vignette (Static)
+                // C. Subtle Vignette
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

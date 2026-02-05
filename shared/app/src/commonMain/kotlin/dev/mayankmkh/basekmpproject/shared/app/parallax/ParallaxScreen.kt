@@ -16,7 +16,7 @@ fun ParallaxScreen(component: ParallaxComponent) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
+            /*.background(
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         Color(0xFF1A1A2E),
@@ -24,7 +24,7 @@ fun ParallaxScreen(component: ParallaxComponent) {
                         Color(0xFF0F3460)
                     )
                 )
-            )
+            )*/
             .then(tiltController.modifier), // Apply platform-specific tilt modifier (Pointer on Desktop, No-op on Mobile)
         contentAlignment = Alignment.Center
     ) {

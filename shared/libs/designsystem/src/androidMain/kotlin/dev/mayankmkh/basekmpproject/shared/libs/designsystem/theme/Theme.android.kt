@@ -13,7 +13,9 @@ internal actual fun supportsDynamicTheming() = Build.VERSION.SDK_INT >= Build.VE
 
 @Composable
 internal actual fun getDynamicColorScheme(darkTheme: Boolean): ColorScheme {
-    if (!supportsDynamicTheming()) error("Dynamic theming is unsupported")
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+        error("Dynamic theming is unsupported")
+    }
     val context = LocalContext.current
     return if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
 }

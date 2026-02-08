@@ -1,58 +1,66 @@
 ### Original code at [NowInAndroid](https://github.com/android/nowinandroid/tree/a77d7b69b58238e2b5e934ab9e492c0932bf2904/build-logic)
 
-# Convention Plugins
+# Convention Plugins (V3.1)
 
-The `build-logic` folder defines project-specific convention plugins, used to keep a single
-source of truth for common module configurations.
+`build-logic` is an included build (configured in `settings.gradle.kts`) that publishes the convention plugins used by all modules.
 
-This approach is heavily based on
-[https://developer.squareup.com/blog/herding-elephants/](https://developer.squareup.com/blog/herding-elephants/)
-and
-[https://github.com/jjohannes/idiomatic-gradle](https://github.com/jjohannes/idiomatic-gradle).
+## Primary plugin model
 
-By setting up convention plugins in `build-logic`, we can avoid duplicated build script setup,
-messy `subproject` configurations, without the pitfalls of the `buildSrc` directory.
+Each module must apply **exactly one** primary `bkp.*` plugin. The `bkp.validation.graph` plugin enforces this at configuration time (`gradle.projectsEvaluated`).
 
-`build-logic` is an included build, as configured in the root
-[`settings.gradle.kts`](../settings.gradle.kts).
+### Plugin selection guide
+- Pure Android app: `bkp.android.app` or `bkp.android.app.compose`
+- Pure Android lib: `bkp.android.lib`
+- Android test module: `bkp.android.test`
+- KMP library (no feature bundle): `bkp.kmp.lib` or `bkp.kmp.lib.compose`
+- KMP feature (with shared feature deps): `bkp.kmp.feature` or `bkp.kmp.feature.compose`
+- Desktop app: `bkp.desktop.app`
 
-Inside `build-logic` is a `convention` module, which defines a set of plugins that all normal
-modules can use to configure themselves.
+## `bkpModule` DSL
 
-`build-logic` also includes a set of `Kotlin` files used to share logic between plugins themselves,
-which is most useful for configuring Android components (libraries vs applications) with shared
-code.
+Primary plugins expose `bkpModule { ... }` for structured module configuration.
 
-These plugins are *additive* and *composable*, and try to only accomplish a single responsibility.
-Modules can then pick and choose the configurations they need.
-If there is one-off logic for a module without shared code, it's preferable to define that directly
-in the module's `build.gradle`, as opposed to creating a convention plugin with module-specific
-setup.
+### Firebase boundary
+- `bkpModule.features.firebase=true` requires applying `bkp.android.app.firebase`.
+- `bkp.android.app.firebase` is valid only with `bkp.android.app*` primary plugins.
 
-Current list of convention plugins:
+### CocoaPods boundary
+- `bkpModule.features.cocoapods=true` and `bkpModule.cocoapods { ... }` provide convention defaults only.
+- Convention defaults include shared values (`frameworkBaseName`, `iosDeploymentTarget`, `podfilePath`).
+- Apply `org.jetbrains.kotlin.native.cocoapods` (`kotlinCocoapods` alias) in modules that enable CocoaPods.
+- Module-specific CocoaPods settings stay in module scripts, e.g.:
+  - `version`, `summary`, `homepage`
+  - `framework { export(...) }`
+  - any module-specific pods wiring
 
-**Android Application Plugins:**
-- [`basekmpproject.android.application`](convention/src/main/kotlin/AndroidApplicationConventionPlugin.kt): Configures common Android application options and Kotlin settings
-- [`basekmpproject.android.application.compose`](convention/src/main/kotlin/AndroidApplicationComposeConventionPlugin.kt): Configures Jetpack Compose options for Android applications
-- [`basekmpproject.android.application.firebase`](convention/src/main/kotlin/AndroidApplicationFirebaseConventionPlugin.kt): Configures Firebase services (Analytics, Performance, Crashlytics) for Android applications
-- [`basekmpproject.android.application.flavors`](convention/src/main/kotlin/AndroidApplicationFlavorsConventionPlugin.kt): Configures build flavors for Android applications
+## Validation lifecycle
 
-**Android Library Plugins:**
-- [`basekmpproject.android.library`](convention/src/main/kotlin/AndroidLibraryConventionPlugin.kt): Configures common Android library options and Kotlin settings
-- [`basekmpproject.android.library.compose`](convention/src/main/kotlin/AndroidLibraryComposeConventionPlugin.kt): Configures Jetpack Compose options for Android libraries
-- [`basekmpproject.android.feature`](convention/src/main/kotlin/AndroidFeatureConventionPlugin.kt): Configures Android feature modules with common dependencies and serialization
+Validation is split into two phases:
+1. Apply-time wiring: primary plugins wire baseline tooling/dependencies in `apply()`.
+2. Post-configuration checks: `bkp.validation.graph` runs in `gradle.projectsEvaluated` to validate final DSL values and plugin graph.
 
-**Android Testing & Quality Plugins:**
-- [`basekmpproject.android.test`](convention/src/main/kotlin/AndroidTestConventionPlugin.kt): Configures Android testing options and dependencies
-- [`basekmpproject.android.lint`](convention/src/main/kotlin/AndroidLintConventionPlugin.kt): Configures Android Lint with XML/SARIF reporting and dependency checking
+This keeps validation early (before task execution) and configuration-cache compatible.
 
-**Kotlin Multiplatform Plugins:**
-- [`basekmpproject.shared.library`](convention/src/main/kotlin/SharedLibraryConventionPlugin.kt): Configures Kotlin Multiplatform shared libraries with common dependencies
-- [`basekmpproject.shared.library.compose`](convention/src/main/kotlin/SharedLibraryComposeConventionPlugin.kt): Configures Compose Multiplatform for shared libraries
-- [`basekmpproject.shared.feature`](convention/src/main/kotlin/SharedFeatureConventionPlugin.kt): Configures shared feature modules with common dependencies and serialization
+## Quality plugins
 
-**JVM Library Plugin:**
-- [`basekmpproject.jvm.library`](convention/src/main/kotlin/JvmLibraryConventionPlugin.kt): Configures JVM libraries with Kotlin and testing setup
+Quality plugins are internal and auto-applied by primary plugins:
+- `bkp.quality.style` (Spotless + Detekt)
+- `bkp.quality.lint` (Android lint when Android/KMP Android plugin is present)
 
-**Code Quality Plugin:**
-- [`basekmpproject.style.enforcer`](convention/src/main/kotlin/StyleEnforcerConventionPlugin.kt): Configures code style enforcement (includes Spotless and Detekt setup)
+## Dependency bundles inventory
+
+The convention core owns reusable bundles in `DependencyBundles.kt`.
+
+### FeatureBundle (used by `bkp.kmp.feature*`)
+- `:shared:libs:arch:core`
+- `:shared:libs:coroutines-x`
+- `:shared:libs:networking`
+- `:shared:libs:designsystem`
+- Decompose + Essenty lifecycle coroutines
+- Koin BOM + Koin core
+
+### Compose bundle
+Configured centrally in `SharedCompose.kt` for compose-enabled primary plugins.
+
+### Test bundle
+Kotlin/Android test dependencies are configured by primary plugin type.

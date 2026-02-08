@@ -3,7 +3,7 @@
 agp = "8.13.2"
 android-tools = "31.13.2"
 android-compileSdk = "36"
-android-minSdk = "24"
+android-minSdk = "23"
 android-targetSdk = "36"
 androidDesugarJdkLibs = "2.1.5"
 androidx-activity = "1.12.3"
@@ -137,18 +137,17 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 
-# Plugins defined by this project
-basekmpproject-android-application = { id = "basekmpproject.android.application" }
-basekmpproject-android-application-compose = { id = "basekmpproject.android.application.compose" }
-basekmpproject-android-application-firebase = { id = "basekmpproject.android.application.firebase" }
-basekmpproject-android-application-flavors = { id = "basekmpproject.android.application.flavors" }
-basekmpproject-android-feature = { id = "basekmpproject.android.feature" }
-basekmpproject-android-library = { id = "basekmpproject.android.library" }
-basekmpproject-android-library-compose = { id = "basekmpproject.android.library.compose" }
-basekmpproject-android-lint = { id = "basekmpproject.android.lint" }
-basekmpproject-android-test = { id = "basekmpproject.android.test" }
-basekmpproject-jvm-library = { id = "basekmpproject.jvm.library" }
-basekmpproject-shared-library = { id = "basekmpproject.shared.library" }
-basekmpproject-shared-library-compose = { id = "basekmpproject.shared.library.compose" }
-basekmpproject-shared-feature = { id = "basekmpproject.shared.feature" }
-basekmpproject-style-enforcer = { id = "basekmpproject.style.enforcer" }
+# New V3 convention plugins
+bkp-android-app = { id = "bkp.android.app" }
+bkp-android-app-compose = { id = "bkp.android.app.compose" }
+bkp-android-app-firebase = { id = "bkp.android.app.firebase" }
+bkp-android-lib = { id = "bkp.android.lib" }
+bkp-android-test = { id = "bkp.android.test" }
+bkp-kmp-lib = { id = "bkp.kmp.lib" }
+bkp-kmp-lib-compose = { id = "bkp.kmp.lib.compose" }
+bkp-kmp-feature = { id = "bkp.kmp.feature" }
+bkp-kmp-feature-compose = { id = "bkp.kmp.feature.compose" }
+bkp-desktop-app = { id = "bkp.desktop.app" }
+bkp-quality-style = { id = "bkp.quality.style" }
+bkp-quality-lint = { id = "bkp.quality.lint" }
+bkp-validation-graph = { id = "bkp.validation.graph" }

@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.basekmpproject.shared.library)
+    alias(libs.plugins.bkp.kmp.lib)
 }
 
 kotlin {

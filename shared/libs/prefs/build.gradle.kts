@@ -1,6 +1,5 @@
 plugins {
-    alias(libs.plugins.basekmpproject.shared.library)
-    alias(libs.plugins.basekmpproject.android.library)
+    alias(libs.plugins.bkp.kmp.lib)
     alias(libs.plugins.kotlin.serialization)
 }
 

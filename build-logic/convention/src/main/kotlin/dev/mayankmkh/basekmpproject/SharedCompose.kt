@@ -21,15 +21,13 @@ import org.gradle.api.Project
 import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
-import org.jetbrains.compose.ComposePlugin
 import org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginExtension
 
 /**
  * Configure Compose-specific options
  */
 internal fun Project.configureAndroidCompose(
-    commonExtension: CommonExtension<*, *, *, *, *, *>,
-    composeDependencies: ComposePlugin.Dependencies
+    commonExtension: CommonExtension<*, *, *, *, *, *>
 ) {
     commonExtension.apply {
         buildFeatures {
@@ -37,11 +35,8 @@ internal fun Project.configureAndroidCompose(
         }
 
         dependencies {
-            "implementation"(composeDependencies.runtime)
-            "implementation"(composeDependencies.foundation)
-            "implementation"(composeDependencies.material3)
-            "implementation"(composeDependencies.preview)
-            "debugImplementation"(composeDependencies.uiTooling)
+            "implementation"(libs.findBundle("compose.android.main").get())
+            "debugImplementation"(libs.findLibrary("compose.ui.tooling").get())
         }
 
         testOptions {
@@ -56,16 +51,10 @@ internal fun Project.configureAndroidCompose(
 }
 
 internal fun Project.configureKMPCompose(
-    composeDependencies: ComposePlugin.Dependencies
 ) {
 
     dependencies {
-        "commonMainImplementation"(composeDependencies.runtime)
-        "commonMainImplementation"(composeDependencies.foundation)
-        "commonMainImplementation"(composeDependencies.material3)
-        "commonMainImplementation"(composeDependencies.ui)
-        "commonMainImplementation"(composeDependencies.components.resources)
-        "commonMainImplementation"(composeDependencies.components.uiToolingPreview)
+        "commonMainImplementation"(libs.findBundle("compose.common.main").get())
     }
 
     configureComposeCompiler()

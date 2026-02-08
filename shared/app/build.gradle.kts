@@ -8,9 +8,6 @@ plugins {
 }
 
 kotlin {
-
-    androidTarget()
-
     cocoapods {
         // Required properties
         // Specify the required Pod version here. Otherwise, the Gradle project version is used.

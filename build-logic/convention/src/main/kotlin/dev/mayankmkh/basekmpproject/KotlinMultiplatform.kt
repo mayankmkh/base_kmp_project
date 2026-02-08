@@ -36,10 +36,10 @@ internal fun Project.configureKotlinAndroid(
     commonExtension: CommonExtension<*, *, *, *, *, *>,
 ) {
     commonExtension.apply {
-        compileSdk = 36
+        compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
 
         defaultConfig {
-            minSdk = 23
+            minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
         }
 
         compileOptions {
@@ -85,8 +85,8 @@ internal fun Project.configureKotlinMultiplatformAndroidLibrary(
     androidExtension: KotlinMultiplatformAndroidLibraryExtension,
 ) {
     androidExtension.apply {
-        compileSdk = 36
-        minSdk = 23
+        compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
+        minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
         namespace = "dev.mayankmkh.basekmpproject" + project.path.replace(':', '.').replace('-', '.')
 
         // KMP Android resources are opt-in in AGP.

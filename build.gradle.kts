@@ -18,4 +18,17 @@ plugins {
     alias(libs.plugins.firebase.crashlytics) apply false
     alias(libs.plugins.firebase.perf) apply false
     alias(libs.plugins.android.kotlin.multiplatform.library) apply false
+    alias(libs.plugins.bkp.android.app) apply false
+    alias(libs.plugins.bkp.android.app.compose) apply false
+    alias(libs.plugins.bkp.android.app.firebase) apply false
+    alias(libs.plugins.bkp.android.lib) apply false
+    alias(libs.plugins.bkp.android.test) apply false
+    alias(libs.plugins.bkp.kmp.lib) apply false
+    alias(libs.plugins.bkp.kmp.lib.compose) apply false
+    alias(libs.plugins.bkp.kmp.feature) apply false
+    alias(libs.plugins.bkp.kmp.feature.compose) apply false
+    alias(libs.plugins.bkp.desktop.app) apply false
+    alias(libs.plugins.bkp.quality.style) apply false
+    alias(libs.plugins.bkp.quality.lint) apply false
+    alias(libs.plugins.bkp.validation.graph) apply false
 }

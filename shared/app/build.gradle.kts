@@ -1,11 +1,21 @@
+import dev.mayankmkh.basekmpproject.convention.dsl.BkpModuleExtension
+import org.gradle.kotlin.dsl.configure
+import org.gradle.kotlin.dsl.getByType
+
 plugins {
-    alias(libs.plugins.basekmpproject.shared.feature)
-    alias(libs.plugins.basekmpproject.shared.library.compose)
-    alias(libs.plugins.basekmpproject.android.library.compose)
-    alias(libs.plugins.basekmpproject.android.library)
+    alias(libs.plugins.bkp.kmp.feature.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlinCocoapods)
 }
+
+extensions.configure<BkpModuleExtension> {
+    features.cocoapods.set(true)
+    cocoapods.frameworkBaseName.set("SharedApp")
+    cocoapods.iosDeploymentTarget.set("16.0")
+    cocoapods.podfilePath.set("iosApp/Podfile")
+}
+
+val bkpModule = extensions.getByType<BkpModuleExtension>()
 
 kotlin {
     cocoapods {
@@ -14,22 +24,22 @@ kotlin {
         version = "1.0"
         summary = "Some description for a Kotlin/Native module"
         homepage = "Link to a Kotlin/Native module homepage"
-        ios.deploymentTarget = "16.0"
+        ios.deploymentTarget = bkpModule.cocoapods.iosDeploymentTarget.get()
 
         // Optional properties
         // Configure the Pod name here instead of changing the Gradle project name
-        name = "SharedApp"
+        name = bkpModule.cocoapods.frameworkBaseName.get()
 
         framework {
             // Required properties
             // Framework name configuration. Use this property instead of deprecated 'frameworkName'
-            baseName = "SharedApp"
+            baseName = bkpModule.cocoapods.frameworkBaseName.get()
 
             export(libs.decompose.decompose)
             export(libs.essenty.lifecycle)
         }
 
-        podfile = project.file("../../iosApp/Podfile")
+        podfile = rootProject.file(bkpModule.cocoapods.podfilePath.get())
     }
 
     sourceSets {
@@ -42,6 +52,7 @@ kotlin {
                 with(projects.shared.libs) {
                     implementation(prefs)
                 }
+                implementation(libs.kotlinx.serialization.json)
                 implementation(libs.touchlab.kermit)
                 api(libs.decompose.decompose)
                 api(libs.essenty.lifecycle)

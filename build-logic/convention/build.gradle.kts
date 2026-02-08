@@ -47,8 +47,9 @@ dependencies {
     compileOnly(libs.ksp.gradlePlugin)
     compileOnly(libs.spotless.gradlePlugin)
     compileOnly(libs.detekt.gradlePlugin)
-    implementation(libs.truth)
     lintChecks(libs.androidx.lint.gradle)
+    testImplementation(kotlin("test"))
+    testImplementation(gradleTestKit())
 }
 
 tasks {
@@ -60,61 +61,57 @@ tasks {
 
 gradlePlugin {
     plugins {
-        register("androidApplicationCompose") {
-            id = libs.plugins.basekmpproject.android.application.compose.get().pluginId
-            implementationClass = "AndroidApplicationComposeConventionPlugin"
+        register("bkpAndroidApp") {
+            id = "bkp.android.app"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidAppPlugin"
         }
-        register("androidApplication") {
-            id = libs.plugins.basekmpproject.android.application.asProvider().get().pluginId
-            implementationClass = "AndroidApplicationConventionPlugin"
+        register("bkpAndroidAppCompose") {
+            id = "bkp.android.app.compose"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidAppComposePlugin"
         }
-        register("androidLibraryCompose") {
-            id = libs.plugins.basekmpproject.android.library.compose.get().pluginId
-            implementationClass = "AndroidLibraryComposeConventionPlugin"
+        register("bkpAndroidAppFirebase") {
+            id = "bkp.android.app.firebase"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidAppFirebasePlugin"
         }
-        register("androidLibrary") {
-            id = libs.plugins.basekmpproject.android.library.asProvider().get().pluginId
-            implementationClass = "AndroidLibraryConventionPlugin"
+        register("bkpAndroidLib") {
+            id = "bkp.android.lib"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidLibPlugin"
         }
-        register("androidFeature") {
-            id = libs.plugins.basekmpproject.android.feature.get().pluginId
-            implementationClass = "AndroidFeatureConventionPlugin"
+        register("bkpAndroidTest") {
+            id = "bkp.android.test"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidTestPlugin"
         }
-        register("androidTest") {
-            id = libs.plugins.basekmpproject.android.test.get().pluginId
-            implementationClass = "AndroidTestConventionPlugin"
+        register("bkpKmpLib") {
+            id = "bkp.kmp.lib"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpKmpLibPlugin"
         }
-        register("androidFirebase") {
-            id = libs.plugins.basekmpproject.android.application.firebase.get().pluginId
-            implementationClass = "AndroidApplicationFirebaseConventionPlugin"
+        register("bkpKmpLibCompose") {
+            id = "bkp.kmp.lib.compose"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpKmpLibComposePlugin"
         }
-        register("androidFlavors") {
-            id = libs.plugins.basekmpproject.android.application.flavors.get().pluginId
-            implementationClass = "AndroidApplicationFlavorsConventionPlugin"
+        register("bkpKmpFeature") {
+            id = "bkp.kmp.feature"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpKmpFeaturePlugin"
         }
-        register("androidLint") {
-            id = libs.plugins.basekmpproject.android.lint.get().pluginId
-            implementationClass = "AndroidLintConventionPlugin"
+        register("bkpKmpFeatureCompose") {
+            id = "bkp.kmp.feature.compose"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpKmpFeatureComposePlugin"
         }
-        register("jvmLibrary") {
-            id = libs.plugins.basekmpproject.jvm.library.get().pluginId
-            implementationClass = "JvmLibraryConventionPlugin"
+        register("bkpDesktopApp") {
+            id = "bkp.desktop.app"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpDesktopAppPlugin"
         }
-        register("sharedLibrary") {
-            id = libs.plugins.basekmpproject.shared.library.asProvider().get().pluginId
-            implementationClass = "SharedLibraryConventionPlugin"
+        register("bkpQualityStyle") {
+            id = "bkp.quality.style"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.quality.BkpQualityStylePlugin"
         }
-        register("sharedLibraryCompose") {
-            id = libs.plugins.basekmpproject.shared.library.compose.get().pluginId
-            implementationClass = "SharedLibraryComposeConventionPlugin"
+        register("bkpQualityLint") {
+            id = "bkp.quality.lint"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.quality.BkpQualityLintPlugin"
         }
-        register("sharedFeature") {
-            id = libs.plugins.basekmpproject.shared.feature.get().pluginId
-            implementationClass = "SharedFeatureConventionPlugin"
-        }
-        register("styleEnforcer") {
-            id = libs.plugins.basekmpproject.style.enforcer.get().pluginId
-            implementationClass = "StyleEnforcerConventionPlugin"
+        register("bkpValidationGraph") {
+            id = "bkp.validation.graph"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.validation.BkpValidationGraphPlugin"
         }
     }
 }

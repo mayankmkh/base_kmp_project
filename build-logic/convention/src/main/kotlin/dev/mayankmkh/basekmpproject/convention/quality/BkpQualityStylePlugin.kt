@@ -40,8 +40,12 @@ class BkpQualityStylePlugin : Plugin<Project> {
                 "detektPlugins"(libs.findLibrary("detekt.composeRules").get())
             }
 
-            tasks.register("detektAll") {
+            val detektAll = tasks.register("detektAll") {
                 dependsOn(tasks.withType<Detekt>())
+            }
+
+            tasks.matching { it.name == "check" }.configureEach {
+                dependsOn(detektAll)
             }
         }
     }

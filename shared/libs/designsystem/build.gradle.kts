@@ -6,5 +6,4 @@ plugins {
 }
 
 kotlin {
-    androidTarget()
 }

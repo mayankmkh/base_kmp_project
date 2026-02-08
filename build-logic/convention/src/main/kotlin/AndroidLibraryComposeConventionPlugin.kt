@@ -19,19 +19,21 @@ import dev.mayankmkh.basekmpproject.configureAndroidCompose
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.apply
+import org.gradle.kotlin.dsl.findByType
 import org.gradle.kotlin.dsl.getByType
 import org.jetbrains.compose.ComposeExtension
 
 class AndroidLibraryComposeConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
-            apply(plugin = "com.android.library")
+            apply(plugin = "basekmpproject.android.library")
             apply(plugin = "org.jetbrains.compose")
             apply(plugin = "org.jetbrains.kotlin.plugin.compose")
 
-            val extension = extensions.getByType<LibraryExtension>()
             val composeDependencies = extensions.getByType<ComposeExtension>().dependencies
-            configureAndroidCompose(extension, composeDependencies)
+            extensions.findByType<LibraryExtension>()?.let { libraryExtension ->
+                configureAndroidCompose(libraryExtension, composeDependencies)
+            }
         }
     }
 }

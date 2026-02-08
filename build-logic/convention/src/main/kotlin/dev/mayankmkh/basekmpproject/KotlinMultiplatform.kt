@@ -17,6 +17,7 @@
 package dev.mayankmkh.basekmpproject
 
 import com.android.build.api.dsl.CommonExtension
+import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryExtension
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.api.plugins.JavaPluginExtension
@@ -35,10 +36,10 @@ internal fun Project.configureKotlinAndroid(
     commonExtension: CommonExtension<*, *, *, *, *, *>,
 ) {
     commonExtension.apply {
-        compileSdk = 35
+        compileSdk = 36
 
         defaultConfig {
-            minSdk = 21
+            minSdk = 23
         }
 
         compileOptions {
@@ -78,6 +79,26 @@ internal fun Project.configureKotlinMultiplatform(kotlinMultiplatformExtension: 
         jvm()
     }
     configureKotlin()
+}
+
+internal fun Project.configureKotlinMultiplatformAndroidLibrary(
+    androidExtension: KotlinMultiplatformAndroidLibraryExtension,
+) {
+    androidExtension.apply {
+        compileSdk = 36
+        minSdk = 23
+        namespace = "dev.mayankmkh.basekmpproject" + project.path.replace(':', '.').replace('-', '.')
+
+        // KMP Android resources are opt-in in AGP.
+        androidResources.enable = true
+        enableCoreLibraryDesugaring = true
+    }
+
+    configureKotlin()
+
+    dependencies {
+        "coreLibraryDesugaring"(libs.findLibrary("android.desugarJdkLibs").get())
+    }
 }
 
 /**

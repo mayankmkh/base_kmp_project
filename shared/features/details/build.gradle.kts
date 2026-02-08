@@ -1,5 +1,3 @@
-import org.gradle.kotlin.dsl.implementation
-
 plugins {
     alias(libs.plugins.basekmpproject.shared.feature)
     alias(libs.plugins.basekmpproject.shared.library.compose)
@@ -8,8 +6,6 @@ plugins {
 }
 
 kotlin {
-    androidTarget()
-
     sourceSets {
         commonMain {
             dependencies {

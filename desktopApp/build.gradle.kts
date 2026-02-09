@@ -21,7 +21,7 @@ kotlin {
 
 compose.desktop {
     application {
-        mainClass = "dev.mayankmkh.base_kmp_project.MainKt"
+        mainClass = "dev.mayankmkh.basekmpproject.desktopapp.MainKt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)

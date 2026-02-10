@@ -1,0 +1,1 @@
+-keep class com.arkivanov.decompose.extensions.compose.mainthread.SwingMainThreadChecker

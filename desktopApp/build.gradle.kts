@@ -28,5 +28,9 @@ compose.desktop {
             packageName = "dev.mayankmkh.base_kmp_project"
             packageVersion = "1.0.0"
         }
+
+        buildTypes.release.proguard {
+            this.configurationFiles.from(file("src/desktopMain/proguard-rules.pro"))
+        }
     }
 }

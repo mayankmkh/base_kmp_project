@@ -25,8 +25,11 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "dev.mayankmkh.base_kmp_project"
+            packageName = "KMP-Parallax"
             packageVersion = "1.0.0"
+            macOS {
+                iconFile.set(project.file("icon.icns"))
+            }
         }
 
         buildTypes.release.proguard {

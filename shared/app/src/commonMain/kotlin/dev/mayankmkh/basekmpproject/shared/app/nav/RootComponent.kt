@@ -6,7 +6,7 @@ import com.arkivanov.decompose.router.stack.StackNavigation
 import com.arkivanov.decompose.router.stack.childStack
 import com.arkivanov.decompose.router.stack.pop
 import com.arkivanov.decompose.router.stack.popTo
-import com.arkivanov.decompose.router.stack.push
+import com.arkivanov.decompose.router.stack.pushNew
 import com.arkivanov.decompose.value.Value
 import dev.mayankmkh.basekmpproject.shared.app.nav.RootComponent.Child
 import dev.mayankmkh.basekmpproject.shared.app.nav.RootComponent.Child.DetailsChild
@@ -54,7 +54,9 @@ class DefaultRootComponent(componentContext: ComponentContext) :
         ListComponent(
             componentContext = componentContext,
             onItemSelected = { id: String -> // Supply dependencies and callbacks
-                navigation.push(Config.Details(itemId = id)) // Push the details component
+                // `pushNew` over `push`: it ignores the call when the same configuration is
+                // already on top, so a double tap cannot stack two identical screens.
+                navigation.pushNew(Config.Details(itemId = id)) // Push the details component
             },
         )
 

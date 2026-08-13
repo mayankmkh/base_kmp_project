@@ -1,6 +1,5 @@
 package dev.mayankmkh.basekmpproject.shared.libs.networking
 
-@ConsistentCopyVisibility
 data class BaseUrls
 internal constructor(val main: String, val subscription: String, val auth: String)
 

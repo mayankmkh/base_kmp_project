@@ -1,7 +1,7 @@
 [versions]
 # AGP and tools should be updated together
-agp = "8.13.2"
-android-tools = "31.13.2"
+agp = "9.3.1"
+android-tools = "32.3.1"
 android-compileSdk = "36"
 android-minSdk = "23"
 android-targetSdk = "36"

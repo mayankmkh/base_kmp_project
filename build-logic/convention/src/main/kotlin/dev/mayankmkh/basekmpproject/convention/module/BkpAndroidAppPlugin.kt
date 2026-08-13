@@ -17,8 +17,8 @@ import org.gradle.kotlin.dsl.dependencies
 class BkpAndroidAppPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
+            // AGP 9 has built-in Kotlin support; `org.jetbrains.kotlin.android` must not be applied.
             apply(plugin = "com.android.application")
-            apply(plugin = "org.jetbrains.kotlin.android")
             apply(plugin = "bkp.quality.style")
             apply(plugin = "bkp.quality.lint")
             apply(plugin = "bkp.validation.graph")

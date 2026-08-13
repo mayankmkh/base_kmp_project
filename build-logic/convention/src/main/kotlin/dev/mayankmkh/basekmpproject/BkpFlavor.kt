@@ -2,8 +2,6 @@ package dev.mayankmkh.basekmpproject
 
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.dsl.ApplicationProductFlavor
-import com.android.build.api.dsl.CommonExtension
-import com.android.build.api.dsl.ProductFlavor
 
 @Suppress("EnumEntryName")
 enum class FlavorDimension {
@@ -19,24 +17,28 @@ enum class BkpFlavor(val dimension: FlavorDimension, val applicationIdSuffix: St
     prod(FlavorDimension.contentType),
 }
 
+/**
+ * In AGP 9 the `productFlavors { }` block DSL is only declared on the concrete extension types —
+ * `CommonExtension.getProductFlavors()` returns an out-projected container that cannot be
+ * registered into. Since only the application plugin declares flavors, this takes the concrete
+ * [ApplicationExtension], which also removes the need for the old runtime type checks.
+ */
 fun configureFlavors(
-    commonExtension: CommonExtension<*, *, *, *, *, *>,
-    flavorConfigurationBlock: ProductFlavor.(flavor: BkpFlavor) -> Unit = {}
+    applicationExtension: ApplicationExtension,
+    flavorConfigurationBlock: ApplicationProductFlavor.(flavor: BkpFlavor) -> Unit = {}
 ) {
-    commonExtension.apply {
-        FlavorDimension.values().forEach { flavorDimension ->
+    applicationExtension.apply {
+        FlavorDimension.entries.forEach { flavorDimension ->
             flavorDimensions += flavorDimension.name
         }
 
         productFlavors {
-            BkpFlavor.values().forEach { bkpFlavor ->
+            BkpFlavor.entries.forEach { bkpFlavor ->
                 register(bkpFlavor.name) {
                     dimension = bkpFlavor.dimension.name
                     flavorConfigurationBlock(this, bkpFlavor)
-                    if (this@apply is ApplicationExtension && this is ApplicationProductFlavor) {
-                        if (bkpFlavor.applicationIdSuffix != null) {
-                            applicationIdSuffix = bkpFlavor.applicationIdSuffix
-                        }
+                    if (bkpFlavor.applicationIdSuffix != null) {
+                        applicationIdSuffix = bkpFlavor.applicationIdSuffix
                     }
                 }
             }

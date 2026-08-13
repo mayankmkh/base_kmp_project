@@ -6,7 +6,7 @@ plugins {
 
 kotlin {
     sourceSets {
-        val desktopMain by getting
+        val desktopMain = getByName("desktopMain")
 
         commonMain.dependencies {
             implementation(projects.shared.app)

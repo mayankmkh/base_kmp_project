@@ -1,11 +1,12 @@
 package dev.mayankmkh.basekmpproject.convention.module
 
-import com.android.build.api.dsl.androidLibrary
+import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import dev.mayankmkh.basekmpproject.configureKotlinMultiplatformAndroidLibrary
 import dev.mayankmkh.basekmpproject.convention.dsl.bkpModuleExtension
 import dev.mayankmkh.basekmpproject.libs
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.plugins.ExtensionAware
 import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
@@ -37,9 +38,13 @@ class BkpKmpLibPlugin : Plugin<Project> {
                     jvm()
                 }
                 if (bkpModule.targets.android.get()) {
-                    androidLibrary {
-                        configureKotlinMultiplatformAndroidLibrary(this)
-                    }
+                    // AGP 9 registers the KMP Android target as an `android` extension on the
+                    // `kotlin` extension (AGP 8's `androidLibrary` name is deprecated) and no
+                    // longer ships a typed accessor for use outside of build scripts, so the
+                    // extension is looked up by name.
+                    val androidTarget = (this as ExtensionAware).extensions
+                        .getByName("android") as KotlinMultiplatformAndroidLibraryTarget
+                    configureKotlinMultiplatformAndroidLibrary(androidTarget)
                 }
             }
 

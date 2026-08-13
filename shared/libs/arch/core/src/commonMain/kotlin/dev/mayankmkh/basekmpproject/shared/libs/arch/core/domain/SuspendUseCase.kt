@@ -3,7 +3,7 @@ package dev.mayankmkh.basekmpproject.shared.libs.arch.core.domain
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
-import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onErr
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -41,7 +41,7 @@ internal constructor(
     suspend operator fun invoke(parameter: P): Result<R, E> {
         return try {
             withContext(coroutineDispatcher) {
-                executeWith(parameter).onFailure { onFailure(UseCaseException("$it")) }
+                executeWith(parameter).onErr { onFailure(UseCaseException("$it")) }
             }
         } catch (e: CancellationException) {
             @Suppress("RethrowCaughtException") throw e

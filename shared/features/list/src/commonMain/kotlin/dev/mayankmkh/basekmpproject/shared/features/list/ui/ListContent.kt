@@ -61,7 +61,8 @@ private fun Success(
         items(itemsModel.items) { item ->
             Text(
                 text = item.title,
-                modifier = Modifier.fillMaxWidth().clickable { onItemClick(item.id) }.padding(16.dp),
+                modifier =
+                    Modifier.fillMaxWidth().clickable { onItemClick(item.id) }.padding(16.dp),
             )
         }
     }

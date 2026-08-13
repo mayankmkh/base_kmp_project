@@ -72,7 +72,12 @@ private fun Project.configureComposeCompiler() {
             .relativeToRootProject("compose-reports")
             .let(reportsDestination::set)
 
-        stabilityConfigurationFiles
-            .add(isolated.rootProject.projectDirectory.file("compose_compiler_config.conf"))
+        // Only wire the stability config when it actually exists -- adding it unconditionally makes
+        // the compiler warn "Stability configuration file not found" on every Compose compilation.
+        val stabilityConfig =
+            isolated.rootProject.projectDirectory.file("compose_compiler_config.conf")
+        if (stabilityConfig.asFile.exists()) {
+            stabilityConfigurationFiles.add(stabilityConfig)
+        }
     }
 }

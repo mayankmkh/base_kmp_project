@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
+// Abstract by intent: these are extension points, not types anyone should be able to instantiate.
+// `AbstractClassCanBeConcreteClass` only sees that every member happens to be concrete.
+@Suppress("AbstractClassCanBeConcreteClass")
 abstract class BasicViewModel : InstanceKeeper.Instance {
     protected val coroutineScope: CoroutineScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -20,6 +23,7 @@ abstract class BasicViewModel : InstanceKeeper.Instance {
     }
 }
 
+@Suppress("AbstractClassCanBeConcreteClass")
 abstract class ViewModel<E : Event> : BasicViewModel() {
     private val eventChannel = Channel<E>(Channel.BUFFERED)
     val eventsFlow: Flow<E> = eventChannel.receiveAsFlow()

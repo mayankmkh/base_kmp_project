@@ -30,7 +30,7 @@ internal class DetailsViewModel(private val itemId: String, getItem: GetItemUseC
         send(Event.Close)
     }
 
-    internal sealed class Event : ViewModel.Event {
-        internal data object Close : Event()
+    internal sealed interface Event : ViewModel.Event {
+        data object Close : Event
     }
 }

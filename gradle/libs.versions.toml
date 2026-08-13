@@ -23,10 +23,9 @@ composeMultiplatform = "1.11.1"
 # The standalone material3 train lags Compose Multiplatform; 1.9.0 is its latest stable.
 composeMaterial3 = "1.9.0"
 decompose = "3.5.0"
-detekt = "1.23.8"
-# 0.5.0+ requires detekt 2.0.0-alpha (`dev.detekt` coordinates), so this is pinned to the
-# detekt 1.x line until detekt 2.x ships a stable release.
-detektComposeRules = "0.4.28"
+detekt = "2.0.0-alpha.6"
+# Compiled against `dev.detekt:detekt-core`, so it has to track `detekt` exactly: 0.6.4 <-> alpha.6.
+detektComposeRules = "0.6.4"
 essenty = "2.5.0"
 firebaseBom = "34.17.0"
 firebaseCrashlyticsPlugin = "3.0.7"
@@ -123,7 +122,7 @@ androidx-lint-gradle = { group = "androidx.lint", name = "lint-gradle", version.
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidx-test-runner" }
 androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidx-test-core" }
 compose-gradlePlugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
-detekt-gradlePlugin = { group = "io.gitlab.arturbosch.detekt", name = "detekt-gradle-plugin", version.ref = "detekt" }
+detekt-gradlePlugin = { group = "dev.detekt", name = "detekt-gradle-plugin", version.ref = "detekt" }
 detekt-composeRules = { group = "io.nlopez.compose.rules", name = "detekt", version.ref = "detektComposeRules" }
 firebase-crashlytics-gradlePlugin = { group = "com.google.firebase", name = "firebase-crashlytics-gradle", version.ref = "firebaseCrashlyticsPlugin" }
 firebase-performance-gradlePlugin = { group = "com.google.firebase", name = "perf-plugin", version.ref = "firebasePerfPlugin" }
@@ -157,7 +156,7 @@ android-test = { id = "com.android.test", version.ref = "agp" }
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }
 firebase-perf = { id = "com.google.firebase.firebase-perf", version.ref = "firebasePerfPlugin" }
 gms = { id = "com.google.gms.google-services", version.ref = "gmsPlugin" }

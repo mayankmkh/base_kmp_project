@@ -27,7 +27,11 @@ class BkpQualityStylePlugin : Plugin<Project> {
             }
             extensions.configure<DetektExtension> {
                 // detekt 2.x's extension is a Property-based interface, not a POJO.
-                config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+                // `isolated.rootProject` reads the root's directory without touching its mutable
+                // `Project` model, which is what project isolation forbids.
+                config.setFrom(
+                    isolated.rootProject.projectDirectory.file("config/detekt/detekt.yml"),
+                )
                 buildUponDefaultConfig.set(true)
                 // Currently a no-op in 2.0.0-alpha.6 -- the release variant tasks are registered
                 // either way (verified by swapping this for "debug": the task list is identical).

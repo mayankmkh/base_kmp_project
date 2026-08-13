@@ -57,12 +57,16 @@ internal fun Project.configureKMPCompose(
 @Suppress("UnstableApiUsage")
 private fun Project.configureComposeCompiler() {
     extensions.configure<ComposeCompilerGradlePluginExtension> {
-        fun Provider<String>.onlyIfTrue() = flatMap { provider { it.takeIf(String::toBoolean) } }
-        fun Provider<*>.relativeToRootProject(dir: String) = map {
-            isolated.rootProject.projectDirectory
-                .dir("build")
-                .dir(projectDir.toRelativeString(rootDir))
-        }.map { it.dir(dir) }
+        // Resolved to plain values here rather than inside the lambdas below: those lambdas outlive
+        // configuration, and capturing a `Project` in one is what both the configuration cache and
+        // project isolation forbid. `isolated.rootProject` also replaces `rootDir`, which reaches
+        // into the root project's mutable model.
+        val outputRoot = isolated.rootProject.projectDirectory.dir("build")
+        val relativePath = projectDir.toRelativeString(isolated.rootProject.projectDirectory.asFile)
+
+        fun Provider<String>.onlyIfTrue() = filter(String::toBoolean)
+        fun Provider<*>.relativeToRootProject(dir: String) =
+            map { outputRoot.dir(relativePath).dir(dir) }
 
         project.providers.gradleProperty("enableComposeCompilerMetrics").onlyIfTrue()
             .relativeToRootProject("compose-metrics")

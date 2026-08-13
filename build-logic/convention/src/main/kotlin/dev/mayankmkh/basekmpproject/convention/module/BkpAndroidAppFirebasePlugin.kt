@@ -14,6 +14,11 @@ import org.gradle.kotlin.dsl.exclude
 class BkpAndroidAppFirebasePlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
+            // Validation is per-project, so every plugin that creates `bkpModule` has to bring the
+            // validator with it -- otherwise a module applying only this plugin creates the
+            // extension with no primary plugin and nothing ever checks it.
+            apply(plugin = "bkp.validation.graph")
+
             bkpModuleExtension().apply {
                 features.firebase.convention(true)
             }

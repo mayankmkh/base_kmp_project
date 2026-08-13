@@ -8,15 +8,16 @@ import org.gradle.kotlin.dsl.findByType
 
 class BkpValidationGraphPlugin : Plugin<Project> {
     override fun apply(target: Project) {
-        val root = target.rootProject
-        synchronized(root) {
-            if (root.extensions.extraProperties.has(VALIDATION_KEY)) return
-            root.extensions.extraProperties.set(VALIDATION_KEY, true)
-        }
-
-        target.gradle.projectsEvaluated {
-            root.allprojects.forEach(::validateProject)
-        }
+        // Each project validates only itself. Walking `rootProject.allprojects` from
+        // `gradle.projectsEvaluated` -- and the extraProperties flag that made that walk happen once
+        // -- read and mutated other projects' models, which project isolation forbids. Every module
+        // that has a bkp primary plugin also gets this one, so per-project checks cover exactly the
+        // same set, and now fail at the offending project rather than after the whole build has
+        // configured.
+        //
+        // `afterEvaluate` is required, not incidental: the values being validated come from the
+        // `bkpModule { }` block in the module's own build script, which runs after plugins apply.
+        target.afterEvaluate(::validateProject)
     }
 
     private fun validateProject(project: Project) {
@@ -98,7 +99,6 @@ class BkpValidationGraphPlugin : Plugin<Project> {
     }
 
     companion object {
-        private const val VALIDATION_KEY = "bkp.validation.graph.registered"
         private val PRIMARY_PLUGIN_IDS = setOf(
             "bkp.android.app",
             "bkp.android.app.compose",

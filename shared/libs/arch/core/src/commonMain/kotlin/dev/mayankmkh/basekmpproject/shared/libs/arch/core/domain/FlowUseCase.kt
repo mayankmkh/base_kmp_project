@@ -2,7 +2,7 @@ package dev.mayankmkh.basekmpproject.shared.libs.arch.core.domain
 
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Result
-import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onErr
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -38,7 +38,7 @@ internal constructor(
     operator fun invoke(parameters: P): Flow<Result<R, E>> {
         return execute(parameters)
             .onEach { result ->
-                result.onFailure { error ->
+                result.onErr { error ->
                     val throwable = error.toThrowable()
                     if (throwable is CancellationException) {
                         throw throwable

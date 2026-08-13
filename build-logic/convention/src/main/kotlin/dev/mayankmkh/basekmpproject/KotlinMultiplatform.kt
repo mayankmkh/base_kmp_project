@@ -21,13 +21,17 @@ import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryExtension
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
 import org.gradle.kotlin.dsl.assign
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
+import org.gradle.kotlin.dsl.registerIfAbsent
 import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
 
 /**
  * Configure base Kotlin with Android options
@@ -101,9 +105,30 @@ internal fun Project.configureKotlinMultiplatformAndroidLibrary(
 }
 
 /**
+ * Throttles [KotlinNativeLink] so only one runs at a time.
+ *
+ * Each Kotlin/Native link forks its own compiler JVM sized by `kotlin.native.jvmArgs`, and the
+ * release links need a large heap for the whole-program devirtualization analysis. Letting the
+ * iosArm64 and iosSimulatorArm64 links run concurrently means two of those heaps plus the rest
+ * of the build, which exhausts memory and fails with an [OutOfMemoryError] -- raising the heap
+ * only brings the failure on sooner. Serialising them keeps the peak to a single compiler JVM.
+ */
+abstract class KotlinNativeLinkThrottle : BuildService<BuildServiceParameters.None>
+
+/**
  * Configure base Kotlin options
  */
 private fun Project.configureKotlin() {
+    val nativeLinkThrottle =
+        gradle.sharedServices.registerIfAbsent(
+            "kotlinNativeLinkThrottle",
+            KotlinNativeLinkThrottle::class,
+        ) {
+            maxParallelUsages = 1
+        }
+    tasks.withType<KotlinNativeLink>().configureEach {
+        usesService(nativeLinkThrottle)
+    }
 
     // Treat all Kotlin warnings as errors (disabled by default)
     // Override by setting warningsAsErrors=true in your ~/.gradle/gradle.properties
@@ -127,7 +152,8 @@ private fun Project.configureKotlin() {
                  * https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/-consistent-copy-visibility/#deprecation-timeline
                  *
                  * Deprecation timeline
-                 * Phase 3. (Supposedly Kotlin 2.2 or Kotlin 2.3).
+                 * Phase 3. (Still not reached as of Kotlin 2.4 -- dropping the flag reinstates the
+                 * "Non-public primary constructor is exposed via the generated 'copy()'" warning.)
                  * The default changes.
                  * Unless ExposedCopyVisibility is used, the generated 'copy' method has the same visibility as the primary constructor.
                  * The binary signature changes. The error on the declaration is no longer reported.

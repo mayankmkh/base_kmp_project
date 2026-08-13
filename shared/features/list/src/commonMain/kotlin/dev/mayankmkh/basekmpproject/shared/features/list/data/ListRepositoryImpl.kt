@@ -22,8 +22,9 @@ internal class ListRepositoryImpl(
                     appDispatchers,
                     failureListener,
                 ) {
-                override suspend fun processResponse(response: List<ItemDto>) =
-                    response.map { it.toItem() }
+                override suspend fun processResponse(response: List<ItemDto>) = response.map {
+                    it.toItem()
+                }
 
                 override suspend fun saveCallResult(item: Collection<Item>) {
                     keyValueStore.saveItems(item.map { it.toItemEntity() })

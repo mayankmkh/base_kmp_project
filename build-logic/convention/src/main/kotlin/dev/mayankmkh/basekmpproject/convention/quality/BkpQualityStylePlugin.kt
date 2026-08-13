@@ -1,10 +1,9 @@
 package dev.mayankmkh.basekmpproject.convention.quality
 
-import com.android.build.api.dsl.CommonExtension
 import com.diffplug.gradle.spotless.SpotlessExtension
+import dev.detekt.gradle.Detekt
+import dev.detekt.gradle.extensions.DetektExtension
 import dev.mayankmkh.basekmpproject.libs
-import io.gitlab.arturbosch.detekt.Detekt
-import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.apply
@@ -17,7 +16,7 @@ class BkpQualityStylePlugin : Plugin<Project> {
         if (target.parent == null) return
         with(target) {
             apply(plugin = "com.diffplug.spotless")
-            apply(plugin = "io.gitlab.arturbosch.detekt")
+            apply(plugin = "dev.detekt")
 
             extensions.configure<SpotlessExtension> {
                 kotlin {
@@ -27,21 +26,13 @@ class BkpQualityStylePlugin : Plugin<Project> {
                 }
             }
             extensions.configure<DetektExtension> {
+                // detekt 2.x's extension is a Property-based interface, not a POJO.
                 config.setFrom(rootProject.file("config/detekt/detekt.yml"))
-                buildUponDefaultConfig = true
-                ignoredBuildTypes = listOf("release")
-            }
-            // detekt 1.x creates its per-variant Android tasks through AGP's legacy variant API,
-            // which AGP 9 removed. On pure-Android modules only the default `detekt` task is left,
-            // and it would only see detekt's own `src/{main,test}/{java,kotlin}` defaults — so feed
-            // it AGP's source sets instead. Drop this once detekt 2.x (AGP 9 aware) is available.
-            pluginManager.withPlugin("com.android.base") {
-                val androidSourceSets = (extensions.getByName("android") as CommonExtension).sourceSets
-                extensions.configure<DetektExtension> {
-                    source.setFrom(
-                        androidSourceSets.flatMap { it.java.directories + it.kotlin.directories },
-                    )
-                }
+                buildUponDefaultConfig.set(true)
+                // Currently a no-op in 2.0.0-alpha.6 -- the release variant tasks are registered
+                // either way (verified by swapping this for "debug": the task list is identical).
+                // Kept so the intent survives until detekt honours it again.
+                ignoredBuildTypes.set(listOf("release"))
             }
             tasks.withType<Detekt>().configureEach {
                 exclude {

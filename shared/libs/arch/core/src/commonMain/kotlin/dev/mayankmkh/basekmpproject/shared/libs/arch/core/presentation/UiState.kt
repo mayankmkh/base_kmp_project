@@ -9,14 +9,14 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.mapLatest
 
-sealed class UiState<out T> {
-    data object Initial : UiState<Nothing>()
+sealed interface UiState<out T> {
+    data object Initial : UiState<Nothing>
 
-    data object InProgress : UiState<Nothing>()
+    data object InProgress : UiState<Nothing>
 
-    data class Success<out T>(val data: T) : UiState<T>()
+    data class Success<out T>(val data: T) : UiState<T>
 
-    data class Failure(val error: Throwable) : UiState<Nothing>()
+    data class Failure(val error: Throwable) : UiState<Nothing>
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

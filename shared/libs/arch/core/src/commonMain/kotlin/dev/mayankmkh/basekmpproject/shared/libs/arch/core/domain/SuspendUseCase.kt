@@ -52,7 +52,10 @@ internal constructor(
     }
 
     private fun onFailure(throwable: Throwable) {
-        failureListener.onFailure(throwable, tag = this::class.simpleName!!) { "onFailure" }
+        // `simpleName` is only null for anonymous objects, which a use case never is.
+        failureListener.onFailure(throwable, tag = this::class.simpleName ?: "UseCase") {
+            "onFailure"
+        }
     }
 
     open suspend fun executeWith(parameter: P): Result<R, E> = Ok(execute(parameter))

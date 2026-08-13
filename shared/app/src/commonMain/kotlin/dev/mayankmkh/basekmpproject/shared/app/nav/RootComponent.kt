@@ -23,10 +23,10 @@ interface RootComponent {
     fun onBackClicked(toIndex: Int)
 
     // Defines all possible child components
-    sealed class Child {
-        class ListChild(val component: ListComponent) : Child()
+    sealed interface Child {
+        class ListChild(val component: ListComponent) : Child
 
-        class DetailsChild(val component: DetailsComponent) : Child()
+        class DetailsChild(val component: DetailsComponent) : Child
     }
 }
 

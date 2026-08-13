@@ -39,7 +39,12 @@ kotlin {
             export(libs.essenty.lifecycle)
         }
 
-        podfile = rootProject.file(bkpModule.cocoapods.podfilePath.get())
+        // `isolated.rootProject` resolves the path without reaching into the root project's model,
+        // which project isolation forbids.
+        podfile =
+            isolated.rootProject.projectDirectory
+                .file(bkpModule.cocoapods.podfilePath.get())
+                .asFile
     }
 
     sourceSets {

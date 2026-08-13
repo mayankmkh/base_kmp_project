@@ -4,13 +4,13 @@ import org.gradle.kotlin.dsl.configure
 
 plugins {
     alias(libs.plugins.bkp.android.app.compose)
-//    alias(libs.plugins.bkp.android.app.firebase)
+    //    alias(libs.plugins.bkp.android.app.firebase)
     alias(libs.plugins.kotlin.serialization)
 }
 
 extensions.configure<BkpModuleExtension> {
     features.flavorsDemoProd.set(true)
-//    features.firebase.set(true)
+    //    features.firebase.set(true)
 }
 
 android {
@@ -31,7 +31,10 @@ android {
         release {
             isMinifyEnabled = true
             applicationIdSuffix = BkpBuildType.RELEASE.applicationIdSuffix
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             // To publish on the Play store a private signing key is required, but to allow anyone
             // who clones the code to sign and run the release variant, use the debug signing key.
             // TODO: Abstract the signing configuration to a separate file to avoid hardcoding this.

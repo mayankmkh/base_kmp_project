@@ -42,9 +42,7 @@ kotlin {
         // `isolated.rootProject` resolves the path without reaching into the root project's model,
         // which project isolation forbids.
         podfile =
-            isolated.rootProject.projectDirectory
-                .file(bkpModule.cocoapods.podfilePath.get())
-                .asFile
+            isolated.rootProject.projectDirectory.file(bkpModule.cocoapods.podfilePath.get()).asFile
     }
 
     sourceSets {

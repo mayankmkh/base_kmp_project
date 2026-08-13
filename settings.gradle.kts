@@ -1,4 +1,5 @@
 rootProject.name = "base_kmp_project"
+
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
@@ -33,21 +34,26 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-include(":desktopApp")
-include(":androidapp")
-include(":shared:app")
-include(":shared:features:list")
-include(":shared:features:details")
-include(":shared:libs:coroutines-x")
-include(":shared:libs:arch:core")
-include(":shared:libs:networking")
-include(":shared:libs:prefs")
-include(":shared:libs:designsystem")
+// One vararg call rather than ten statements: ktfmt inserts a blank line between consecutive
+// top-level calls, which turns the module list into a page of scrolling.
+include(
+    ":desktopApp",
+    ":androidapp",
+    ":shared:app",
+    ":shared:features:list",
+    ":shared:features:details",
+    ":shared:libs:coroutines-x",
+    ":shared:libs:arch:core",
+    ":shared:libs:networking",
+    ":shared:libs:prefs",
+    ":shared:libs:designsystem",
+)
 
 check(JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)) {
     """
     Now in Android requires JDK 17+ but it is currently using JDK ${JavaVersion.current()}.
     Java Home: [${System.getProperty("java.home")}]
     https://developer.android.com/build/jdks#jdk-config-in-studio
-    """.trimIndent()
+    """
+        .trimIndent()
 }

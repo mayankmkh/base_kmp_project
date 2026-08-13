@@ -28,7 +28,9 @@ plugins {
     alias(libs.plugins.bkp.kmp.feature) apply false
     alias(libs.plugins.bkp.kmp.feature.compose) apply false
     alias(libs.plugins.bkp.desktop.app) apply false
-    alias(libs.plugins.bkp.quality.style) apply false
+    // Applied, not just declared: the root has no sources, but it owns `build.gradle.kts` and
+    // `settings.gradle.kts`, and the plugin skips its detekt half for the root project.
+    alias(libs.plugins.bkp.quality.style)
     alias(libs.plugins.bkp.quality.lint) apply false
     alias(libs.plugins.bkp.validation.graph) apply false
 }

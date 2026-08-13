@@ -13,18 +13,28 @@ import org.gradle.kotlin.dsl.withType
 
 class BkpQualityStylePlugin : Plugin<Project> {
     override fun apply(target: Project) {
-        if (target.parent == null) return
         with(target) {
             apply(plugin = "com.diffplug.spotless")
-            apply(plugin = "dev.detekt")
 
             extensions.configure<SpotlessExtension> {
+                // Spotless cannot auto-detect Android or KMP source layouts, so the target is
+                // explicit. `src/**` rather than `src/*/kotlin/**`: `androidapp` keeps its Kotlin
+                // under `src/main/java`, which a kotlin-only glob skips without saying so.
                 kotlin {
-                    target("src/*/kotlin/**/*.kt")
-                    targetExclude("build/**/*.kt")
-                    ktfmt().kotlinlangStyle()
+                    target("src/**/*.kt")
+                    targetExclude("**/build/**")
+                    ktfmt(KTFMT_VERSION).kotlinlangStyle()
+                }
+                // Build scripts were formatted by nothing before this block.
+                kotlinGradle {
+                    ktfmt(KTFMT_VERSION).kotlinlangStyle()
                 }
             }
+
+            // The root project has build scripts worth formatting but no sources to analyse.
+            if (parent == null) return
+
+            apply(plugin = "dev.detekt")
             extensions.configure<DetektExtension> {
                 // detekt 2.x's extension is a Property-based interface, not a POJO.
                 // `isolated.rootProject` reads the root's directory without touching its mutable
@@ -56,5 +66,11 @@ class BkpQualityStylePlugin : Plugin<Project> {
                 dependsOn(detektAll)
             }
         }
+    }
+
+    private companion object {
+        // Pinned deliberately: spotless bundles a default ktfmt, so leaving it implicit means a
+        // spotless upgrade reformats the whole repo as a side effect of a version bump.
+        const val KTFMT_VERSION = "0.63"
     }
 }

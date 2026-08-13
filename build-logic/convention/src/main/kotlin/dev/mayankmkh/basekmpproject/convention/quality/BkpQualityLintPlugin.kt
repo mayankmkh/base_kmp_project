@@ -3,7 +3,7 @@ package dev.mayankmkh.basekmpproject.convention.quality
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.dsl.LibraryExtension
 import com.android.build.api.dsl.Lint
-import com.android.build.gradle.TestExtension
+import com.android.build.api.dsl.TestExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.apply
@@ -32,8 +32,7 @@ class BkpQualityLintPlugin : Plugin<Project> {
 }
 
 private fun Lint.configureLint() {
-    xmlReport = true
-    sarifReport = true
+    // `xmlReport`/`sarifReport` are gone in AGP 9 — lint reports are now always generated.
     checkDependencies = true
     disable += "GradleDependency"
 }

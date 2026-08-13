@@ -1,7 +1,7 @@
 package dev.mayankmkh.basekmpproject.convention.module
 
+import com.android.build.api.dsl.LibraryExtension
 import com.android.build.api.variant.LibraryAndroidComponentsExtension
-import com.android.build.gradle.LibraryExtension
 import dev.mayankmkh.basekmpproject.configureKotlinAndroid
 import dev.mayankmkh.basekmpproject.configurePrintApksTask
 import dev.mayankmkh.basekmpproject.convention.core.androidSdkConfig
@@ -17,8 +17,8 @@ import org.gradle.kotlin.dsl.get
 class BkpAndroidLibPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
+            // AGP 9 has built-in Kotlin support; `org.jetbrains.kotlin.android` must not be applied.
             apply(plugin = "com.android.library")
-            apply(plugin = "org.jetbrains.kotlin.android")
             apply(plugin = "bkp.quality.style")
             apply(plugin = "bkp.quality.lint")
             apply(plugin = "bkp.validation.graph")
@@ -26,7 +26,9 @@ class BkpAndroidLibPlugin : Plugin<Project> {
             val sdk = androidSdkConfig()
             extensions.configure<LibraryExtension> {
                 configureKotlinAndroid(this)
-                defaultConfig.targetSdk = sdk.targetSdk
+                // AGP 9 removed `targetSdk` from the library `defaultConfig`; for libraries it only
+                // ever affected tests and lint, and now lives on `testOptions`.
+                testOptions.targetSdk = sdk.targetSdk
                 defaultConfig.testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
                 testOptions.animationsDisabled = true
                 namespace = "dev.mayankmkh.basekmpproject" + project.path.replace(':', '.').replace('-', '.')

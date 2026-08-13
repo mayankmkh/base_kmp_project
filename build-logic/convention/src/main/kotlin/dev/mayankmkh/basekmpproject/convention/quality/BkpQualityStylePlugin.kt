@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.convention.quality
 
+import com.android.build.api.dsl.CommonExtension
 import com.diffplug.gradle.spotless.SpotlessExtension
 import dev.mayankmkh.basekmpproject.libs
 import io.gitlab.arturbosch.detekt.Detekt
@@ -29,6 +30,18 @@ class BkpQualityStylePlugin : Plugin<Project> {
                 config.setFrom(rootProject.file("config/detekt/detekt.yml"))
                 buildUponDefaultConfig = true
                 ignoredBuildTypes = listOf("release")
+            }
+            // detekt 1.x creates its per-variant Android tasks through AGP's legacy variant API,
+            // which AGP 9 removed. On pure-Android modules only the default `detekt` task is left,
+            // and it would only see detekt's own `src/{main,test}/{java,kotlin}` defaults — so feed
+            // it AGP's source sets instead. Drop this once detekt 2.x (AGP 9 aware) is available.
+            pluginManager.withPlugin("com.android.base") {
+                val androidSourceSets = (extensions.getByName("android") as CommonExtension).sourceSets
+                extensions.configure<DetektExtension> {
+                    source.setFrom(
+                        androidSourceSets.flatMap { it.java.directories + it.kotlin.directories },
+                    )
+                }
             }
             tasks.withType<Detekt>().configureEach {
                 exclude {

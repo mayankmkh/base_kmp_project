@@ -27,28 +27,27 @@ import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 /**
  * Configure base Kotlin with Android options
  */
 internal fun Project.configureKotlinAndroid(
-    commonExtension: CommonExtension<*, *, *, *, *, *>,
+    commonExtension: CommonExtension,
 ) {
+    // AGP 9's `CommonExtension` is no longer generic and only exposes getters — the block DSL
+    // (`defaultConfig { }`, `compileOptions { }`) lives on the concrete extension types, so the
+    // shared helper configures the nested objects through property access instead.
     commonExtension.apply {
         compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
 
-        defaultConfig {
-            minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
-        }
+        defaultConfig.minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
 
-        compileOptions {
-            // Up to Java 11 APIs are available through desugaring
-            // https://developer.android.com/studio/write/java11-minimal-support-table
-            sourceCompatibility = JavaVersion.VERSION_11
-            targetCompatibility = JavaVersion.VERSION_11
-            isCoreLibraryDesugaringEnabled = true
-        }
+        // Up to Java 11 APIs are available through desugaring
+        // https://developer.android.com/studio/write/java11-minimal-support-table
+        compileOptions.sourceCompatibility = JavaVersion.VERSION_11
+        compileOptions.targetCompatibility = JavaVersion.VERSION_11
+        compileOptions.isCoreLibraryDesugaringEnabled = true
     }
 
     configureKotlin()
@@ -112,7 +111,9 @@ private fun Project.configureKotlin() {
         it.toBoolean()
     }.orElse(false)
 
-    tasks.withType<KotlinCompile>().configureEach {
+    // `KotlinJvmCompile` is the interface implemented both by KGP's own `KotlinCompile` tasks
+    // (KMP jvm/android compilations) and by the tasks AGP 9 registers for built-in Kotlin.
+    tasks.withType<KotlinJvmCompile>().configureEach {
         compilerOptions {
             jvmTarget = JvmTarget.JVM_11
             allWarningsAsErrors = warningsAsErrors

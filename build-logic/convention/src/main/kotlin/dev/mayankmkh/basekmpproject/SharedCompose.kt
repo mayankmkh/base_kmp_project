@@ -27,24 +27,18 @@ import org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginE
  * Configure Compose-specific options
  */
 internal fun Project.configureAndroidCompose(
-    commonExtension: CommonExtension<*, *, *, *, *, *>
+    commonExtension: CommonExtension
 ) {
-    commonExtension.apply {
-        buildFeatures {
-            compose = true
-        }
+    // AGP 9's `CommonExtension` is no longer generic and only exposes getters — the block DSL
+    // lives on the concrete extension types, so configure the nested objects via property access.
+    commonExtension.buildFeatures.compose = true
 
-        dependencies {
-            "implementation"(libs.findBundle("compose.android.main").get())
-            "debugImplementation"(libs.findLibrary("compose.ui.tooling").get())
-        }
+    // For Robolectric
+    commonExtension.testOptions.unitTests.isIncludeAndroidResources = true
 
-        testOptions {
-            unitTests {
-                // For Robolectric
-                isIncludeAndroidResources = true
-            }
-        }
+    dependencies {
+        "implementation"(libs.findBundle("compose.android.main").get())
+        "debugImplementation"(libs.findLibrary("compose.ui.tooling").get())
     }
 
     configureComposeCompiler()

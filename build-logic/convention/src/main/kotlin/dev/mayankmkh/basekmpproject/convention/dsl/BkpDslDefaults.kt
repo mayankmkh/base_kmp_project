@@ -16,10 +16,5 @@ internal fun Project.bkpModuleExtension(): BkpModuleExtension {
 
         features.flavorsDemoProd.convention(false)
         features.firebase.convention(false)
-        features.cocoapods.convention(false)
-
-        cocoapods.frameworkBaseName.convention("SharedApp")
-        cocoapods.iosDeploymentTarget.convention("16.0")
-        cocoapods.podfilePath.convention("iosApp/Podfile")
     }
 }

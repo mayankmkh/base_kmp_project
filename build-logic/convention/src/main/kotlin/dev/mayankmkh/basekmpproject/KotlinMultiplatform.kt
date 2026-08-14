@@ -124,6 +124,10 @@ internal fun Project.configureKotlinMultiplatformAndroidLibrary(
         // KMP Android resources are opt-in in AGP.
         androidResources.enable = true
         enableCoreLibraryDesugaring = true
+
+        // Host tests are opt-in too, and without them `commonTest` has no Android compilation at
+        // all -- shared tests would run on jvm and ios but silently skip the Android target.
+        withHostTest { isIncludeAndroidResources = true }
     }
 
     configureKotlin()

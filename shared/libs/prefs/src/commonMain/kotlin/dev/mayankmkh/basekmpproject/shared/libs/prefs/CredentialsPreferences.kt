@@ -1,28 +1,24 @@
 package dev.mayankmkh.basekmpproject.shared.libs.prefs
 
-import com.russhwolf.settings.ExperimentalSettingsApi
-import com.russhwolf.settings.ExperimentalSettingsImplementation
-import com.russhwolf.settings.coroutines.FlowSettings
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import kotlinx.coroutines.flow.Flow
 
-@OptIn(ExperimentalSettingsApi::class, ExperimentalSettingsImplementation::class)
-class CredentialsPreferences private constructor(private val settings: FlowSettings) {
+class CredentialsPreferences private constructor(private val dataStore: DataStore<Preferences>) {
 
-    constructor(
-        prefContext: PrefContext
-    ) : this(createDataStoreSettings(prefContext, PrefFile.CREDENTIALS))
+    constructor(prefContext: PrefContext) : this(createDataStore(prefContext, PrefFile.CREDENTIALS))
 
-    suspend fun getAuthToken(): String? = settings.getStringOrNull(Keys.AUTH_TOKEN.key)
+    suspend fun getAuthToken(): String? = dataStore.getStringOrNull(Keys.AUTH_TOKEN)
 
-    suspend fun setAuthToken(token: String) = settings.putString(Keys.AUTH_TOKEN.key, token)
+    suspend fun setAuthToken(token: String) = dataStore.putString(Keys.AUTH_TOKEN, token)
 
-    suspend fun removeAuthToken() = settings.remove(Keys.AUTH_TOKEN.key)
+    suspend fun removeAuthToken() = dataStore.remove(Keys.AUTH_TOKEN)
 
-    suspend fun hasAuthToken() = settings.hasKey(Keys.AUTH_TOKEN.key)
+    suspend fun hasAuthToken() = dataStore.hasKey(Keys.AUTH_TOKEN)
 
     private enum class Keys(override val key: String) : PrefKey {
         AUTH_TOKEN("token")
     }
 
-    fun getAuthTokenFlowable(): Flow<String?> = settings.getStringOrNullFlow(Keys.AUTH_TOKEN.key)
+    fun getAuthTokenFlowable(): Flow<String?> = dataStore.getStringOrNullFlow(Keys.AUTH_TOKEN)
 }

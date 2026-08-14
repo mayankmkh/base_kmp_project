@@ -4,19 +4,10 @@ plugins {
     alias(libs.plugins.bkp.desktop.app)
 }
 
-kotlin {
-    sourceSets {
-        val desktopMain = getByName("desktopMain")
-
-        commonMain.dependencies {
-            implementation(projects.shared.app)
-        }
-
-        desktopMain.dependencies {
-            implementation(compose.desktop.currentOs)
-            implementation(libs.kotlinx.coroutinesSwing)
-        }
-    }
+dependencies {
+    implementation(projects.shared.app)
+    implementation(compose.desktop.currentOs)
+    implementation(libs.kotlinx.coroutinesSwing)
 }
 
 compose.desktop {
@@ -30,7 +21,7 @@ compose.desktop {
         }
 
         buildTypes.release.proguard {
-            this.configurationFiles.from(file("src/desktopMain/proguard-rules.pro"))
+            this.configurationFiles.from(file("src/main/proguard-rules.pro"))
         }
     }
 }

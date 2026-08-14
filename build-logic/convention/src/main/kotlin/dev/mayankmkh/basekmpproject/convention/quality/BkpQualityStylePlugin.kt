@@ -20,13 +20,20 @@ class BkpQualityStylePlugin : Plugin<Project> {
                 // Spotless cannot auto-detect Android or KMP source layouts, so the target is
                 // explicit. `src/**` rather than `src/*/kotlin/**`: `androidapp` keeps its Kotlin
                 // under `src/main/java`, which a kotlin-only glob skips without saying so.
+                // `**/build` matches the directory, so Gradle *prunes* it while walking.
+                // `**/build/**` matches only files inside it, which filters the results but still
+                // descends -- and that walk races with whatever is writing to a sibling module's
+                // `build/` under `org.gradle.parallel`, failing with "Could not read path".
+                val generatedOutput = "**/build"
+
                 kotlin {
                     target("src/**/*.kt")
-                    targetExclude("**/build/**")
+                    targetExclude(generatedOutput)
                     ktfmt(KTFMT_VERSION).kotlinlangStyle()
                 }
                 // Build scripts were formatted by nothing before this block.
                 kotlinGradle {
+                    targetExclude(generatedOutput)
                     ktfmt(KTFMT_VERSION).kotlinlangStyle()
                 }
             }

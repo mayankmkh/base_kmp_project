@@ -1,48 +1,20 @@
-import dev.mayankmkh.basekmpproject.convention.dsl.BkpModuleExtension
-import org.gradle.kotlin.dsl.configure
-import org.gradle.kotlin.dsl.getByType
-
 plugins {
     alias(libs.plugins.bkp.kmp.feature.compose)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.kotlinCocoapods)
 }
-
-extensions.configure<BkpModuleExtension> {
-    features.cocoapods.set(true)
-    cocoapods.frameworkBaseName.set("SharedApp")
-    cocoapods.iosDeploymentTarget.set("16.0")
-    cocoapods.podfilePath.set("iosApp/Podfile")
-}
-
-val bkpModule = extensions.getByType<BkpModuleExtension>()
 
 kotlin {
-    cocoapods {
-        // Required properties
-        // Specify the required Pod version here. Otherwise, the Gradle project version is used.
-        version = "1.0"
-        summary = "Some description for a Kotlin/Native module"
-        homepage = "Link to a Kotlin/Native module homepage"
-        ios.deploymentTarget = bkpModule.cocoapods.iosDeploymentTarget.get()
-
-        // Optional properties
-        // Configure the Pod name here instead of changing the Gradle project name
-        name = bkpModule.cocoapods.frameworkBaseName.get()
-
-        framework {
-            // Required properties
-            // Framework name configuration. Use this property instead of deprecated 'frameworkName'
-            baseName = bkpModule.cocoapods.frameworkBaseName.get()
+    // The iOS targets themselves are registered by the convention plugin; this only adds the
+    // framework binary Xcode consumes. Static because the app links it directly via
+    // `embedAndSignAppleFrameworkForXcode`.
+    listOf(iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "SharedApp"
+            isStatic = true
 
             export(libs.decompose.decompose)
             export(libs.essenty.lifecycle)
         }
-
-        // `isolated.rootProject` resolves the path without reaching into the root project's model,
-        // which project isolation forbids.
-        podfile =
-            isolated.rootProject.projectDirectory.file(bkpModule.cocoapods.podfilePath.get()).asFile
     }
 
     sourceSets {

@@ -26,7 +26,6 @@ class BkpKmpLibPlugin : Plugin<Project> {
                 targets.android.convention(true)
                 targets.jvm.convention(true)
                 targets.ios.convention(true)
-                features.cocoapods.convention(false)
             }
 
             extensions.configure<KotlinMultiplatformExtension> {

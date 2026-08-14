@@ -75,14 +75,6 @@ class BkpValidationGraphPlugin : Plugin<Project> {
             )
         }
 
-        if (!isKmpPrimary && extension.features.cocoapods.get()) {
-            throw GradleException("${project.path}: cocoapods feature is only supported for bkp.kmp* plugins")
-        }
-        if (isKmpPrimary && extension.features.cocoapods.get() &&
-            !project.pluginManager.hasPlugin("org.jetbrains.kotlin.native.cocoapods")
-        ) {
-            throw GradleException("${project.path}: cocoapods feature is enabled but Kotlin Cocoapods plugin is not applied")
-        }
         if (isKmpPrimary &&
             (!extension.targets.android.get() || !extension.targets.jvm.get() || !extension.targets.ios.get())
         ) {

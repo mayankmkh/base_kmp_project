@@ -1,6 +1,7 @@
 package dev.mayankmkh.basekmpproject.shared.features.details.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -54,12 +55,14 @@ fun DetailsContent(component: DetailsComponent, modifier: Modifier = Modifier) {
             )
         },
     ) { paddingValues ->
-        Box(Modifier.padding(paddingValues).fillMaxSize()) {
+        Box(Modifier.fillMaxSize()) {
             when (val viewState = uiState) {
-                UiState.Initial -> Initial()
-                UiState.InProgress -> InProgress()
-                is UiState.Success -> Success(viewState.data)
-                is UiState.Failure -> Failure(viewState.error)
+                UiState.Initial -> Initial(Modifier.padding(paddingValues))
+                UiState.InProgress -> InProgress(Modifier.padding(paddingValues))
+                // The scrolling text gets the insets as content padding rather than as a margin,
+                // so it passes under the system bars instead of stopping at them.
+                is UiState.Success -> Success(viewState.data, contentPadding = paddingValues)
+                is UiState.Failure -> Failure(viewState.error, Modifier.padding(paddingValues))
             }
         }
     }
@@ -73,11 +76,20 @@ private fun InProgress(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun Success(item: Item, modifier: Modifier = Modifier) {
+private fun Success(
+    item: Item,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(),
+) {
     Text(
         text = item.text,
+        // Both paddings sit inside `verticalScroll`, so they scroll with the text.
         modifier =
-            modifier.fillMaxWidth().verticalScroll(state = rememberScrollState()).padding(16.dp),
+            modifier
+                .fillMaxWidth()
+                .verticalScroll(state = rememberScrollState())
+                .padding(contentPadding)
+                .padding(16.dp),
     )
 }
 

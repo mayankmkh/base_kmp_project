@@ -2,6 +2,7 @@ package dev.mayankmkh.basekmpproject.shared.features.list.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -32,13 +33,19 @@ fun ListContent(component: ListComponent, modifier: Modifier = Modifier) {
         modifier = modifier,
         topBar = { TopAppBar(title = { Text(text = "Decompose-Dagger Sample") }) },
     ) { paddingValues ->
-        Box(Modifier.padding(paddingValues).fillMaxSize()) {
+        Box(Modifier.fillMaxSize()) {
             when (val viewState = uiState) {
-                UiState.Initial -> Initial()
-                UiState.InProgress -> InProgress()
+                UiState.Initial -> Initial(Modifier.padding(paddingValues))
+                UiState.InProgress -> InProgress(Modifier.padding(paddingValues))
+                // The list gets the insets as content padding rather than as a margin, so its
+                // items scroll under the system bars instead of stopping at them.
                 is UiState.Success ->
-                    Success(viewState.data, onItemClick = viewModel::onItemClicked)
-                is UiState.Failure -> Failure(viewState.error)
+                    Success(
+                        viewState.data,
+                        onItemClick = viewModel::onItemClicked,
+                        contentPadding = paddingValues,
+                    )
+                is UiState.Failure -> Failure(viewState.error, Modifier.padding(paddingValues))
             }
         }
     }
@@ -56,8 +63,9 @@ private fun Success(
     itemsModel: ItemsModel,
     onItemClick: (id: String) -> Unit,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(),
 ) {
-    LazyColumn(modifier = modifier) {
+    LazyColumn(modifier = modifier, contentPadding = contentPadding) {
         items(itemsModel.items) { item ->
             Text(
                 text = item.title,

@@ -1,0 +1,7 @@
+// Everything a fork needs to change lives here, so the Xcode project itself stays untouched.
+// TEAM_ID is your Apple Developer Team ID; leave it empty to build for the simulator only.
+TEAM_ID=
+PRODUCT_NAME=iosApp
+PRODUCT_BUNDLE_IDENTIFIER=dev.mayankmkh.baseKmpProject
+CURRENT_PROJECT_VERSION=1
+MARKETING_VERSION=1.0

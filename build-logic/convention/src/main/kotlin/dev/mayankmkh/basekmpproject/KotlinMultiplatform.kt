@@ -29,6 +29,7 @@ import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.findByType
 import org.gradle.kotlin.dsl.registerIfAbsent
 import org.gradle.kotlin.dsl.withType
+import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
@@ -182,10 +183,14 @@ private fun Project.configureKotlin() {
     // warnings (e.g. the `copy()` visibility one on `BaseUrls`) that the build does not.
     // `KotlinMultiplatformExtension.compilerOptions` is populated at configuration time and
     // propagates to every target, including the AGP-registered Android one.
+    //
+    // `extraWarnings` rides along for the same reason: set on the tasks alone, the IDE would report
+    // fewer warnings than the build does.
     val kotlinMultiplatform = extensions.findByType<KotlinMultiplatformExtension>()
     if (kotlinMultiplatform != null) {
         kotlinMultiplatform.compilerOptions {
             freeCompilerArgs.addAll(COMMON_FREE_COMPILER_ARGS)
+            extraWarnings = true
         }
     } else {
         // Pure-Android/JVM modules run on AGP 9's built-in Kotlin and have no KGP extension to hang
@@ -193,6 +198,7 @@ private fun Project.configureKotlin() {
         tasks.withType<KotlinCompilationTask<*>>().configureEach {
             compilerOptions {
                 freeCompilerArgs.addAll(COMMON_FREE_COMPILER_ARGS)
+                extraWarnings = true
             }
         }
     }
@@ -203,6 +209,10 @@ private fun Project.configureKotlin() {
     tasks.withType<KotlinJvmCompile>().configureEach {
         compilerOptions {
             jvmTarget = JvmTarget.JVM_11
+            // Nothing outside this build compiles against these modules, so the `DefaultImpls`
+            // classes the default mode emits for every interface with a default method are dead
+            // weight in the dex and the desktop jar. Only safe while nothing is published.
+            jvmDefault = JvmDefaultMode.NO_COMPATIBILITY
         }
     }
 }

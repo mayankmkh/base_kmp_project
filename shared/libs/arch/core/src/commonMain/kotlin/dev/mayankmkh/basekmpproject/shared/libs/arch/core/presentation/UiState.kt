@@ -28,7 +28,7 @@ fun <T> Result<T, Throwable>.toUiState(): UiState<T> =
     mapBoth(success = { UiState.Success(it) }, failure = { UiState.Failure(it) })
 
 @OptIn(ExperimentalContracts::class)
-public inline infix fun <T, U> UiState<T>.map(transform: (T) -> U): UiState<U> {
+inline infix fun <T, U> UiState<T>.map(transform: (T) -> U): UiState<U> {
     contract { callsInPlace(transform, InvocationKind.AT_MOST_ONCE) }
 
     return when (this) {

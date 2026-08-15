@@ -17,6 +17,7 @@
 package dev.mayankmkh.basekmpproject
 
 import com.android.build.api.dsl.CommonExtension
+import dev.mayankmkh.basekmpproject.convention.dsl.bkpModuleExtension
 import org.gradle.api.Project
 import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.configure
@@ -49,6 +50,16 @@ internal fun Project.configureKMPCompose(
 
     dependencies {
         "commonMainImplementation"(libs.findBundle("compose.common.main").get())
+    }
+
+    if (bkpModuleExtension().targets.android.get()) {
+        dependencies {
+            // The bundle carries `ui-tooling-preview`, the `@Preview` annotation itself; this is the
+            // renderer that draws those previews in the IDE. A KMP module puts it on
+            // `androidRuntimeClasspath` where a pure-Android module would use `debugImplementation`
+            // -- the KMP Android target has no build types to hang a `debug` configuration off.
+            "androidRuntimeClasspath"(libs.findLibrary("compose.ui.tooling").get())
+        }
     }
 
     configureComposeCompiler()

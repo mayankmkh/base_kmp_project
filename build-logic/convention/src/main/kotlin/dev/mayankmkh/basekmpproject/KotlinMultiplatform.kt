@@ -128,6 +128,13 @@ internal fun Project.configureKotlinMultiplatformAndroidLibrary(
         // Host tests are opt-in too, and without them `commonTest` has no Android compilation at
         // all -- shared tests would run on jvm and ios but silently skip the Android target.
         withHostTest { isIncludeAndroidResources = true }
+
+        // Device tests are opt-in as well. No shared module has instrumented tests today, but
+        // without this an `src/androidDeviceTest` directory added later is simply never compiled --
+        // no source set, no task, no error. `sourceSetTreeName = "test"` is what puts it under the
+        // same `commonTest` tree as the host tests.
+        withDeviceTestBuilder { sourceSetTreeName = "test" }
+            .configure { instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     }
 
     configureKotlin()

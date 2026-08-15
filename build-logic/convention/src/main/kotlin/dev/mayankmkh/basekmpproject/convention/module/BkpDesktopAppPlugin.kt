@@ -2,9 +2,11 @@ package dev.mayankmkh.basekmpproject.convention.module
 
 import dev.mayankmkh.basekmpproject.configureKotlinJvm
 import dev.mayankmkh.basekmpproject.convention.dsl.bkpModuleExtension
+import dev.mayankmkh.basekmpproject.libs
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.apply
+import org.gradle.kotlin.dsl.dependencies
 
 class BkpDesktopAppPlugin : Plugin<Project> {
     override fun apply(target: Project) {
@@ -26,6 +28,13 @@ class BkpDesktopAppPlugin : Plugin<Project> {
             }
 
             configureKotlinJvm()
+
+            dependencies {
+                // The Compose plugins above only bring the compiler; without this a `@Preview` in
+                // the desktop entry point does not resolve. The renderer (`ui-tooling`) is not
+                // needed -- desktop previews render in the IDE from the annotation alone.
+                "implementation"(libs.findLibrary("compose.ui.tooling.preview").get())
+            }
         }
     }
 }

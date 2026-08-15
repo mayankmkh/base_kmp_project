@@ -1,6 +1,4 @@
 import dev.mayankmkh.basekmpproject.BkpBuildType
-import dev.mayankmkh.basekmpproject.convention.dsl.BkpModuleExtension
-import org.gradle.kotlin.dsl.configure
 
 plugins {
     alias(libs.plugins.bkp.android.app.compose)
@@ -8,9 +6,8 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-extensions.configure<BkpModuleExtension> {
+bkpModule {
     features.flavorsDemoProd.set(true)
-    //    features.firebase.set(true)
 }
 
 android {

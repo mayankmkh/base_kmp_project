@@ -1,6 +1,7 @@
 package dev.mayankmkh.basekmpproject.convention.quality
 
 import com.diffplug.gradle.spotless.SpotlessExtension
+import com.diffplug.spotless.LineEnding
 import dev.detekt.gradle.Detekt
 import dev.detekt.gradle.extensions.DetektExtension
 import dev.mayankmkh.basekmpproject.libs
@@ -18,6 +19,18 @@ class BkpQualityStylePlugin : Plugin<Project> {
             apply(plugin = "com.diffplug.spotless")
 
             extensions.configure<SpotlessExtension> {
+                // Spotless defaults to GIT_ATTRIBUTES_FAST_ALLSAME, which resolves line endings at
+                // configuration time by locating a `git` binary on PATH and reading the system, user
+                // and repo git config plus every `.gitattributes` from the file up to the filesystem
+                // root. One of those reads is not stable across runs, and it took the whole
+                // configuration cache with it: `./gradlew build` reported "cannot be reused because
+                // an input to unknown location has changed" on every single run, including two
+                // identical invocations back to back -- diffplug/spotless#2431, still open. Pinning
+                // the policy removes the reads and the build reuses the cache. Nothing changes for
+                // this repo -- there is no `.gitattributes`, and no Kotlin or Gradle script here is
+                // anything but LF, which is what the git-backed policy already resolved to.
+                lineEndings = LineEnding.UNIX
+
                 // Spotless cannot auto-detect Android or KMP source layouts, so the target is
                 // explicit. `src/**` rather than `src/*/kotlin/**`: `androidApp` keeps its Kotlin
                 // under `src/main/java`, which a kotlin-only glob skips without saying so.

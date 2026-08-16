@@ -118,6 +118,7 @@ detekt-gradlePlugin = { group = "dev.detekt", name = "detekt-gradle-plugin", ver
 detekt-composeRules = { group = "io.nlopez.compose.rules", name = "detekt", version.ref = "detektComposeRules" }
 firebase-crashlytics-gradlePlugin = { group = "com.google.firebase", name = "firebase-crashlytics-gradle", version.ref = "firebaseCrashlyticsPlugin" }
 firebase-performance-gradlePlugin = { group = "com.google.firebase", name = "perf-plugin", version.ref = "firebasePerfPlugin" }
+gms-gradlePlugin = { group = "com.google.gms", name = "google-services", version.ref = "gmsPlugin" }
 jetbrains-compose-gradlePlugin = { group = "org.jetbrains.compose", name = "compose-gradle-plugin", version.ref = "composeMultiplatform" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 ksp-gradlePlugin = { group = "com.google.devtools.ksp", name = "com.google.devtools.ksp.gradle.plugin", version.ref = "ksp" }

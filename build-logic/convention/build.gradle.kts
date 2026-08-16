@@ -36,6 +36,12 @@ kotlin {
     }
 }
 
+// The convention plugins compile against AGP, KGP and the rest but never ship them -- a consuming
+// build brings its own. TestKit builds have no such build: `withPluginClasspath()` injects exactly
+// what is listed here, and a synthetic project applying `bkp.kmp.lib` needs KGP, AGP, Spotless,
+// detekt and lint on that classpath because the plugin applies all of them.
+val testPluginClasspath = configurations.create("testPluginClasspath")
+
 dependencies {
     compileOnly(libs.android.gradlePlugin)
     compileOnly(libs.android.tools.common)
@@ -50,12 +56,36 @@ dependencies {
     lintChecks(libs.androidx.lint.gradle)
     testImplementation(kotlin("test"))
     testImplementation(gradleTestKit())
+
+    testPluginClasspath(libs.android.gradlePlugin)
+    testPluginClasspath(libs.kotlin.gradlePlugin)
+    testPluginClasspath(libs.spotless.gradlePlugin)
+    testPluginClasspath(libs.detekt.gradlePlugin)
+    testPluginClasspath(libs.compose.gradlePlugin)
+    testPluginClasspath(libs.jetbrains.compose.gradlePlugin)
+    testPluginClasspath(libs.gms.gradlePlugin)
+    testPluginClasspath(libs.firebase.crashlytics.gradlePlugin)
+    testPluginClasspath(libs.firebase.performance.gradlePlugin)
 }
 
 tasks {
     validatePlugins {
         enableStricterValidation = true
         failOnWarning = true
+    }
+
+    pluginUnderTestMetadata {
+        pluginClasspath.from(testPluginClasspath)
+    }
+
+    test {
+        useJUnitPlatform()
+        // The synthetic projects apply the real version catalog rather than a stub, so a test fails
+        // when a plugin asks for a key the project does not actually have.
+        systemProperty(
+            "bkp.test.versionCatalog",
+            isolated.rootProject.projectDirectory.file("../gradle/libs.versions.toml").asFile.absolutePath,
+        )
     }
 }
 

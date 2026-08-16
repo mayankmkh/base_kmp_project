@@ -17,7 +17,8 @@
 package dev.mayankmkh.basekmpproject
 
 import com.android.build.api.dsl.CommonExtension
-import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryExtension
+import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
+import dev.mayankmkh.basekmpproject.convention.core.androidSdkConfig
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.api.plugins.JavaPluginExtension
@@ -104,21 +105,17 @@ internal fun Project.configureKotlinJvm() {
     configureKotlin()
 }
 
-internal fun Project.configureKotlinMultiplatform(kotlinMultiplatformExtension: KotlinMultiplatformExtension) {
-    kotlinMultiplatformExtension.apply {
-        iosArm64()
-        iosSimulatorArm64()
-        jvm()
-    }
-    configureKotlin()
-}
-
 internal fun Project.configureKotlinMultiplatformAndroidLibrary(
-    androidExtension: KotlinMultiplatformAndroidLibraryExtension,
+    kotlinMultiplatformExtension: KotlinMultiplatformExtension,
 ) {
-    androidExtension.apply {
-        compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
-        minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
+    val sdk = androidSdkConfig()
+
+    // The KMP Android plugin deliberately does not register a project-level extension: the target
+    // *is* the DSL object, so it is reached through the target container rather than by name.
+    // https://developer.android.com/kotlin/multiplatform/kmp-integration
+    kotlinMultiplatformExtension.targets.withType<KotlinMultiplatformAndroidLibraryTarget>().configureEach {
+        compileSdk = sdk.compileSdk
+        minSdk = sdk.minSdk
         namespace = "dev.mayankmkh.basekmpproject" + project.path.replace(':', '.').replace('-', '.')
 
         // KMP Android resources are opt-in in AGP.
@@ -134,7 +131,13 @@ internal fun Project.configureKotlinMultiplatformAndroidLibrary(
         // no source set, no task, no error. `sourceSetTreeName = "test"` is what puts it under the
         // same `commonTest` tree as the host tests.
         withDeviceTestBuilder { sourceSetTreeName = "test" }
-            .configure { instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+            .configure {
+                instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+                // `targetSdk` has no `defaultConfig` equivalent on a KMP Android library; the
+                // device test compilation is the only place it applies, and without it these
+                // modules silently drop off the catalog value the other primaries use.
+                targetSdk { version = release(sdk.targetSdk) }
+            }
     }
 
     configureKotlin()

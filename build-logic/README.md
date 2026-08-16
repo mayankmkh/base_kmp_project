@@ -161,5 +161,9 @@ Kotlin/Android test dependencies are configured by primary plugin type.
 - `bkp.android.lib` and `bkp.android.test` do not register `bkpModule`, so the DSL is unavailable
   in those modules and the validator's DSL checks short-circuit for them. The "one primary plugin"
   check still runs. Neither plugin has a consumer yet.
+- The KMP primaries call `withHostTest` and `withDeviceTestBuilder` eagerly, so that `commonTest`
+  gets an Android compilation instead of silently skipping the Android target. AGP creates those
+  compilations once, so a module cannot call either again to refine its own test settings — it
+  fails with an "already created" error. A per-module opt-out would go through `beforeVariants`.
 - There is no test coverage for any of the above.
 - There is no module generator; new modules are written by hand.

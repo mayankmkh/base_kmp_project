@@ -140,8 +140,6 @@ internal fun Project.configureKotlinMultiplatformAndroidLibrary(
             }
     }
 
-    configureKotlin()
-
     dependencies {
         "coreLibraryDesugaring"(libs.findLibrary("android.desugarJdkLibs").get())
     }
@@ -161,7 +159,7 @@ abstract class KotlinNativeLinkThrottle : BuildService<BuildServiceParameters.No
 /**
  * Configure base Kotlin options
  */
-private fun Project.configureKotlin() {
+internal fun Project.configureKotlin() {
     val nativeLinkThrottle =
         gradle.sharedServices.registerIfAbsent(
             "kotlinNativeLinkThrottle",

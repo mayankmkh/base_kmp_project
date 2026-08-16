@@ -10,10 +10,6 @@ internal fun Project.bkpModuleExtension(): BkpModuleExtension {
 
     return extensions.create<BkpModuleExtension>("bkpModule").apply {
         // Default safe/off unless a primary plugin overrides specific defaults.
-        targets.android.convention(false)
-        targets.jvm.convention(false)
-        targets.ios.convention(false)
-
         features.flavorsDemoProd.convention(false)
         features.firebase.convention(false)
     }

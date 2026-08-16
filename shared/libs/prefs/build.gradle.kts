@@ -4,6 +4,8 @@ plugins {
 }
 
 kotlin {
+    bkpTargets { default() }
+
     sourceSets {
         commonMain {
             dependencies {

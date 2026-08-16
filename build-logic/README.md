@@ -11,7 +11,7 @@ that publishes the convention plugins used by all modules. It reads the same
 ```
 convention/src/main/kotlin/dev/mayankmkh/basekmpproject/
 ├── convention/core/         catalog-backed config (BuildConfig) and shared dependency bundles
-├── convention/dsl/          the bkpModule extension and its defaults
+├── convention/dsl/          the bkpModule and bkpTargets extensions
 ├── convention/module/       the primary plugins
 ├── convention/quality/      Spotless + detekt (style), Android lint (lint)
 └── convention/validation/   plugin-graph and DSL legality checks
@@ -34,7 +34,7 @@ apply Spotless, detekt, lint, or the validator by hand.
 | Android app with Compose | `bkp.android.app.compose` | adds `bkp.android.app` |
 | Android library (non-KMP) | `bkp.android.lib` | no consumers today |
 | Android test module | `bkp.android.test` | |
-| KMP library (no feature bundle) | `bkp.kmp.lib` | Android + JVM + iOS |
+| KMP library (no feature bundle) | `bkp.kmp.lib` | targets chosen per module |
 | KMP library with Compose | `bkp.kmp.lib.compose` | adds `bkp.kmp.lib` |
 | KMP feature (with shared feature deps) | `bkp.kmp.feature` | `bkp.kmp.lib` + the feature bundle |
 | KMP feature with Compose | `bkp.kmp.feature.compose` | adds `bkp.kmp.feature` |
@@ -59,8 +59,8 @@ that:
   `android-targetSdk`). No plugin hardcodes them.
 - **`bkp.android.lib`** derives `namespace` from the Gradle project path, so library modules do not
   set it.
-- **KMP primaries** declare `iosArm64`, `iosSimulatorArm64`, `jvm()` and the AGP KMP Android
-  library target, and add `kotlin-test` to `commonTest`.
+- **KMP primaries** declare no targets at all — the module picks them with
+  [`kotlin { bkpTargets { … } }`](#target-selection) — and add `kotlin-test` to `commonTest`.
 - **Compose primaries** wire the Compose compiler, the shared Compose bundle, and the tooling
   renderer on the right configuration for the module type.
 - **AGP 9 has built-in Kotlin**, so `org.jetbrains.kotlin.android` is never applied.
@@ -82,9 +82,6 @@ bkpModule {
 
 | Property | Default | Valid on |
 |---|---|---|
-| `targets.android` | `true` on KMP primaries, `false` on `bkp.desktop.app` | `bkp.kmp.*` |
-| `targets.jvm` | `true` on KMP primaries and `bkp.desktop.app` | `bkp.kmp.*` |
-| `targets.ios` | `true` on KMP primaries, `false` on `bkp.desktop.app` | `bkp.kmp.*` |
 | `features.flavorsDemoProd` | `true` | `bkp.android.app*` |
 | `features.firebase` | `true` when `bkp.android.app.firebase` is applied, else `false` | `bkp.android.app*` |
 
@@ -96,17 +93,77 @@ late for DSL changes. Anything that needs the flavors to exist while the build s
 being evaluated (a `demoImplementation` dependency, a `productFlavors { }` block of its own) will
 not find them; no module does that today.
 
-**Target overrides do not work yet**, and `bkp.validation.graph` fails the build if a KMP module
-turns one off. The check guards a real ordering problem rather than merely an untested path: the
-KMP primaries read `targets.*` inside `apply()`, which runs *before* the module's `bkpModule` block
-is evaluated, so `targets.ios.set(false)` in a build script does not change which targets get
-declared. Dropping the check would silently ignore the override instead of honouring it.
-Implementing overrides means deferring target declaration until after the extension is configured.
-
 ### Firebase boundary
 
 - `bkpModule.features.firebase=true` requires applying `bkp.android.app.firebase`.
 - `bkp.android.app.firebase` is valid only with `bkp.android.app*` primary plugins.
+
+## Target selection
+
+KMP primaries create no targets. Every KMP module declares its own set, inside `kotlin { }`:
+
+```kotlin
+plugins {
+    alias(libs.plugins.bkp.kmp.lib)
+}
+
+kotlin {
+    bkpTargets { default() }
+}
+```
+
+| Selector | Creates |
+|---|---|
+| `default()` | `android()`, `jvm()`, `ios()` |
+| `android()` / `android { }` | applies `com.android.kotlin.multiplatform.library` and configures its target |
+| `jvm()` | the JVM target |
+| `ios()` / `ios { }` | `iosArm64` and `iosSimulatorArm64` as a family |
+| `web()` | nothing — fails, see below |
+
+`android { }` and `ios { }` take the created target as their receiver, which is where per-module
+target config goes:
+
+```kotlin
+kotlin {
+    bkpTargets {
+        android()
+        jvm()
+        ios {
+            binaries.framework { baseName = "SharedApp" }
+        }
+    }
+}
+```
+
+`android { }` exists because the module cannot use AGP's own `kotlin { android { } }` accessor.
+Applying the plugin *is* what creates the Android target, so it has to happen from the module's own
+declaration — and Gradle only generates type-safe accessors for plugins present in `plugins { }`
+before the script is compiled. Everything else about a late-applied AGP is fine: the full task graph
+is registered, and a source set declared before the target arrives is adopted rather than orphaned.
+
+Repeat calls are idempotent — KGP's target factories are configure-or-create — so `default()`
+followed by `android { }` refines the target rather than creating a second one.
+
+**Narrowing is a dependency-graph decision, not a local one.** A module's target set must still
+cover every platform its consumers need. `bkp.kmp.feature*` modules pull in four libraries via the
+[feature bundle](#featurebundle-used-by-bkpkmpfeature), and `:shared:app` feeds both `:androidApp`
+and `:desktopApp`, so narrowing works bottom-up through the dependency closure. Dropping a platform
+from an upstream library while a downstream module still targets it fails at resolution, not at
+declaration.
+
+`web()` is declared but always fails. `wasmJs { browser() }` breaks under project isolation because
+KGP's `WasmNpmResolverPlugin` applies `WasmNodeJsRootPlugin` to the *root* project. The selector
+exists so that the reason is at hand rather than discovered.
+
+### What validation can and cannot see
+
+`bkp.validation.graph` compares the module's final target set against what `bkpTargets` recorded,
+skipping KGP's automatic `metadata` target. It fails when a module declares nothing, and when a
+target exists that was never declared.
+
+It cannot flag a *redundant* direct call. KGP's factories are configure-or-create, so a build script
+calling `iosArm64()` on an already-declared target neither creates anything nor leaves a trace —
+it is indistinguishable from the declaration itself. Only the final set is observable.
 
 ## Validation lifecycle
 
@@ -129,8 +186,8 @@ The build fails when:
 - `flavorsDemoProd` or `firebase` is set outside a `bkp.android.app*` module
 - `bkp.android.app.firebase` is applied without a `bkp.android.app*` primary
 - `features.firebase` is enabled but `bkp.android.app.firebase` is not applied
-- a KMP module disables any of `targets.android` / `jvm` / `ios`
-- `targets.*` is set on a non-KMP, non-desktop primary
+- a KMP module declares no targets
+- a KMP module has a target that was created outside `bkpTargets { }`
 
 ## Quality plugins
 

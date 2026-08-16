@@ -1,10 +1,15 @@
 package dev.mayankmkh.basekmpproject.convention.validation
 
 import dev.mayankmkh.basekmpproject.convention.dsl.BkpModuleExtension
+import dev.mayankmkh.basekmpproject.convention.dsl.BkpTargets
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.plugins.ExtensionAware
 import org.gradle.kotlin.dsl.findByType
+import org.gradle.kotlin.dsl.getByType
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 class BkpValidationGraphPlugin : Plugin<Project> {
     override fun apply(target: Project) {
@@ -58,7 +63,6 @@ class BkpValidationGraphPlugin : Plugin<Project> {
         val primary = primaryPlugins.first()
         val isAndroidApp = primary.startsWith("bkp.android.app")
         val isKmpPrimary = primary.startsWith("bkp.kmp")
-        val isDesktopPrimary = primary == "bkp.desktop.app"
 
         if (!isAndroidApp && extension.features.flavorsDemoProd.get()) {
             throw GradleException("${project.path}: flavorsDemoProd is only supported for bkp.android.app* plugins")
@@ -75,18 +79,36 @@ class BkpValidationGraphPlugin : Plugin<Project> {
             )
         }
 
-        if (isKmpPrimary &&
-            (!extension.targets.android.get() || !extension.targets.jvm.get() || !extension.targets.ios.get())
-        ) {
+        if (isKmpPrimary) validateTargets(project)
+    }
+
+    /**
+     * Checks the module's final target set against what it declared in `kotlin { bkpTargets { } }`.
+     *
+     * Only the final set is observable. KGP's target factories are configure-or-create, so a build
+     * script calling `iosArm64()` on an already-declared target is indistinguishable from the
+     * declaration itself and cannot be flagged. What is caught is the case that matters: a target
+     * that exists without having been declared.
+     */
+    private fun validateTargets(project: Project) {
+        val kotlin = project.extensions.getByType<KotlinMultiplatformExtension>()
+        val declared = (kotlin as ExtensionAware).extensions.getByType<BkpTargets>().declaredTargetNames
+
+        if (declared.isEmpty()) {
             throw GradleException(
-                "${project.path}: target overrides are reserved for future implementation. Keep android/jvm/ios enabled."
+                "${project.path}: no targets declared. Add `kotlin { bkpTargets { default() } }` to the build script."
             )
         }
 
-        if (!isKmpPrimary && !isDesktopPrimary &&
-            (extension.targets.android.get() || extension.targets.jvm.get() || extension.targets.ios.get())
-        ) {
-            throw GradleException("${project.path}: targets.* overrides are only valid for bkp.kmp* plugins")
+        // KGP always registers a `metadata` target of its own; it is not a platform and is never
+        // declared, so comparing raw target names would reject every module.
+        val created = kotlin.targets.filterNot { it.platformType == KotlinPlatformType.common }.map { it.name }
+        val undeclared = created - declared
+        if (undeclared.isNotEmpty()) {
+            throw GradleException(
+                "${project.path}: ${undeclared.sorted().joinToString()} created outside " +
+                    "`kotlin { bkpTargets { } }`. Declare targets there instead."
+            )
         }
     }
 

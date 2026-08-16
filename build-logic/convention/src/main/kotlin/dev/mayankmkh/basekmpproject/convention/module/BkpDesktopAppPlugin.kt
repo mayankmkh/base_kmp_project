@@ -21,11 +21,7 @@ class BkpDesktopAppPlugin : Plugin<Project> {
             apply(plugin = "bkp.quality.style")
             apply(plugin = "bkp.validation.graph")
 
-            bkpModuleExtension().apply {
-                targets.android.convention(false)
-                targets.jvm.convention(true)
-                targets.ios.convention(false)
-            }
+            bkpModuleExtension()
 
             configureKotlinJvm()
 

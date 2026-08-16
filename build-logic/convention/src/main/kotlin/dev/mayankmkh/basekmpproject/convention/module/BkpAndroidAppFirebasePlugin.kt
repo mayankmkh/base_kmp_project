@@ -2,7 +2,6 @@ package dev.mayankmkh.basekmpproject.convention.module
 
 import com.android.build.api.dsl.ApplicationExtension
 import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
-import dev.mayankmkh.basekmpproject.convention.dsl.bkpModuleExtension
 import dev.mayankmkh.basekmpproject.libs
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -14,14 +13,10 @@ import org.gradle.kotlin.dsl.exclude
 class BkpAndroidAppFirebasePlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
-            // Validation is per-project, so every plugin that creates `bkpModule` has to bring the
-            // validator with it -- otherwise a module applying only this plugin creates the
-            // extension with no primary plugin and nothing ever checks it.
+            // Validation is per-project, so a plugin that layers onto a primary has to bring the
+            // validator with it -- otherwise a module applying only this plugin has no primary and
+            // nothing ever checks it.
             apply(plugin = "bkp.validation.graph")
-
-            bkpModuleExtension().apply {
-                features.firebase.convention(true)
-            }
 
             apply(plugin = "com.google.gms.google-services")
             apply(plugin = "com.google.firebase.firebase-perf")

@@ -4,13 +4,5 @@ import org.gradle.api.Project
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.findByType
 
-internal fun Project.bkpModuleExtension(): BkpModuleExtension {
-    val existing = extensions.findByType<BkpModuleExtension>()
-    if (existing != null) return existing
-
-    return extensions.create<BkpModuleExtension>("bkpModule").apply {
-        // Default safe/off unless a primary plugin overrides specific defaults.
-        features.flavorsDemoProd.convention(false)
-        features.firebase.convention(false)
-    }
-}
+internal fun Project.bkpModuleExtension(): BkpModuleExtension =
+    extensions.findByType<BkpModuleExtension>() ?: extensions.create<BkpModuleExtension>("bkpModule")

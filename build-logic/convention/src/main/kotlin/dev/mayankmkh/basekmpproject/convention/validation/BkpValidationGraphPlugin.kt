@@ -55,6 +55,12 @@ class BkpValidationGraphPlugin : Plugin<Project> {
             )
         }
 
+        // Ahead of the extension lookup on purpose: the firebase plugin creates no `bkpModule`, so a
+        // module that applies it and nothing else has no extension and would return early.
+        if (hasAndroidAppFirebase && !hasAndroidApp) {
+            throw GradleException("${project.path}: bkp.android.app.firebase requires a bkp.android.app* primary plugin")
+        }
+
         val extension = project.extensions.findByType<BkpModuleExtension>() ?: return
         if (activeGroups.isEmpty()) {
             throw GradleException("${project.path}: bkpModule extension is present but no bkp primary plugin is applied")
@@ -64,19 +70,8 @@ class BkpValidationGraphPlugin : Plugin<Project> {
         val isAndroidApp = primary.startsWith("bkp.android.app")
         val isKmpPrimary = primary.startsWith("bkp.kmp")
 
-        if (!isAndroidApp && extension.features.flavorsDemoProd.get()) {
-            throw GradleException("${project.path}: flavorsDemoProd is only supported for bkp.android.app* plugins")
-        }
-        if (!isAndroidApp && extension.features.firebase.get()) {
-            throw GradleException("${project.path}: firebase is only supported for bkp.android.app* plugins")
-        }
-        if (hasAndroidAppFirebase && !isAndroidApp) {
-            throw GradleException("${project.path}: bkp.android.app.firebase requires a bkp.android.app* primary plugin")
-        }
-        if (isAndroidApp && extension.features.firebase.get() && !hasAndroidAppFirebase) {
-            throw GradleException(
-                "${project.path}: firebase is enabled but bkp.android.app.firebase plugin is not applied"
-            )
+        if (!isAndroidApp && extension.features.demoProdFlavorsEnabled) {
+            throw GradleException("${project.path}: demoProdFlavors() is only supported for bkp.android.app* plugins")
         }
 
         if (isKmpPrimary) validateTargets(project)

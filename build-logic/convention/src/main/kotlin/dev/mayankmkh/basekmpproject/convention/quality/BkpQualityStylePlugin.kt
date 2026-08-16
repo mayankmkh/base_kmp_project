@@ -10,6 +10,7 @@ import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.withType
+import org.gradle.language.base.plugins.LifecycleBasePlugin
 
 class BkpQualityStylePlugin : Plugin<Project> {
     override fun apply(target: Project) {
@@ -39,7 +40,9 @@ class BkpQualityStylePlugin : Plugin<Project> {
             }
 
             // The root project has build scripts worth formatting but no sources to analyse.
-            if (parent == null) return
+            // `parent` reaches into another project's model, which project isolation forbids; the
+            // root project is the one whose path is ":".
+            if (path == ":") return
 
             apply(plugin = "dev.detekt")
             extensions.configure<DetektExtension> {
@@ -69,8 +72,14 @@ class BkpQualityStylePlugin : Plugin<Project> {
                 dependsOn(tasks.withType<Detekt>())
             }
 
-            tasks.matching { it.name == "check" }.configureEach {
-                dependsOn(detektAll)
+            // `tasks.matching { }` has to realize every task in the project to test the predicate.
+            // `check` comes from `lifecycle-base`, which the primary plugin's Kotlin/Android
+            // plugins pull in -- possibly after this one -- so the wiring waits for it instead of
+            // scanning for it.
+            pluginManager.withPlugin("lifecycle-base") {
+                tasks.named(LifecycleBasePlugin.CHECK_TASK_NAME) {
+                    dependsOn(detektAll)
+                }
             }
         }
     }

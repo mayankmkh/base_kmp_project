@@ -88,6 +88,14 @@ bkpModule {
 | `features.flavorsDemoProd` | `true` | `bkp.android.app*` |
 | `features.firebase` | `true` when `bkp.android.app.firebase` is applied, else `false` | `bkp.android.app*` |
 
+`features.flavorsDemoProd` is honoured: setting it to `false` leaves the app on plain
+`debug`/`release` variants. The flag is read in AGP's `finalizeDsl`, which runs after the module's
+`bkpModule` block but still before variants are created — the last point at which flavors can be
+registered. Reading it in `apply()` would always see the convention, and `afterEvaluate` is too
+late for DSL changes. Anything that needs the flavors to exist while the build script is still
+being evaluated (a `demoImplementation` dependency, a `productFlavors { }` block of its own) will
+not find them; no module does that today.
+
 **Target overrides do not work yet**, and `bkp.validation.graph` fails the build if a KMP module
 turns one off. The check guards a real ordering problem rather than merely an untested path: the
 KMP primaries read `targets.*` inside `apply()`, which runs *before* the module's `bkpModule` block

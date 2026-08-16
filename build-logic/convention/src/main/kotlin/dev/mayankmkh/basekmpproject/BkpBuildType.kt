@@ -16,10 +16,50 @@
 
 package dev.mayankmkh.basekmpproject
 
+import com.android.build.api.dsl.ApplicationExtension
+import org.gradle.api.Project
+
 /**
- * This is shared between :app and :benchmarks module to provide configurations type safety.
+ * The application id suffix each build type carries, so debug and release installs can sit side by
+ * side on one device. Paired with [BkpFlavor], which suffixes the same id along the flavor axis.
  */
 enum class BkpBuildType(val applicationIdSuffix: String? = null) {
     DEBUG(".debug"),
     RELEASE,
 }
+
+/**
+ * Applies the build-type convention every `bkp.android.app*` module shares.
+ *
+ * These are defaults, not decrees. A module's own `android { }` block runs after the plugin, and
+ * every value set here is a plain property, so an app that wants an unminified release or a
+ * different suffix just says so and wins -- see `BkpAndroidAppPluginTest`.
+ *
+ * `proguardFiles` is the exception: it appends rather than assigns, and a module cannot take an
+ * entry back out without `setProguardFiles`, which would also discard AGP's default. So the
+ * module's own rules file is added only when it exists. Listing it unconditionally would make it
+ * mandatory -- AGP 9 fails the build on a missing ProGuard file
+ * (`android.proguard.failOnMissingFiles` defaults to true) -- and a convention should not oblige
+ * every app module to carry an empty file.
+ */
+internal fun Project.configureBuildTypes(applicationExtension: ApplicationExtension) {
+    applicationExtension.apply {
+        // The container is only invariant through the block form; the `buildTypes` getter is
+        // out-projected and cannot be configured. Same shape as `configureFlavors`.
+        buildTypes {
+            named("debug") {
+                applicationIdSuffix = BkpBuildType.DEBUG.applicationIdSuffix
+            }
+            named("release") {
+                isMinifyEnabled = true
+                applicationIdSuffix = BkpBuildType.RELEASE.applicationIdSuffix
+                proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+                if (file(MODULE_PROGUARD_RULES).exists()) {
+                    proguardFiles(MODULE_PROGUARD_RULES)
+                }
+            }
+        }
+    }
+}
+
+private const val MODULE_PROGUARD_RULES = "proguard-rules.pro"

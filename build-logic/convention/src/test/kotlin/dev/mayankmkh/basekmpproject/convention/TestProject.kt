@@ -41,6 +41,12 @@ internal class TestProject(private val dir: File) {
         return this
     }
 
+    /** Adds a file to the project, for conventions that key off one being there. */
+    fun withFile(path: String, content: String): TestProject {
+        dir.resolve(path).writeText(content)
+        return this
+    }
+
     /**
      * Runs [tasks], defaulting to `help` -- the cheapest task that still forces the whole project to
      * configure, which is where the convention plugins and the validator do their work.

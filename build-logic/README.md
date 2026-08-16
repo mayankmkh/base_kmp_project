@@ -59,6 +59,13 @@ that:
   `android-targetSdk`). No plugin hardcodes them.
 - **`bkp.android.lib`** derives `namespace` from the Gradle project path, so library modules do not
   set it.
+- **`bkp.android.app*`** owns the build-type convention: a `.debug` application id suffix, a minified
+  release, the `META-INF/{AL2.0,LGPL2.1}` packaging excludes, `buildConfig = true`, and the
+  instrumentation runner. An app module declares only what is genuinely its own — `namespace`,
+  `applicationId`, version and signing. These are defaults, not decrees: a module's `android { }`
+  block runs after the plugin and overrides any of them. The one exception is `proguardFiles`, which
+  appends rather than assigns; a module's own `proguard-rules.pro` is picked up when the file exists,
+  and no module is obliged to carry an empty one.
 - **KMP primaries** declare no targets at all — the module picks them with
   [`kotlin { bkpTargets { … } }`](#target-selection) — and add `kotlin-test` to `commonTest`.
 - **Compose primaries** wire the Compose compiler, the shared Compose bundle, and the tooling

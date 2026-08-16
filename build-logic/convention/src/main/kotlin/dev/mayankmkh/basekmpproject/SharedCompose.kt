@@ -17,7 +17,6 @@
 package dev.mayankmkh.basekmpproject
 
 import com.android.build.api.dsl.CommonExtension
-import dev.mayankmkh.basekmpproject.convention.dsl.bkpModuleExtension
 import org.gradle.api.Project
 import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.configure
@@ -52,7 +51,9 @@ internal fun Project.configureKMPCompose(
         "commonMainImplementation"(libs.findBundle("compose.common.main").get())
     }
 
-    if (bkpModuleExtension().targets.android.get()) {
+    // Reactive rather than a flag read: whether the module has an Android target is decided by its
+    // own `bkpTargets { }` block, which runs after this plugin has applied.
+    pluginManager.withPlugin("com.android.kotlin.multiplatform.library") {
         dependencies {
             // The bundle carries `ui-tooling-preview`, the `@Preview` annotation itself; this is the
             // renderer that draws those previews in the IDE. A KMP module puts it on

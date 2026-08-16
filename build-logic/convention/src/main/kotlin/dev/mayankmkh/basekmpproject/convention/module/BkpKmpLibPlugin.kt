@@ -1,43 +1,35 @@
 package dev.mayankmkh.basekmpproject.convention.module
 
-import dev.mayankmkh.basekmpproject.configureKotlinMultiplatformAndroidLibrary
+import dev.mayankmkh.basekmpproject.configureKotlin
+import dev.mayankmkh.basekmpproject.convention.dsl.BkpTargets
 import dev.mayankmkh.basekmpproject.convention.dsl.bkpModuleExtension
 import dev.mayankmkh.basekmpproject.libs
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.plugins.ExtensionAware
 import org.gradle.kotlin.dsl.apply
-import org.gradle.kotlin.dsl.configure
+import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.dependencies
-import org.gradle.kotlin.dsl.get
+import org.gradle.kotlin.dsl.getByType
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 class BkpKmpLibPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
             apply(plugin = "org.jetbrains.kotlin.multiplatform")
-            apply(plugin = "com.android.kotlin.multiplatform.library")
             apply(plugin = "bkp.quality.style")
             apply(plugin = "bkp.quality.lint")
             apply(plugin = "bkp.validation.graph")
 
-            val bkpModule = bkpModuleExtension().apply {
-                targets.android.convention(true)
-                targets.jvm.convention(true)
-                targets.ios.convention(true)
-            }
+            bkpModuleExtension()
 
-            extensions.configure<KotlinMultiplatformExtension> {
-                if (bkpModule.targets.ios.get()) {
-                    iosArm64()
-                    iosSimulatorArm64()
-                }
-                if (bkpModule.targets.jvm.get()) {
-                    jvm()
-                }
-                if (bkpModule.targets.android.get()) {
-                    configureKotlinMultiplatformAndroidLibrary(this)
-                }
-            }
+            val kotlin = extensions.getByType<KotlinMultiplatformExtension>()
+            (kotlin as ExtensionAware).extensions.create<BkpTargets>("bkpTargets", this, kotlin)
+
+            // Unconditional: the compiler baseline has nothing to do with which platforms the module
+            // picks, and hanging it off the Android target would drop warnings-as-errors and the
+            // shared free compiler args from a module that omits Android.
+            configureKotlin()
 
             dependencies {
                 "commonTestImplementation"(libs.findLibrary("kotlin.test").get())

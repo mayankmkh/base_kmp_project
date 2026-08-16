@@ -2,6 +2,7 @@ package dev.mayankmkh.basekmpproject.convention.module
 
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import dev.mayankmkh.basekmpproject.configureBuildTypes
 import dev.mayankmkh.basekmpproject.configureFlavors
 import dev.mayankmkh.basekmpproject.configureKotlinAndroid
 import dev.mayankmkh.basekmpproject.configurePrintApksTask
@@ -29,7 +30,17 @@ class BkpAndroidAppPlugin : Plugin<Project> {
             extensions.configure<ApplicationExtension> {
                 configureKotlinAndroid(this)
                 defaultConfig.targetSdk = sdk.targetSdk
+                defaultConfig.testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
                 testOptions.animationsDisabled = true
+                configureBuildTypes(this)
+
+                // Two licence files that several JVM libraries each ship a copy of; without this the
+                // packager fails on the duplicates.
+                packaging.resources.excludes.add("/META-INF/{AL2.0,LGPL2.1}")
+
+                // Off by default since AGP 8. An app is where `BuildConfig.DEBUG` and the generated
+                // build-type constants are actually read, so every app module wants it on.
+                buildFeatures.buildConfig = true
             }
             extensions.configure<ApplicationAndroidComponentsExtension> {
                 configurePrintApksTask(this)

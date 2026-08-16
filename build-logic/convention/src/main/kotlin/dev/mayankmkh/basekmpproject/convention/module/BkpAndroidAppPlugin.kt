@@ -23,10 +23,7 @@ class BkpAndroidAppPlugin : Plugin<Project> {
             apply(plugin = "bkp.quality.lint")
             apply(plugin = "bkp.validation.graph")
 
-            val bkpModule = bkpModuleExtension().apply {
-                features.flavorsDemoProd.convention(true)
-                features.firebase.convention(false)
-            }
+            val bkpModule = bkpModuleExtension()
             val sdk = androidSdkConfig()
 
             extensions.configure<ApplicationExtension> {
@@ -38,12 +35,12 @@ class BkpAndroidAppPlugin : Plugin<Project> {
                 configurePrintApksTask(this)
 
                 // Flavors are read from `bkpModule { }`, which the module's build script evaluates
-                // long after `apply()` returns -- reading the flag here would always see the
-                // convention. `finalizeDsl` runs once the script has been evaluated but before AGP
-                // creates variants, which is the last point at which flavors can still be
-                // registered, so plain `afterEvaluate` is not an option.
+                // long after `apply()` returns -- reading the flag here would always see it unset.
+                // `finalizeDsl` runs once the script has been evaluated but before AGP creates
+                // variants, which is the last point at which flavors can still be registered, so
+                // plain `afterEvaluate` is not an option.
                 finalizeDsl { applicationExtension ->
-                    if (bkpModule.features.flavorsDemoProd.get()) {
+                    if (bkpModule.features.demoProdFlavorsEnabled) {
                         configureFlavors(applicationExtension)
                     }
                 }

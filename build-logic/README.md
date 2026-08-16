@@ -30,7 +30,7 @@ apply Spotless, detekt, lint, or the validator by hand.
 
 | Module is a… | Plugin | Notes |
 |---|---|---|
-| Android app | `bkp.android.app` | flavors on by default |
+| Android app | `bkp.android.app` | plain `debug`/`release` unless the module opts into flavors |
 | Android app with Compose | `bkp.android.app.compose` | adds `bkp.android.app` |
 | Android library (non-KMP) | `bkp.android.lib` | no consumers today |
 | Android test module | `bkp.android.test` | |
@@ -76,27 +76,33 @@ plugins {
 }
 
 bkpModule {
-    features.flavorsDemoProd.set(true)
+    features {
+        demoProdFlavors()
+    }
 }
 ```
 
-| Property | Default | Valid on |
-|---|---|---|
-| `features.flavorsDemoProd` | `true` | `bkp.android.app*` |
-| `features.firebase` | `true` when `bkp.android.app.firebase` is applied, else `false` | `bkp.android.app*` |
+Features are opt-in functions, not flags. Everything is off until a module asks for it, and calling
+the function is the entire declaration — there is no value to pass and nothing to turn back off. A
+line inside `features { }` therefore always means something, which a `set(true)` matching a
+convention did not.
 
-`features.flavorsDemoProd` is honoured: setting it to `false` leaves the app on plain
-`debug`/`release` variants. The flag is read in AGP's `finalizeDsl`, which runs after the module's
-`bkpModule` block but still before variants are created — the last point at which flavors can be
-registered. Reading it in `apply()` would always see the convention, and `afterEvaluate` is too
-late for DSL changes. Anything that needs the flavors to exist while the build script is still
-being evaluated (a `demoImplementation` dependency, a `productFlavors { }` block of its own) will
-not find them; no module does that today.
+| Feature | Valid on |
+|---|---|
+| `demoProdFlavors()` | `bkp.android.app*` |
+
+`demoProdFlavors()` registers `demo` and `prod` product flavors; without it the app stays on plain
+`debug`/`release`. It is read in AGP's `finalizeDsl`, which runs after the module's `bkpModule`
+block but still before variants are created — the last point at which flavors can be registered.
+Reading it in `apply()` would always see it unset, and `afterEvaluate` is too late for DSL changes.
+Anything that needs the flavors to exist while the build script is still being evaluated (a
+`demoImplementation` dependency, a `productFlavors { }` block of its own) will not find them; no
+module does that today.
 
 ### Firebase boundary
 
-- `bkpModule.features.firebase=true` requires applying `bkp.android.app.firebase`.
-- `bkp.android.app.firebase` is valid only with `bkp.android.app*` primary plugins.
+Firebase is a plugin, not a feature — applying `bkp.android.app.firebase` is the declaration, so
+there is nothing to keep in sync with it. It is valid only alongside a `bkp.android.app*` primary.
 
 ## Target selection
 
@@ -183,9 +189,8 @@ The build fails when:
 
 - more than one primary plugin group is applied
 - `bkpModule` is present but no primary plugin is
-- `flavorsDemoProd` or `firebase` is set outside a `bkp.android.app*` module
+- `demoProdFlavors()` is called outside a `bkp.android.app*` module
 - `bkp.android.app.firebase` is applied without a `bkp.android.app*` primary
-- `features.firebase` is enabled but `bkp.android.app.firebase` is not applied
 - a KMP module declares no targets
 - a KMP module has a target that was created outside `bkpTargets { }`
 

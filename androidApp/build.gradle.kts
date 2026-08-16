@@ -7,7 +7,9 @@ plugins {
 }
 
 bkpModule {
-    features.flavorsDemoProd.set(true)
+    features {
+        demoProdFlavors()
+    }
 }
 
 android {

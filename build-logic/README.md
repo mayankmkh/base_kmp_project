@@ -187,12 +187,28 @@ module instead of after the whole build has configured.
 
 The build fails when:
 
-- more than one primary plugin group is applied
-- `bkpModule` is present but no primary plugin is
 - `demoProdFlavors()` is called outside a `bkp.android.app*` module
 - `bkp.android.app.firebase` is applied without a `bkp.android.app*` primary
 - a KMP module declares no targets
 - a KMP module has a target that was created outside `bkpTargets { }`
+
+Two further checks exist but cannot fire today — more than one primary plugin group, and `bkpModule`
+without a primary plugin. Both are guards against a future plugin breaking an assumption the current
+set happens to satisfy; see the notes in
+[`BkpValidationGraphPluginTest`](convention/src/test/kotlin/dev/mayankmkh/basekmpproject/convention/BkpValidationGraphPluginTest.kt).
+
+## Tests
+
+```bash
+./gradlew -p build-logic :convention:test
+```
+
+The suite drives the plugins through Gradle TestKit against throwaway single-module projects. The
+plugins are injected with `withPluginClasspath()` rather than resolved from a repository, which is
+why `build.gradle.kts` lists AGP, KGP and friends a second time under `testPluginClasspath` — they
+are `compileOnly` for publishing, but a TestKit build has no consumer to bring them. The synthetic
+projects read this repo's real `gradle/libs.versions.toml`, so a plugin asking for a catalog key
+that does not exist fails a test rather than only failing a real build.
 
 ## Quality plugins
 

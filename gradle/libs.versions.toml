@@ -98,6 +98,12 @@ koin-test = { group = "io.insert-koin", name = "koin-test" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 
+# AGP 9's built-in Kotlin never consults `PowerAssertGradlePlugin`, so a pure-Android module has to
+# put the compiler plugin on the task classpath itself and pull in the runtime the rewritten code
+# calls into. The KMP plugin does both of these on its own.
+kotlin-powerAssert-compilerPlugin = { group = "org.jetbrains.kotlin", name = "kotlin-power-assert-compiler-plugin-embeddable", version.ref = "kotlin" }
+kotlin-powerAssert-runtime = { group = "org.jetbrains.kotlin", name = "kotlin-power-assert-runtime", version.ref = "kotlin" }
+
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
@@ -135,6 +141,7 @@ firebase-performance-gradlePlugin = { group = "com.google.firebase", name = "per
 gms-gradlePlugin = { group = "com.google.gms", name = "google-services", version.ref = "gmsPlugin" }
 jetbrains-compose-gradlePlugin = { group = "org.jetbrains.compose", name = "compose-gradle-plugin", version.ref = "composeMultiplatform" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlin-powerAssert-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-power-assert", version.ref = "kotlin" }
 ksp-gradlePlugin = { group = "com.google.devtools.ksp", name = "com.google.devtools.ksp.gradle.plugin", version.ref = "ksp" }
 spotless-gradlePlugin = { group = "com.diffplug.spotless", name = "spotless-plugin-gradle", version.ref = "spotless" }
 truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
@@ -170,6 +177,7 @@ gms = { id = "com.google.gms.google-services", version.ref = "gmsPlugin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kotlin-powerAssert = { id = "org.jetbrains.kotlin.plugin.power-assert", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 

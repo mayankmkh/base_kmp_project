@@ -1,6 +1,7 @@
 package dev.mayankmkh.basekmpproject.convention.module
 
 import dev.mayankmkh.basekmpproject.configureKotlin
+import dev.mayankmkh.basekmpproject.convention.core.POWER_ASSERT_FUNCTIONS
 import dev.mayankmkh.basekmpproject.convention.dsl.BkpTargets
 import dev.mayankmkh.basekmpproject.convention.dsl.bkpModuleExtension
 import dev.mayankmkh.basekmpproject.libs
@@ -12,11 +13,13 @@ import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.getByType
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.powerassert.gradle.PowerAssertGradleExtension
 
 class BkpKmpLibPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
             apply(plugin = "org.jetbrains.kotlin.multiplatform")
+            apply(plugin = "org.jetbrains.kotlin.plugin.power-assert")
             apply(plugin = "bkp.quality.style")
             apply(plugin = "bkp.quality.lint")
             apply(plugin = "bkp.validation.graph")
@@ -30,6 +33,24 @@ class BkpKmpLibPlugin : Plugin<Project> {
             // picks, and hanging it off the Android target would drop warnings-as-errors and the
             // shared free compiler args from a module that omits Android.
             configureKotlin()
+
+            extensions.getByType<PowerAssertGradleExtension>().apply {
+                functions.addAll(POWER_ASSERT_FUNCTIONS)
+
+                // Left empty, the plugin only takes compilations literally named `test` -- which
+                // skips Android, whose compilations under the KMP library plugin are `hostTest`
+                // and `deviceTest`. Naming source sets replaces that rule rather than adding to
+                // it, so every test compilation has to be listed, derived from the target set the
+                // module actually declared.
+                includedSourceSets.addAll(
+                    provider {
+                        kotlin.targets
+                            .flatMap { it.compilations }
+                            .map { it.defaultSourceSet.name }
+                            .filter { it.endsWith("Test") }
+                    }
+                )
+            }
 
             // Every module in this project is coroutine-shaped, so `runTest` and `Flow` assertions
             // are as much a baseline as `kotlin.test` itself. Both publish for all of `bkpTargets`.

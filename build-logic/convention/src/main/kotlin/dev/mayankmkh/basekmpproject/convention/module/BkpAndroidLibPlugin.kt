@@ -5,6 +5,7 @@ import com.android.build.api.variant.LibraryAndroidComponentsExtension
 import dev.mayankmkh.basekmpproject.configureKotlinAndroid
 import dev.mayankmkh.basekmpproject.configurePrintApksTask
 import dev.mayankmkh.basekmpproject.convention.core.androidSdkConfig
+import dev.mayankmkh.basekmpproject.convention.core.configureAndroidPowerAssert
 import dev.mayankmkh.basekmpproject.disableUnnecessaryAndroidTests
 import dev.mayankmkh.basekmpproject.libs
 import org.gradle.api.Plugin
@@ -39,13 +40,19 @@ class BkpAndroidLibPlugin : Plugin<Project> {
             }
 
             // The same test baseline `bkp.kmp.lib` gives `commonTest`, so an Android-only module is
-            // not the odd one out.
+            // not the odd one out. `kotlin-test` alone is not enough here: on JVM its annotations
+            // are optional expectations that only a framework artifact supplies, and the variant
+            // that picks one automatically is a KGP feature this module deliberately does without.
             dependencies {
                 "androidTestImplementation"(libs.findLibrary("kotlin.test").get())
+                "androidTestImplementation"(libs.findLibrary("kotlin.testJunit").get())
                 "testImplementation"(libs.findLibrary("kotlin.test").get())
+                "testImplementation"(libs.findLibrary("kotlin.testJunit").get())
                 "testImplementation"(libs.findLibrary("kotlinx.coroutines.test").get())
                 "testImplementation"(libs.findLibrary("turbine").get())
             }
+
+            configureAndroidPowerAssert()
         }
     }
 }

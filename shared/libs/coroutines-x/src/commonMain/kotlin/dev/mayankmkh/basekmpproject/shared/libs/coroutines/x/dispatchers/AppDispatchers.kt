@@ -3,8 +3,11 @@ package dev.mayankmkh.basekmpproject.shared.libs.coroutines.x.dispatchers
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
-class AppDispatchers
-private constructor(
+/**
+ * Production code takes this as a constructor parameter and calls [invoke] to get the real one. The
+ * constructor stays public so a test can hand the same code a `TestDispatcher` instead.
+ */
+class AppDispatchers(
     val disk: CoroutineDispatcher,
     val network: CoroutineDispatcher,
     val main: CoroutineDispatcher,
@@ -13,7 +16,9 @@ private constructor(
     val mainImmediate: CoroutineDispatcher,
 ) {
     companion object {
-        private val instance =
+        // Lazy because `Dispatchers.Main.immediate` throws where no main dispatcher exists -- a
+        // plain JVM test. Eager, that would break tests that only ever build their own instance.
+        private val instance by lazy {
             AppDispatchers(
                 ioDispatcher,
                 ioDispatcher,
@@ -22,6 +27,7 @@ private constructor(
                 Dispatchers.Unconfined,
                 Dispatchers.Main.immediate,
             )
+        }
 
         operator fun invoke() = instance
     }

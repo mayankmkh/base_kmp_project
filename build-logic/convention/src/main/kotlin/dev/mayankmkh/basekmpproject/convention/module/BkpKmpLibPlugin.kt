@@ -31,8 +31,12 @@ class BkpKmpLibPlugin : Plugin<Project> {
             // shared free compiler args from a module that omits Android.
             configureKotlin()
 
+            // Every module in this project is coroutine-shaped, so `runTest` and `Flow` assertions
+            // are as much a baseline as `kotlin.test` itself. Both publish for all of `bkpTargets`.
             dependencies {
                 "commonTestImplementation"(libs.findLibrary("kotlin.test").get())
+                "commonTestImplementation"(libs.findLibrary("kotlinx.coroutines.test").get())
+                "commonTestImplementation"(libs.findLibrary("turbine").get())
             }
         }
     }

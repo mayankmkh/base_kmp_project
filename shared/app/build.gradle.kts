@@ -60,5 +60,12 @@ kotlin {
                 implementation(libs.androidx.activity.compose)
             }
         }
+        jvmTest {
+            dependencies {
+                // JVM-only: Koin's graph verification reflects over constructors, so there is no
+                // `commonTest` home for it even though the artifact is multiplatform.
+                implementation(libs.koin.test)
+            }
+        }
     }
 }

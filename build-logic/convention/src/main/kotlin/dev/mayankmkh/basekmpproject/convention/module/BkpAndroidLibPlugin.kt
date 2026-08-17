@@ -38,9 +38,13 @@ class BkpAndroidLibPlugin : Plugin<Project> {
                 disableUnnecessaryAndroidTests(target)
             }
 
+            // The same test baseline `bkp.kmp.lib` gives `commonTest`, so an Android-only module is
+            // not the odd one out.
             dependencies {
                 "androidTestImplementation"(libs.findLibrary("kotlin.test").get())
                 "testImplementation"(libs.findLibrary("kotlin.test").get())
+                "testImplementation"(libs.findLibrary("kotlinx.coroutines.test").get())
+                "testImplementation"(libs.findLibrary("turbine").get())
             }
         }
     }

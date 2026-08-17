@@ -9,9 +9,13 @@ import okio.Path.Companion.toPath
 internal fun createDataStore(producePath: () -> String): DataStore<Preferences> =
     PreferenceDataStoreFactory.createWithPath(produceFile = { producePath().toPath() })
 
-internal expect fun createDataStorePath(prefContext: PrefContext, prefFile: PrefFile): String
-
-internal fun createDataStore(prefContext: PrefContext, prefFile: PrefFile): DataStore<Preferences> =
-    createDataStore {
-        createDataStorePath(prefContext, prefFile)
-    }
+/**
+ * The store backing one [PrefFile].
+ *
+ * Every platform with a filesystem answers this by pointing [createDataStore] at a path. The
+ * browser has no path to point at, so the expectation is on the store, not on the path.
+ */
+internal expect fun createDataStore(
+    prefContext: PrefContext,
+    prefFile: PrefFile,
+): DataStore<Preferences>

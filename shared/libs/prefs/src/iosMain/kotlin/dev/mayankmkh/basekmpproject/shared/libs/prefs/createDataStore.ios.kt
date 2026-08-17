@@ -1,5 +1,7 @@
 package dev.mayankmkh.basekmpproject.shared.libs.prefs
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
@@ -7,7 +9,10 @@ import platform.Foundation.NSURL
 import platform.Foundation.NSUserDomainMask
 
 @OptIn(ExperimentalForeignApi::class)
-internal actual fun createDataStorePath(prefContext: PrefContext, prefFile: PrefFile): String {
+internal actual fun createDataStore(
+    prefContext: PrefContext,
+    prefFile: PrefFile,
+): DataStore<Preferences> = createDataStore {
     val documentDirectory: NSURL? =
         NSFileManager.defaultManager.URLForDirectory(
             directory = NSDocumentDirectory,
@@ -16,5 +21,5 @@ internal actual fun createDataStorePath(prefContext: PrefContext, prefFile: Pref
             create = false,
             error = null,
         )
-    return requireNotNull(documentDirectory).path + "/${prefFile.dataStoreFileName}"
+    requireNotNull(documentDirectory).path + "/${prefFile.dataStoreFileName}"
 }

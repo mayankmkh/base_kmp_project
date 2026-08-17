@@ -27,5 +27,12 @@ kotlin {
                 implementation(libs.ktor.client.darwin)
             }
         }
+        wasmJsMain {
+            dependencies {
+                // Named for Kotlin/JS but published for wasmJs too; the engine is the browser's
+                // own `fetch` either way.
+                implementation(libs.ktor.client.js)
+            }
+        }
     }
 }

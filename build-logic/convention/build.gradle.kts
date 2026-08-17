@@ -131,6 +131,10 @@ gradlePlugin {
             id = "bkp.desktop.app"
             implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpDesktopAppPlugin"
         }
+        register("bkpWebApp") {
+            id = "bkp.web.app"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpWebAppPlugin"
+        }
         register("bkpQualityStyle") {
             id = "bkp.quality.style"
             implementationClass = "dev.mayankmkh.basekmpproject.convention.quality.BkpQualityStylePlugin"

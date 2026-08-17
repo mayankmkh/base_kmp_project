@@ -49,6 +49,7 @@ dependencies {
     compileOnly(libs.firebase.crashlytics.gradlePlugin)
     compileOnly(libs.firebase.performance.gradlePlugin)
     compileOnly(libs.kotlin.gradlePlugin)
+    compileOnly(libs.kotlin.powerAssert.gradlePlugin)
     compileOnly(libs.jetbrains.compose.gradlePlugin)
     compileOnly(libs.ksp.gradlePlugin)
     compileOnly(libs.spotless.gradlePlugin)
@@ -59,6 +60,7 @@ dependencies {
 
     testPluginClasspath(libs.android.gradlePlugin)
     testPluginClasspath(libs.kotlin.gradlePlugin)
+    testPluginClasspath(libs.kotlin.powerAssert.gradlePlugin)
     testPluginClasspath(libs.spotless.gradlePlugin)
     testPluginClasspath(libs.detekt.gradlePlugin)
     testPluginClasspath(libs.compose.gradlePlugin)

@@ -68,9 +68,15 @@ that:
   appends rather than assigns; a module's own `proguard-rules.pro` is picked up when the file exists,
   and no module is obliged to carry an empty one.
 - **KMP primaries** declare no targets at all — the module picks them with
-  [`kotlin { bkpTargets { … } }`](#target-selection) — and add `kotlin-test` to `commonTest`.
-  `bkp.web.app` is the exception: it adds `bkp.kmp.lib.compose` and then declares `web()` itself
-  with `binaries.executable()`, because an app module named for the web has nothing to choose.
+  [`kotlin { bkpTargets { … } }`](#target-selection). `bkp.web.app` is the exception: it adds
+  `bkp.kmp.lib.compose` and then declares `web()` itself with `binaries.executable()`, because an
+  app module named for the web has nothing to choose.
+- **The test baseline** — `kotlin-test`, `kotlinx-coroutines-test`, Turbine and power-assert
+  diagrams on the `kotlin.test` assertions — is the same for `bkp.kmp.lib` (`commonTest`) and
+  `bkp.android.lib` (`test`), so a module is never the odd one out for the platforms it targets.
+  On the Android side the compiler plugin is attached to the test compile tasks by hand: AGP 9's
+  built-in Kotlin creates no `KotlinCompilation`, so the power-assert Gradle plugin would apply and
+  do nothing.
 - **Compose primaries** wire the Compose compiler, the shared Compose bundle, and the tooling
   renderer on the right configuration for the module type.
 - **AGP 9 has built-in Kotlin**, so `org.jetbrains.kotlin.android` is never applied.

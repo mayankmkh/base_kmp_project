@@ -17,6 +17,12 @@ kotlin {
                 implementation(libs.michael.bull.kotlin.result)
             }
         }
+        commonTest {
+            dependencies {
+                // Swaps the engine rather than the client, so tests exercise the real plugin stack.
+                implementation(libs.ktor.client.mock)
+            }
+        }
         androidMain {
             dependencies {
                 implementation(libs.ktor.client.okhttp)

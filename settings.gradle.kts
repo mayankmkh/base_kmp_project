@@ -38,6 +38,7 @@ plugins {
 // top-level calls, which turns the module list into a page of scrolling.
 include(
     ":desktopApp",
+    ":webApp",
     ":androidApp",
     ":shared:app",
     ":shared:features:list",

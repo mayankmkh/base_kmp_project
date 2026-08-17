@@ -7,10 +7,11 @@
 # put it back. The generated file covers the third-party rulesets too.
 
 coroutines:
-  # `AppDispatchers` is the single place that names concrete dispatchers -- the seam the rule wants
-  # everything else to inject -- so it is the one file that has to reference them directly.
+  # The `dispatchers` package is the single place that names concrete dispatchers -- the seam the
+  # rule wants everything else to inject -- so it is the one place that references them directly.
+  # `IoDispatcher` is there because `Dispatchers.IO` does not exist on wasmJs.
   InjectDispatcher:
-    excludes: ['**/dispatchers/AppDispatchers.kt']
+    excludes: ['**/dispatchers/AppDispatchers.kt', '**/dispatchers/IoDispatcher*.kt']
 
 complexity:
   LongParameterList:

@@ -2,12 +2,13 @@ package dev.mayankmkh.basekmpproject.convention.dsl
 
 import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import dev.mayankmkh.basekmpproject.configureKotlinMultiplatformAndroidLibrary
+import dev.mayankmkh.basekmpproject.wasmJsBrowser
 import org.gradle.api.Action
-import org.gradle.api.GradleException
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinWasmJsTargetDsl
 import javax.inject.Inject
 
 /**
@@ -32,6 +33,7 @@ abstract class BkpTargets @Inject constructor(
         android()
         jvm()
         ios()
+        web()
     }
 
     fun android() = android {}
@@ -66,10 +68,18 @@ abstract class BkpTargets @Inject constructor(
         }
     }
 
-    fun web(): Nothing = throw GradleException(
-        "bkpTargets.web() is not implemented: KGP's WasmNpmResolverPlugin applies " +
-            "WasmNodeJsRootPlugin to the root project, which project isolation forbids."
-    )
+    /**
+     * Kotlin/Wasm in a browser. Named for the platform rather than the backend because which
+     * backend serves the browser best is not the module's business -- see [wasmJsBrowser].
+     *
+     * Declaring this is what forces `org.gradle.isolated-projects` off, for reasons recorded in
+     * `gradle.properties`.
+     */
+    fun web() = web {}
+
+    fun web(action: Action<KotlinWasmJsTargetDsl>) {
+        record { kotlin.wasmJsBrowser { action.execute(this) } }
+    }
 
     /**
      * Records whatever [create] added to the target container, so the validator can tell a declared

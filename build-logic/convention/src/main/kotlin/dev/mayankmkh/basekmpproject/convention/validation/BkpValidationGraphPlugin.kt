@@ -34,7 +34,10 @@ class BkpValidationGraphPlugin : Plugin<Project> {
         val hasAndroidTest = project.pluginManager.hasPlugin("bkp.android.test")
         val hasKmpFeature = project.pluginManager.hasPlugin("bkp.kmp.feature") ||
             project.pluginManager.hasPlugin("bkp.kmp.feature.compose")
-        val hasKmpLibOnly = !hasKmpFeature && (
+        val hasWebApp = project.pluginManager.hasPlugin("bkp.web.app")
+        // `bkp.kmp.feature*` and `bkp.web.app` are both built on `bkp.kmp.lib*`, so the lib group is
+        // only the module's own primary when neither of them claimed it first.
+        val hasKmpLibOnly = !hasKmpFeature && !hasWebApp && (
             project.pluginManager.hasPlugin("bkp.kmp.lib") ||
                 project.pluginManager.hasPlugin("bkp.kmp.lib.compose")
             )
@@ -47,6 +50,7 @@ class BkpValidationGraphPlugin : Plugin<Project> {
             "kmpFeature".takeIf { hasKmpFeature },
             "kmpLib".takeIf { hasKmpLibOnly },
             "desktopApp".takeIf { hasDesktopApp },
+            "webApp".takeIf { hasWebApp },
         )
 
         if (activeGroups.size > 1) {
@@ -118,6 +122,7 @@ class BkpValidationGraphPlugin : Plugin<Project> {
             "bkp.kmp.feature",
             "bkp.kmp.feature.compose",
             "bkp.desktop.app",
+            "bkp.web.app",
         )
     }
 }

@@ -39,6 +39,7 @@ apply Spotless, detekt, lint, or the validator by hand.
 | KMP feature (with shared feature deps) | `bkp.kmp.feature` | `bkp.kmp.lib` + the feature bundle |
 | KMP feature with Compose | `bkp.kmp.feature.compose` | adds `bkp.kmp.feature` |
 | Desktop app | `bkp.desktop.app` | Kotlin/JVM, not KMP |
+| Web app | `bkp.web.app` | KMP with a `wasmJs` browser target only |
 
 Two plugins layer on top of a primary rather than replacing it:
 
@@ -68,6 +69,8 @@ that:
   and no module is obliged to carry an empty one.
 - **KMP primaries** declare no targets at all — the module picks them with
   [`kotlin { bkpTargets { … } }`](#target-selection) — and add `kotlin-test` to `commonTest`.
+  `bkp.web.app` is the exception: it adds `bkp.kmp.lib.compose` and then declares `web()` itself
+  with `binaries.executable()`, because an app module named for the web has nothing to choose.
 - **Compose primaries** wire the Compose compiler, the shared Compose bundle, and the tooling
   renderer on the right configuration for the module type.
 - **AGP 9 has built-in Kotlin**, so `org.jetbrains.kotlin.android` is never applied.
@@ -127,11 +130,11 @@ kotlin {
 
 | Selector | Creates |
 |---|---|
-| `default()` | `android()`, `jvm()`, `ios()` |
+| `default()` | `android()`, `jvm()`, `ios()`, `web()` |
 | `android()` / `android { }` | applies `com.android.kotlin.multiplatform.library` and configures its target |
 | `jvm()` | the JVM target |
 | `ios()` / `ios { }` | `iosArm64` and `iosSimulatorArm64` as a family |
-| `web()` | nothing — fails, see below |
+| `web()` / `web { }` | `wasmJs` with a `browser()` compilation |
 
 `android { }` and `ios { }` take the created target as their receiver, which is where per-module
 target config goes:
@@ -164,9 +167,11 @@ and `:desktopApp`, so narrowing works bottom-up through the dependency closure. 
 from an upstream library while a downstream module still targets it fails at resolution, not at
 declaration.
 
-`web()` is declared but always fails. `wasmJs { browser() }` breaks under project isolation because
-KGP's `WasmNpmResolverPlugin` applies `WasmNodeJsRootPlugin` to the *root* project. The selector
-exists so that the reason is at hand rather than discovered.
+**`web()` is why project isolation is off.** `wasmJs { browser() }` needs KGP's
+`WasmNpmResolverPlugin`, which applies `WasmNodeJsRootPlugin` to the *root* project — reaching
+across project boundaries, which isolation forbids. There is no per-module opt-out, so
+`org.gradle.unsafe.isolated-projects` is unset in `gradle.properties`. Deleting every `web()` call
+is what it would take to turn isolation back on; the configuration cache is unaffected either way.
 
 ### What validation can and cannot see
 

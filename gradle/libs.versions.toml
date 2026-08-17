@@ -9,7 +9,9 @@ androidDesugarJdkLibs = "2.1.5"
 androidx-activity = "1.13.0"
 androidx-appcompat = "1.8.0"
 androidx-core = "1.19.0"
-androidx-datastore = "1.2.1"
+# 1.3.0-alphaNN, not stable 1.2.1: the web implementation (`WebLocalStorage`) landed in the alphas,
+# and 1.2.1's wasmJs artifacts are stubs that throw. Drop to the stable line to give up web prefs.
+androidx-datastore = "1.3.0-alpha10"
 androidx-espresso = "3.7.0"
 androidx-lifecycle = "2.11.0"
 # `org.jetbrains.androidx.lifecycle` is the Compose Multiplatform port, a separate release train from
@@ -54,8 +56,11 @@ androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "a
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel", version.ref = "jetbrains-lifecycle" }
 androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "jetbrains-lifecycle" }
-androidx-datastore = { group = "androidx.datastore", name = "datastore", version.ref = "androidx-datastore" }
-androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "androidx-datastore" }
+# The `-core` artifacts, not the `datastore`/`datastore-preferences` umbrellas: the umbrellas add
+# Android-only conveniences this project does not use, and they publish no wasmJs variant.
+androidx-datastore-core = { group = "androidx.datastore", name = "datastore-core", version.ref = "androidx-datastore" }
+androidx-datastore-preferences-core = { group = "androidx.datastore", name = "datastore-preferences-core", version.ref = "androidx-datastore" }
+androidx-datastore-core-okio = { group = "androidx.datastore", name = "datastore-core-okio", version.ref = "androidx-datastore" }
 androidx-lifecycle-runtimeTesting = { group = "androidx.lifecycle", name = "lifecycle-runtime-testing", version.ref = "androidx-lifecycle" }
 compose-runtime = { group = "org.jetbrains.compose.runtime", name = "runtime", version.ref = "composeMultiplatform" }
 compose-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "composeMultiplatform" }
@@ -100,6 +105,7 @@ ktor-client-auth = { group = "io.ktor", name = "ktor-client-auth", version.ref =
 ktor-client-logging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor" }
 ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-darwin = { group = "io.ktor", name = "ktor-client-darwin", version.ref = "ktor" }
+ktor-client-js = { group = "io.ktor", name = "ktor-client-js", version.ref = "ktor" }
 ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 
@@ -170,6 +176,7 @@ bkp-kmp-lib-compose = { id = "bkp.kmp.lib.compose" }
 bkp-kmp-feature = { id = "bkp.kmp.feature" }
 bkp-kmp-feature-compose = { id = "bkp.kmp.feature.compose" }
 bkp-desktop-app = { id = "bkp.desktop.app" }
+bkp-web-app = { id = "bkp.web.app" }
 bkp-quality-style = { id = "bkp.quality.style" }
 bkp-quality-lint = { id = "bkp.quality.lint" }
 bkp-validation-graph = { id = "bkp.validation.graph" }

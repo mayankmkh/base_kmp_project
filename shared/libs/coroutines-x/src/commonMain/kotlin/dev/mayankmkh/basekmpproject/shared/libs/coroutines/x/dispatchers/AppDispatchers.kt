@@ -2,7 +2,6 @@ package dev.mayankmkh.basekmpproject.shared.libs.coroutines.x.dispatchers
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 
 class AppDispatchers
 private constructor(
@@ -16,8 +15,8 @@ private constructor(
     companion object {
         private val instance =
             AppDispatchers(
-                Dispatchers.IO,
-                Dispatchers.IO,
+                ioDispatcher,
+                ioDispatcher,
                 Dispatchers.Main,
                 Dispatchers.Default,
                 Dispatchers.Unconfined,

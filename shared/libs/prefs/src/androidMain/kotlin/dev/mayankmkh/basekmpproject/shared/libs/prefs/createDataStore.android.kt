@@ -1,5 +1,11 @@
 package dev.mayankmkh.basekmpproject.shared.libs.prefs
 
-internal actual fun createDataStorePath(prefContext: PrefContext, prefFile: PrefFile): String {
-    return prefContext.appContext.filesDir.resolve(prefFile.dataStoreFileName).absolutePath
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+
+internal actual fun createDataStore(
+    prefContext: PrefContext,
+    prefFile: PrefFile,
+): DataStore<Preferences> = createDataStore {
+    prefContext.appContext.filesDir.resolve(prefFile.dataStoreFileName).absolutePath
 }

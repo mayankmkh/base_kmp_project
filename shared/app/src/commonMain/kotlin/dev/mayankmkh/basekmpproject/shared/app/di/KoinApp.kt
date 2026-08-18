@@ -25,9 +25,7 @@ fun initKoin(config: KoinAppDeclaration? = null) {
     startKoin {
         includes(config)
 
-        modules(jsonModule, dispatchersModule, loggerModule, archModule, prefsModule)
-
-        modules(listFeatureModule, detailsFeatureModule)
+        modules(appModules)
     }
 }
 
@@ -56,5 +54,16 @@ private val prefsModule = module {
     factory { createPrefContext() }
     singleOf(::KeyValueStore)
 }
+
+// Declared last: top-level properties initialise in source order, so a list assembled any earlier
+// would capture nulls.
+
+private val libModules =
+    listOf(jsonModule, dispatchersModule, loggerModule, archModule, prefsModule)
+
+private val featureModules = listOf(listFeatureModule, detailsFeatureModule)
+
+// One list so `KoinGraphTest` verifies the graph `initKoin` starts.
+internal val appModules = libModules + featureModules
 
 internal expect fun Scope.createPrefContext(): PrefContext

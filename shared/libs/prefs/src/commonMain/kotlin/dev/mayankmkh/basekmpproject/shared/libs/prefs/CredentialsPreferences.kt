@@ -4,7 +4,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import kotlinx.coroutines.flow.Flow
 
-class CredentialsPreferences private constructor(private val dataStore: DataStore<Preferences>) {
+// Internal rather than private so tests can hand it a store that needs no file behind it.
+class CredentialsPreferences internal constructor(private val dataStore: DataStore<Preferences>) {
 
     constructor(prefContext: PrefContext) : this(createDataStore(prefContext, PrefFile.CREDENTIALS))
 

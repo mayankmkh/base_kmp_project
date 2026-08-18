@@ -8,8 +8,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
+// Internal rather than private so tests can hand it a store that needs no file behind it.
 class KeyValueStore
-private constructor(private val dataStore: DataStore<Preferences>, private val json: Json) {
+internal constructor(private val dataStore: DataStore<Preferences>, private val json: Json) {
 
     constructor(
         prefContext: PrefContext,

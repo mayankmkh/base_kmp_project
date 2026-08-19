@@ -34,6 +34,7 @@ kotlin {
 
                 export(libs.decompose.decompose)
                 export(libs.essenty.lifecycle)
+                export(libs.essenty.backHandler)
             }
         }
     }
@@ -52,6 +53,7 @@ kotlin {
                 implementation(libs.touchlab.kermit)
                 api(libs.decompose.decompose)
                 api(libs.essenty.lifecycle)
+                api(libs.essenty.backHandler)
                 api(libs.decompose.extensions.compose)
             }
         }

@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- The app puts the current screen in the URL path, so a reload at e.g. `/details/7` would
+         otherwise resolve every relative URL against `/details/` -- including the
+         `./composeResources/...` fetches Compose issues for drawables and fonts. -->
+    <base href="/">
     <title>base_kmp_project</title>
     <link type="text/css" rel="stylesheet" href="styles.css">
 </head>

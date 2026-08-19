@@ -4,6 +4,7 @@ import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.runCatching
 import com.github.michaelbull.result.throwIf
 import io.ktor.client.HttpClient
+import io.ktor.client.HttpClientConfig
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.auth.Auth
@@ -18,6 +19,7 @@ import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.http.takeFrom
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.util.AttributeKey
 import kotlinx.coroutines.CancellationException
@@ -31,57 +33,74 @@ fun createJson() = Json {
 private const val RequestTimeoutMillis = 30_000L
 private const val SocketTimeoutMillis = 30_000L
 
-@Suppress("LongMethod", "LongParameterList")
+@Suppress("LongParameterList")
 fun createHttpClient(
     config: NetworkConfig,
     bearerTokenSource: BearerTokenSource,
     clientLogger: Logger,
     json: Json = createJson(),
     logLevel: LogLevel = LogLevel.HEADERS,
-): HttpClient {
-    return HttpClient {
-        install(ContentNegotiation) { json(json) }
-        install(HttpTimeout) {
-            requestTimeoutMillis = RequestTimeoutMillis
-            socketTimeoutMillis = SocketTimeoutMillis
-        }
-        install(Logging) {
-            logger = ktorPlatformLogger(clientLogger)
-            level = logLevel
-        }
-        expectSuccess = true
-        defaultRequest {
-            // https://github.com/ktorio/ktor/issues/537
-            url {
-                if (host == "localhost") {
-                    protocol = config.baseUrl.protocol
-                    host = config.baseUrl.host
-                }
-                if (contentType() == null) {
-                    contentType(config.contentType)
-                }
-            }
-            config.defaultHeaders.forEach { (key, value) -> header(key, value) }
-        }
+): HttpClient = HttpClient {
+    installNetworking(
+        config,
+        bearerTokenSource,
+        json,
+        tokenClient(json, logLevel, clientLogger),
+        ktorPlatformLogger(clientLogger),
+        logLevel,
+    )
+}
 
-        val tokenClient = tokenClient(json, logLevel, clientLogger)
-        install(Auth) {
-            bearer {
-                sendWithoutRequest { it.isAuthenticationEnabled() }
-                loadTokens { getBearerTokensFromSource(bearerTokenSource) }
-                refreshTokens {
-                    runCatching {
-                            val bearerTokens = getBearerTokensFromSource(bearerTokenSource)
-                            if (oldTokens?.accessToken != bearerTokens?.accessToken) {
-                                bearerTokens
-                            } else {
-                                refreshTokenFromClient(bearerTokenSource, tokenClient)
-                                getBearerTokensFromSource(bearerTokenSource)
-                            }
+/**
+ * Split out of [createHttpClient] so the engine stays the caller's choice: `HttpClient { }`
+ * resolves one off the classpath, which leaves no seam for a test to answer requests without a
+ * network.
+ */
+@Suppress("LongMethod", "LongParameterList")
+internal fun HttpClientConfig<*>.installNetworking(
+    config: NetworkConfig,
+    bearerTokenSource: BearerTokenSource,
+    json: Json,
+    tokenClient: HttpClient,
+    clientLogger: Logger,
+    logLevel: LogLevel,
+) {
+    install(ContentNegotiation) { json(json) }
+    install(HttpTimeout) {
+        requestTimeoutMillis = RequestTimeoutMillis
+        socketTimeoutMillis = SocketTimeoutMillis
+    }
+    install(Logging) {
+        logger = clientLogger
+        level = logLevel
+    }
+    expectSuccess = true
+    defaultRequest {
+        // Only fills in what the call left out: `DefaultRequest` keeps a request's own host when it
+        // has one, so an absolute url still goes where it says.
+        url.takeFrom(config.baseUrl)
+        if (contentType() == null) {
+            contentType(config.contentType)
+        }
+        config.defaultHeaders.forEach { (key, value) -> header(key, value) }
+    }
+
+    install(Auth) {
+        bearer {
+            sendWithoutRequest { it.isAuthenticationEnabled() }
+            loadTokens { getBearerTokensFromSource(bearerTokenSource) }
+            refreshTokens {
+                runCatching {
+                        val bearerTokens = getBearerTokensFromSource(bearerTokenSource)
+                        if (oldTokens?.accessToken != bearerTokens?.accessToken) {
+                            bearerTokens
+                        } else {
+                            refreshTokenFromClient(bearerTokenSource, tokenClient)
+                            getBearerTokensFromSource(bearerTokenSource)
                         }
-                        .throwIf { it is CancellationException }
-                        .getOrElse { getBearerTokensFromSource(bearerTokenSource) }
-                }
+                    }
+                    .throwIf { it is CancellationException }
+                    .getOrElse { getBearerTokensFromSource(bearerTokenSource) }
             }
         }
     }

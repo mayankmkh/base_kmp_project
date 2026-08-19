@@ -103,6 +103,13 @@ class ClientTest {
         assertTrue(source.refreshUnauthorizedCalled)
     }
 
+    @Test
+    fun `every target ships an engine createHttpClient can find`() {
+        // `HttpClient { }` resolves one off the classpath and throws where the source set declares
+        // none, which the tests above cannot see -- they hand it a MockEngine.
+        createHttpClient(config, FakeBearerTokenSource(), SilentLogger).close()
+    }
+
     private fun client(
         engine: MockEngine,
         source: FakeBearerTokenSource = FakeBearerTokenSource(),

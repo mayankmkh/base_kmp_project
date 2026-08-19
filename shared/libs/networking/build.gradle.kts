@@ -28,6 +28,13 @@ kotlin {
                 implementation(libs.ktor.client.okhttp)
             }
         }
+        jvmMain {
+            dependencies {
+                // Desktop needs an engine of its own; without one `createHttpClient` finds nothing
+                // on the classpath and throws on the first call.
+                implementation(libs.ktor.client.okhttp)
+            }
+        }
         iosMain {
             dependencies {
                 implementation(libs.ktor.client.darwin)

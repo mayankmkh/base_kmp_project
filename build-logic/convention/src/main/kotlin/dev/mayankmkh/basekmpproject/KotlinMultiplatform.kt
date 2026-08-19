@@ -21,7 +21,6 @@ import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import dev.mayankmkh.basekmpproject.convention.core.androidSdkConfig
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
-import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
 import org.gradle.kotlin.dsl.assign
@@ -84,6 +83,15 @@ internal fun Project.configureKotlinAndroid(
         compileOptions.isCoreLibraryDesugaringEnabled = true
     }
 
+    // `KotlinJvmCompile` is the interface implemented both by KGP's own `KotlinCompile` tasks and by
+    // the ones AGP 9 registers for built-in Kotlin. In a pure-Android module every such task is an
+    // Android compilation, so the blanket `withType` is exact here.
+    tasks.withType<KotlinJvmCompile>().configureEach {
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_11
+        }
+    }
+
     configureKotlin()
 
     dependencies {
@@ -95,13 +103,10 @@ internal fun Project.configureKotlinAndroid(
  * Configure base Kotlin options for JVM (non-Android)
  */
 internal fun Project.configureKotlinJvm() {
-    extensions.configure<JavaPluginExtension> {
-        // Up to Java 11 APIs are available through desugaring
-        // https://developer.android.com/studio/write/java11-minimal-support-table
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
+    // No `jvmTarget` and no `sourceCompatibility`: both then follow the Gradle daemon JDK, which
+    // `gradle-daemon-jvm.properties` pins and auto-provisions. That is the JVM jpackage builds the
+    // desktop runtime image from, so the bytecode level and the shipped JRE cannot drift apart.
+    // Nothing here needs the Android desugaring baseline -- this module ships its own runtime.
     configureKotlin()
 }
 
@@ -117,6 +122,14 @@ internal fun Project.configureKotlinMultiplatformAndroidLibrary(
         compileSdk = sdk.compileSdk
         minSdk = sdk.minSdk
         namespace = "dev.mayankmkh.basekmpproject" + project.path.replace(':', '.').replace('-', '.')
+
+        // Android alone. The jvm target is deliberately left unpinned so it follows the Gradle
+        // daemon JDK, which `gradle-daemon-jvm.properties` pins and auto-provisions -- that is the
+        // same JVM jpackage builds the desktop runtime image from, so the bytecode level and the
+        // shipped JRE move together instead of needing two edits to stay in step.
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_11
+        }
 
         // KMP Android resources are opt-in in AGP.
         androidResources.enable = true
@@ -209,15 +222,6 @@ internal fun Project.configureKotlin() {
             compilerOptions {
                 freeCompilerArgs.addAll(COMMON_FREE_COMPILER_ARGS)
             }
-        }
-    }
-
-    // `jvmTarget` only exists on the JVM-flavoured compilations. `KotlinJvmCompile` is the interface
-    // implemented both by KGP's own `KotlinCompile` tasks (KMP jvm/android compilations) and by the
-    // tasks AGP 9 registers for built-in Kotlin.
-    tasks.withType<KotlinJvmCompile>().configureEach {
-        compilerOptions {
-            jvmTarget = JvmTarget.JVM_11
         }
     }
 }

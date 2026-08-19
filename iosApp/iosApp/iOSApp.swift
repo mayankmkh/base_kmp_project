@@ -12,7 +12,7 @@ struct iOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(root: appDelegate.root)
+            ContentView(root: appDelegate.root, backDispatcher: appDelegate.backDispatcher)
         }
     }
 }

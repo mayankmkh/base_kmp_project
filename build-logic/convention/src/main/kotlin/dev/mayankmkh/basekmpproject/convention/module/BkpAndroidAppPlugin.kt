@@ -58,6 +58,9 @@ class BkpAndroidAppPlugin : Plugin<Project> {
             }
 
             dependencies {
+                // The runner named in `testInstrumentationRunner` above ships in this artifact and
+                // nothing else pulls it in, so without it a device test fails to start.
+                "androidTestImplementation"(libs.findLibrary("androidx.test.runner").get())
                 "implementation"(platform(libs.findLibrary("koin.bom").get()))
                 "implementation"(libs.findLibrary("koin.android").get())
             }

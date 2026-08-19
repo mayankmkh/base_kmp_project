@@ -34,7 +34,6 @@ kotlin = "2.4.10"
 kotlinResult = "2.3.1"
 kotlinx-coroutines = "1.11.0"
 kotlinxSerialization = "1.11.0"
-ksp = "2.3.11"
 ktor = "3.5.2"
 spotless = "8.9.0"
 touchlabKermit = "2.1.0"
@@ -133,7 +132,6 @@ gms-gradlePlugin = { group = "com.google.gms", name = "google-services", version
 jetbrains-compose-gradlePlugin = { group = "org.jetbrains.compose", name = "compose-gradle-plugin", version.ref = "composeMultiplatform" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlin-powerAssert-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-power-assert", version.ref = "kotlin" }
-ksp-gradlePlugin = { group = "com.google.devtools.ksp", name = "com.google.devtools.ksp.gradle.plugin", version.ref = "ksp" }
 spotless-gradlePlugin = { group = "com.diffplug.spotless", name = "spotless-plugin-gradle", version.ref = "spotless" }
 truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
 
@@ -169,7 +167,6 @@ kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref =
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kotlin-powerAssert = { id = "org.jetbrains.kotlin.plugin.power-assert", version.ref = "kotlin" }
-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 
 # New V3 convention plugins

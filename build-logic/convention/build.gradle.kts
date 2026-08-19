@@ -51,7 +51,6 @@ dependencies {
     compileOnly(libs.kotlin.gradlePlugin)
     compileOnly(libs.kotlin.powerAssert.gradlePlugin)
     compileOnly(libs.jetbrains.compose.gradlePlugin)
-    compileOnly(libs.ksp.gradlePlugin)
     compileOnly(libs.spotless.gradlePlugin)
     compileOnly(libs.detekt.gradlePlugin)
     lintChecks(libs.androidx.lint.gradle)

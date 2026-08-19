@@ -21,7 +21,10 @@ import org.gradle.api.Project
 import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
+import org.gradle.kotlin.dsl.getByType
+import org.jetbrains.compose.ComposePlugin
 import org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginExtension
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 /**
  * Configure Compose-specific options
@@ -51,6 +54,8 @@ internal fun Project.configureKMPCompose(
         "commonMainImplementation"(libs.findBundle("compose.common.main").get())
     }
 
+    configureComposeUiTest()
+
     // Reactive rather than a flag read: whether the module has an Android target is decided by its
     // own `bkpTargets { }` block, which runs after this plugin has applied.
     pluginManager.withPlugin("com.android.kotlin.multiplatform.library") {
@@ -64,6 +69,29 @@ internal fun Project.configureKMPCompose(
     }
 
     configureComposeCompiler()
+}
+
+/**
+ * Puts the Compose test APIs on the jvm target only.
+ *
+ * `runComposeUiTest` needs a real Android looper on the Android target, which off-device means
+ * Robolectric and a `@RunWith` that cannot live in `commonTest` anyway. What these tests check --
+ * which state draws what, which tap calls back -- is common code that behaves the same wherever it
+ * renders, so one target is enough. A module wanting an iOS or web run adds the same two lines to
+ * its own source set.
+ */
+private fun Project.configureComposeUiTest() {
+    extensions.getByType<KotlinMultiplatformExtension>().sourceSets.configureEach {
+        if (name != "jvmTest") return@configureEach
+
+        dependencies {
+            implementation(libs.findLibrary("compose.ui.test").get())
+            // Desktop Compose draws through Skia, and the native Skia binaries ship only in the
+            // per-OS artifact this resolves to -- the plain `desktop` module carries none.
+            @Suppress("DEPRECATION")
+            implementation(ComposePlugin.DesktopDependencies.currentOs)
+        }
+    }
 }
 
 @Suppress("UnstableApiUsage")

@@ -44,6 +44,9 @@ class BkpAndroidLibPlugin : Plugin<Project> {
             // are optional expectations that only a framework artifact supplies, and the variant
             // that picks one automatically is a KGP feature this module deliberately does without.
             dependencies {
+                // The runner named in `testInstrumentationRunner` above ships in this artifact and
+                // nothing else pulls it in, so without it a device test fails to start.
+                "androidTestImplementation"(libs.findLibrary("androidx.test.runner").get())
                 "androidTestImplementation"(libs.findLibrary("kotlin.test").get())
                 "androidTestImplementation"(libs.findLibrary("kotlin.testJunit").get())
                 "testImplementation"(libs.findLibrary("kotlin.test").get())

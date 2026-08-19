@@ -142,6 +142,9 @@ internal fun Project.configureKotlinMultiplatformAndroidLibrary(
 
     dependencies {
         "coreLibraryDesugaring"(libs.findLibrary("android.desugarJdkLibs").get())
+        // The runner named above ships in this artifact and nothing else pulls it in, so without
+        // it a device test fails to start.
+        "androidDeviceTestImplementation"(libs.findLibrary("androidx.test.runner").get())
     }
 }
 

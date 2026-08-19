@@ -7,7 +7,6 @@ android-minSdk = "23"
 android-targetSdk = "37"
 androidDesugarJdkLibs = "2.1.5"
 androidx-activity = "1.13.0"
-androidx-appcompat = "1.8.0"
 androidx-core = "1.19.0"
 # 1.3.0-alphaNN, not stable 1.2.1: the web implementation (`WebLocalStorage`) landed in the alphas,
 # and 1.2.1's wasmJs artifacts are stubs that throw. Drop to the stable line to give up web prefs.
@@ -18,7 +17,6 @@ androidx-lifecycle = "2.11.0"
 jetbrains-lifecycle = "2.11.0"
 androidx-lint-gradle = "1.0.0"
 androidx-test-runner = "1.7.0"
-androidx-test-core = "1.7.0"
 composeMultiplatform = "1.11.1"
 # The standalone material3 train lags Compose Multiplatform; 1.9.0 is its latest stable.
 composeMaterial3 = "1.9.0"
@@ -48,7 +46,6 @@ turbine = "1.2.0"
 android-desugarJdkLibs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "androidDesugarJdkLibs" }
 
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
-androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel", version.ref = "jetbrains-lifecycle" }
 androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "jetbrains-lifecycle" }
@@ -58,6 +55,8 @@ androidx-datastore-core = { group = "androidx.datastore", name = "datastore-core
 androidx-datastore-preferences-core = { group = "androidx.datastore", name = "datastore-preferences-core", version.ref = "androidx-datastore" }
 androidx-datastore-core-okio = { group = "androidx.datastore", name = "datastore-core-okio", version.ref = "androidx-datastore" }
 androidx-lifecycle-runtimeTesting = { group = "androidx.lifecycle", name = "lifecycle-runtime-testing", version.ref = "androidx-lifecycle" }
+# Supplies the `AndroidJUnitRunner` the Android modules name as their instrumentation runner.
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidx-test-runner" }
 compose-runtime = { group = "org.jetbrains.compose.runtime", name = "runtime", version.ref = "composeMultiplatform" }
 compose-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "composeMultiplatform" }
 compose-material3 = { group = "org.jetbrains.compose.material3", name = "material3", version.ref = "composeMaterial3" }
@@ -125,8 +124,6 @@ turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
 android-tools-common = { group = "com.android.tools", name = "common", version.ref = "android-tools" }
 androidx-lint-gradle = { group = "androidx.lint", name = "lint-gradle", version.ref = "androidx-lint-gradle" }
-androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidx-test-runner" }
-androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidx-test-core" }
 compose-gradlePlugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
 detekt-gradlePlugin = { group = "dev.detekt", name = "detekt-gradle-plugin", version.ref = "detekt" }
 detekt-composeRules = { group = "io.nlopez.compose.rules", name = "detekt", version.ref = "detektComposeRules" }

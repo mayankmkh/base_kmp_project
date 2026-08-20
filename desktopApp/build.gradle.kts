@@ -18,6 +18,10 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "dev.mayankmkh.base_kmp_project"
             packageVersion = "1.0.0"
+
+            // Reported by `suggestRuntimeModules`. DataStore's bundled protobuf needs
+            // sun.misc.Unsafe, which jlink leaves out unless jdk.unsupported is asked for.
+            modules("java.instrument", "jdk.unsupported")
         }
 
         buildTypes.release.proguard {

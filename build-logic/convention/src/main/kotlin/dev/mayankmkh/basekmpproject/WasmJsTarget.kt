@@ -22,11 +22,20 @@ import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinWasmJsTargetDsl
  * `browser()` over `nodejs()`/`d8()`. The target only compiles; an environment is what gives it run
  * and test tasks, and the browser is the one this project ships to. It is also the expensive half:
  * `browser()` is what drags in the npm toolchain that costs the build its project isolation.
+ *
+ * `binaries.executable()` on every module, libraries included. Nothing consumes a library's bundle;
+ * what needs it is the browser *test* bundle, which is where skiko's JS glue gets webpacked in. A
+ * wasm test that calls `runComposeUiTest` without it dies on a missing `1nMakeRasterN32Premul`
+ * (CMP-4906), and Compose 1.12's `checkComposeUiTestConfigurationForWasmJs` fails the build rather
+ * than let that happen. No such test exists yet -- the Compose test APIs are jvm-only, see
+ * `SharedCompose` -- but `commonTest` reaches wasm, so the first one written would hit it. The
+ * bundles cost about 40s on a cold build, nothing on a warm one, and stay inside `build/`.
  */
 @OptIn(ExperimentalWasmDsl::class)
 internal fun KotlinMultiplatformExtension.wasmJsBrowser(configure: KotlinWasmJsTargetDsl.() -> Unit = {}) {
     wasmJs {
         browser()
+        binaries.executable()
         configure()
     }
 }

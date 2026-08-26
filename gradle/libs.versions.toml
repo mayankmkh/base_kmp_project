@@ -12,12 +12,9 @@ androidx-core = "1.19.0"
 # and 1.2.1's wasmJs artifacts are stubs that throw. Drop to the stable line to give up web prefs.
 androidx-datastore = "1.3.0-alpha10"
 androidx-lifecycle = "2.11.0"
-# `org.jetbrains.androidx.lifecycle` is the Compose Multiplatform port, a separate release train from
-# AndroidX's own `androidx.lifecycle`. They happen to be aligned today; do not collapse the two refs.
-jetbrains-lifecycle = "2.11.0"
 androidx-lint-gradle = "1.0.0"
 androidx-test-runner = "1.7.0"
-composeMultiplatform = "1.11.1"
+composeMultiplatform = "1.12.0"
 # The standalone material3 train lags Compose Multiplatform; 1.9.0 is its latest stable.
 composeMaterial3 = "1.9.0"
 decompose = "3.5.0"
@@ -46,8 +43,10 @@ android-desugarJdkLibs = { group = "com.android.tools", name = "desugar_jdk_libs
 
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
-androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel", version.ref = "jetbrains-lifecycle" }
-androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "jetbrains-lifecycle" }
+# `androidx.lifecycle`, not the `org.jetbrains.androidx.lifecycle` port: the port is a redirect stub
+# now -- a 7KB klib that depends on this one -- and having both on a klib path collides their
+# `unique_name`s. AndroidX publishes the wasmJs and iOS variants itself, `-navigation3` included.
+androidx-lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel", version.ref = "androidx-lifecycle" }
 # The `-core` artifacts, not the `datastore`/`datastore-preferences` umbrellas: the umbrellas add
 # Android-only conveniences this project does not use, and they publish no wasmJs variant.
 androidx-datastore-core = { group = "androidx.datastore", name = "datastore-core", version.ref = "androidx-datastore" }

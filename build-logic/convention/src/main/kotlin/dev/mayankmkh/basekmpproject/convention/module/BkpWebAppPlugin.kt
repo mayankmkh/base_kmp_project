@@ -25,11 +25,7 @@ class BkpWebAppPlugin : Plugin<Project> {
             apply(plugin = "bkp.kmp.lib.compose")
 
             val kotlin = extensions.getByType<KotlinMultiplatformExtension>()
-            (kotlin as ExtensionAware).extensions.getByType<BkpTargets>().web {
-                // A library target produces a klib; an app has to produce something the browser can
-                // load, which is what turns on the webpack bundling and the `*Run` tasks.
-                binaries.executable()
-            }
+            (kotlin as ExtensionAware).extensions.getByType<BkpTargets>().web()
         }
     }
 }

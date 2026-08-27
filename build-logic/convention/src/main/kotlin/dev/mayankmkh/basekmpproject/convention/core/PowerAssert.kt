@@ -8,15 +8,16 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 // The shipped default only rewrites `kotlin.assert`, which nothing here calls, so the plugin would
 // be inert without naming the `kotlin.test` functions in use.
-internal val POWER_ASSERT_FUNCTIONS = listOf(
-    "kotlin.assert",
-    "kotlin.test.assertEquals",
-    "kotlin.test.assertNotEquals",
-    "kotlin.test.assertTrue",
-    "kotlin.test.assertFalse",
-    "kotlin.test.assertNull",
-    "kotlin.test.assertNotNull",
-)
+internal val POWER_ASSERT_FUNCTIONS =
+    listOf(
+        "kotlin.assert",
+        "kotlin.test.assertEquals",
+        "kotlin.test.assertNotEquals",
+        "kotlin.test.assertTrue",
+        "kotlin.test.assertFalse",
+        "kotlin.test.assertNull",
+        "kotlin.test.assertNotNull",
+    )
 
 /**
  * Attaches power-assert by hand for modules on AGP 9's built-in Kotlin.
@@ -28,9 +29,10 @@ internal val POWER_ASSERT_FUNCTIONS = listOf(
  * directly -- an unsupported hook that may need revisiting on an AGP upgrade.
  */
 internal fun Project.configureAndroidPowerAssert() {
-    val compilerPlugin = configurations.detachedConfiguration(
-        dependencies.create(libs.findLibrary("kotlin.powerAssert.compilerPlugin").get().get()),
-    )
+    val compilerPlugin =
+        configurations.detachedConfiguration(
+            dependencies.create(libs.findLibrary("kotlin.powerAssert.compilerPlugin").get().get())
+        )
     val options = POWER_ASSERT_FUNCTIONS.flatMap {
         listOf("-P", "plugin:org.jetbrains.kotlin.powerassert:function=$it")
     }

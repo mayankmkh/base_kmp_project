@@ -20,6 +20,7 @@ import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.variant.AndroidComponentsExtension
 import com.android.build.api.variant.BuiltArtifactsLoader
 import com.android.build.api.variant.HasAndroidTest
+import java.io.File
 import org.gradle.api.DefaultTask
 import org.gradle.api.Project
 import org.gradle.api.file.Directory
@@ -35,7 +36,6 @@ import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.kotlin.dsl.assign
 import org.gradle.work.DisableCachingByDefault
-import java.io.File
 
 internal fun Project.configurePrintApksTask(extension: AndroidComponentsExtension<*, *, *>) {
     extension.onVariants { variant ->
@@ -45,11 +45,12 @@ internal fun Project.configurePrintApksTask(extension: AndroidComponentsExtensio
             val javaSources = variant.androidTest?.sources?.java?.all
             val kotlinSources = variant.androidTest?.sources?.kotlin?.all
 
-            val testSources = if (javaSources != null && kotlinSources != null) {
-                javaSources.zip(kotlinSources) { javaDirs, kotlinDirs ->
-                    javaDirs + kotlinDirs
-                }
-            } else javaSources ?: kotlinSources
+            val testSources =
+                if (javaSources != null && kotlinSources != null) {
+                    javaSources.zip(kotlinSources) { javaDirs, kotlinDirs ->
+                        javaDirs + kotlinDirs
+                    }
+                } else javaSources ?: kotlinSources
 
             if (artifact != null && testSources != null) {
                 tasks.register(
@@ -77,27 +78,26 @@ internal abstract class PrintApkLocationTask : DefaultTask() {
     @get:InputFiles
     abstract val sources: ListProperty<Directory>
 
-    @get:Internal
-    abstract val builtArtifactsLoader: Property<BuiltArtifactsLoader>
+    @get:Internal abstract val builtArtifactsLoader: Property<BuiltArtifactsLoader>
 
-    @get:Input
-    abstract val variantName: Property<String>
+    @get:Input abstract val variantName: Property<String>
 
     @TaskAction
     fun taskAction() {
-        val hasFiles = sources.orNull?.any { directory ->
-            directory.asFileTree.files.any {
-                it.isFile && "build${File.separator}generated" !in it.parentFile.path
-            }
-        } ?: throw RuntimeException("Cannot check androidTest sources")
+        val hasFiles =
+            sources.orNull?.any { directory ->
+                directory.asFileTree.files.any {
+                    it.isFile && "build${File.separator}generated" !in it.parentFile.path
+                }
+            } ?: throw RuntimeException("Cannot check androidTest sources")
 
         // Don't print APK location if there are no androidTest source files
         if (!hasFiles) return
 
-        val builtArtifacts = builtArtifactsLoader.get().load(apkFolder.get())
-            ?: throw RuntimeException("Cannot load APKs")
-        if (builtArtifacts.elements.size != 1)
-            throw RuntimeException("Expected one APK !")
+        val builtArtifacts =
+            builtArtifactsLoader.get().load(apkFolder.get())
+                ?: throw RuntimeException("Cannot load APKs")
+        if (builtArtifacts.elements.size != 1) throw RuntimeException("Expected one APK !")
         val apk = File(builtArtifacts.elements.single().outputFile).toPath()
         println(apk)
     }

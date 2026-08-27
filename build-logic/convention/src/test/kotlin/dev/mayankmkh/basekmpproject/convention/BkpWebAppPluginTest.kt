@@ -1,9 +1,9 @@
 package dev.mayankmkh.basekmpproject.convention
 
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import kotlin.test.assertContains
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 
 /**
  * `bkp.web.app` is the one primary that declares a target on the module's behalf, so what it
@@ -11,13 +11,14 @@ import kotlin.test.assertContains
  */
 class BkpWebAppPluginTest {
 
-    @field:TempDir
-    lateinit var projectDir: File
+    @field:TempDir lateinit var projectDir: File
 
     @Test
     fun `web app declares the wasmJs target and nothing else`() {
-        val result = TestProject(projectDir).withBuildScript(
-            """
+        val result =
+            TestProject(projectDir)
+                .withBuildScript(
+                    """
             plugins { id("bkp.web.app") }
 
             afterEvaluate {
@@ -25,8 +26,9 @@ class BkpWebAppPluginTest {
                 val names = kotlin.targets.map { it.name }.filter { it != "metadata" }.sorted()
                 println("TARGETS=" + names.joinToString(","))
             }
-            """,
-        ).run()
+            """
+                )
+                .run()
 
         assertContains(result.output, "TARGETS=wasmJs")
     }
@@ -37,11 +39,14 @@ class BkpWebAppPluginTest {
      */
     @Test
     fun `web app produces a browser executable`() {
-        val result = TestProject(projectDir).withBuildScript(
-            """
+        val result =
+            TestProject(projectDir)
+                .withBuildScript(
+                    """
             plugins { id("bkp.web.app") }
-            """,
-        ).run("tasks", "--all")
+            """
+                )
+                .run("tasks", "--all")
 
         assertContains(result.output, "wasmJsBrowserDevelopmentRun")
     }

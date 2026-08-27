@@ -18,7 +18,8 @@ import org.gradle.kotlin.dsl.get
 class BkpAndroidLibPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
-            // AGP 9 has built-in Kotlin support; `org.jetbrains.kotlin.android` must not be applied.
+            // AGP 9 has built-in Kotlin support; `org.jetbrains.kotlin.android` must not be
+            // applied.
             apply(plugin = "com.android.library")
             apply(plugin = "bkp.quality.style")
             apply(plugin = "bkp.quality.lint")
@@ -32,7 +33,9 @@ class BkpAndroidLibPlugin : Plugin<Project> {
                 testOptions.targetSdk = sdk.targetSdk
                 defaultConfig.testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
                 testOptions.animationsDisabled = true
-                namespace = "dev.mayankmkh.basekmpproject" + project.path.replace(':', '.').replace('-', '.')
+                namespace =
+                    "dev.mayankmkh.basekmpproject" +
+                        project.path.replace(':', '.').replace('-', '.')
             }
             extensions.configure<LibraryAndroidComponentsExtension> {
                 configurePrintApksTask(this)

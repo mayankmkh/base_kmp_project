@@ -40,34 +40,33 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
  * native, JVM and Android alike -- so that all source sets are analysed under the same language
  * rules.
  */
-private val COMMON_FREE_COMPILER_ARGS = listOf(
-    // Enable experimental coroutines APIs, including Flow
-    "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-    /**
-     * Remove this arg after Phase 3.
-     * https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/-consistent-copy-visibility/#deprecation-timeline
-     *
-     * Deprecation timeline
-     * Phase 3. (Still not reached as of Kotlin 2.4 -- dropping the flag reinstates the
-     * "Non-public primary constructor is exposed via the generated 'copy()'" warning.)
-     * The default changes.
-     * Unless ExposedCopyVisibility is used, the generated 'copy' method has the same visibility as the primary constructor.
-     * The binary signature changes. The error on the declaration is no longer reported.
-     * '-Xconsistent-data-class-copy-visibility' compiler flag and ConsistentCopyVisibility annotation are now unnecessary.
-     */
-    "-Xconsistent-data-class-copy-visibility",
-    // `expect`/`actual` classes are still Beta and warn on every `actual` declaration. The design
-    // deliberately uses them (see `PrefContext`), so accept them project-wide instead of annotating
-    // each actual. Drop this once KT-61573 stabilises them.
-    "-Xexpect-actual-classes",
-)
+private val COMMON_FREE_COMPILER_ARGS =
+    listOf(
+        // Enable experimental coroutines APIs, including Flow
+        "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+        /**
+         * Remove this arg after Phase 3.
+         * https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/-consistent-copy-visibility/#deprecation-timeline
+         *
+         * Deprecation timeline Phase 3. (Still not reached as of Kotlin 2.4 -- dropping the flag
+         * reinstates the "Non-public primary constructor is exposed via the generated 'copy()'"
+         * warning.) The default changes. Unless ExposedCopyVisibility is used, the generated 'copy'
+         * method has the same visibility as the primary constructor. The binary signature changes.
+         * The error on the declaration is no longer reported.
+         * '-Xconsistent-data-class-copy-visibility' compiler flag and ConsistentCopyVisibility
+         * annotation are now unnecessary.
+         */
+        "-Xconsistent-data-class-copy-visibility",
+        // `expect`/`actual` classes are still Beta and warn on every `actual` declaration. The
+        // design
+        // deliberately uses them (see `PrefContext`), so accept them project-wide instead of
+        // annotating
+        // each actual. Drop this once KT-61573 stabilises them.
+        "-Xexpect-actual-classes",
+    )
 
-/**
- * Configure base Kotlin with Android options
- */
-internal fun Project.configureKotlinAndroid(
-    commonExtension: CommonExtension,
-) {
+/** Configure base Kotlin with Android options */
+internal fun Project.configureKotlinAndroid(commonExtension: CommonExtension) {
     // AGP 9's `CommonExtension` is no longer generic and only exposes getters — the block DSL
     // (`defaultConfig { }`, `compileOptions { }`) lives on the concrete extension types, so the
     // shared helper configures the nested objects through property access instead.
@@ -83,7 +82,8 @@ internal fun Project.configureKotlinAndroid(
         compileOptions.isCoreLibraryDesugaringEnabled = true
     }
 
-    // `KotlinJvmCompile` is the interface implemented both by KGP's own `KotlinCompile` tasks and by
+    // `KotlinJvmCompile` is the interface implemented both by KGP's own `KotlinCompile` tasks and
+    // by
     // the ones AGP 9 registers for built-in Kotlin. In a pure-Android module every such task is an
     // Android compilation, so the blanket `withType` is exact here.
     tasks.withType<KotlinJvmCompile>().configureEach {
@@ -99,9 +99,7 @@ internal fun Project.configureKotlinAndroid(
     }
 }
 
-/**
- * Configure base Kotlin options for JVM (non-Android)
- */
+/** Configure base Kotlin options for JVM (non-Android) */
 internal fun Project.configureKotlinJvm() {
     // No `jvmTarget` and no `sourceCompatibility`: both then follow the Gradle daemon JDK, which
     // `gradle-daemon-jvm.properties` pins and auto-provisions. That is the JVM jpackage builds the
@@ -111,47 +109,55 @@ internal fun Project.configureKotlinJvm() {
 }
 
 internal fun Project.configureKotlinMultiplatformAndroidLibrary(
-    kotlinMultiplatformExtension: KotlinMultiplatformExtension,
+    kotlinMultiplatformExtension: KotlinMultiplatformExtension
 ) {
     val sdk = androidSdkConfig()
 
     // The KMP Android plugin deliberately does not register a project-level extension: the target
     // *is* the DSL object, so it is reached through the target container rather than by name.
     // https://developer.android.com/kotlin/multiplatform/kmp-integration
-    kotlinMultiplatformExtension.targets.withType<KotlinMultiplatformAndroidLibraryTarget>().configureEach {
-        compileSdk = sdk.compileSdk
-        minSdk = sdk.minSdk
-        namespace = "dev.mayankmkh.basekmpproject" + project.path.replace(':', '.').replace('-', '.')
+    kotlinMultiplatformExtension.targets
+        .withType<KotlinMultiplatformAndroidLibraryTarget>()
+        .configureEach {
+            compileSdk = sdk.compileSdk
+            minSdk = sdk.minSdk
+            namespace =
+                "dev.mayankmkh.basekmpproject" + project.path.replace(':', '.').replace('-', '.')
 
-        // Android alone. The jvm target is deliberately left unpinned so it follows the Gradle
-        // daemon JDK, which `gradle-daemon-jvm.properties` pins and auto-provisions -- that is the
-        // same JVM jpackage builds the desktop runtime image from, so the bytecode level and the
-        // shipped JRE move together instead of needing two edits to stay in step.
-        compilerOptions {
-            jvmTarget = JvmTarget.JVM_11
-        }
-
-        // KMP Android resources are opt-in in AGP.
-        androidResources.enable = true
-        enableCoreLibraryDesugaring = true
-
-        // Host tests are opt-in too, and without them `commonTest` has no Android compilation at
-        // all -- shared tests would run on jvm and ios but silently skip the Android target.
-        withHostTest { isIncludeAndroidResources = true }
-
-        // Device tests are opt-in as well. No shared module has instrumented tests today, but
-        // without this an `src/androidDeviceTest` directory added later is simply never compiled --
-        // no source set, no task, no error. `sourceSetTreeName = "test"` is what puts it under the
-        // same `commonTest` tree as the host tests.
-        withDeviceTestBuilder { sourceSetTreeName = "test" }
-            .configure {
-                instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-                // `targetSdk` has no `defaultConfig` equivalent on a KMP Android library; the
-                // device test compilation is the only place it applies, and without it these
-                // modules silently drop off the catalog value the other primaries use.
-                targetSdk { version = release(sdk.targetSdk) }
+            // Android alone. The jvm target is deliberately left unpinned so it follows the Gradle
+            // daemon JDK, which `gradle-daemon-jvm.properties` pins and auto-provisions -- that is
+            // the
+            // same JVM jpackage builds the desktop runtime image from, so the bytecode level and
+            // the
+            // shipped JRE move together instead of needing two edits to stay in step.
+            compilerOptions {
+                jvmTarget = JvmTarget.JVM_11
             }
-    }
+
+            // KMP Android resources are opt-in in AGP.
+            androidResources.enable = true
+            enableCoreLibraryDesugaring = true
+
+            // Host tests are opt-in too, and without them `commonTest` has no Android compilation
+            // at
+            // all -- shared tests would run on jvm and ios but silently skip the Android target.
+            withHostTest { isIncludeAndroidResources = true }
+
+            // Device tests are opt-in as well. No shared module has instrumented tests today, but
+            // without this an `src/androidDeviceTest` directory added later is simply never
+            // compiled --
+            // no source set, no task, no error. `sourceSetTreeName = "test"` is what puts it under
+            // the
+            // same `commonTest` tree as the host tests.
+            withDeviceTestBuilder { sourceSetTreeName = "test" }
+                .configure {
+                    instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+                    // `targetSdk` has no `defaultConfig` equivalent on a KMP Android library; the
+                    // device test compilation is the only place it applies, and without it these
+                    // modules silently drop off the catalog value the other primaries use.
+                    targetSdk { version = release(sdk.targetSdk) }
+                }
+        }
 
     dependencies {
         "coreLibraryDesugaring"(libs.findLibrary("android.desugarJdkLibs").get())
@@ -166,15 +172,13 @@ internal fun Project.configureKotlinMultiplatformAndroidLibrary(
  *
  * Each Kotlin/Native link forks its own compiler JVM sized by `kotlin.native.jvmArgs`, and the
  * release links need a large heap for the whole-program devirtualization analysis. Letting the
- * iosArm64 and iosSimulatorArm64 links run concurrently means two of those heaps plus the rest
- * of the build, which exhausts memory and fails with an [OutOfMemoryError] -- raising the heap
- * only brings the failure on sooner. Serialising them keeps the peak to a single compiler JVM.
+ * iosArm64 and iosSimulatorArm64 links run concurrently means two of those heaps plus the rest of
+ * the build, which exhausts memory and fails with an [OutOfMemoryError] -- raising the heap only
+ * brings the failure on sooner. Serialising them keeps the peak to a single compiler JVM.
  */
 abstract class KotlinNativeLinkThrottle : BuildService<BuildServiceParameters.None>
 
-/**
- * Configure base Kotlin options
- */
+/** Configure base Kotlin options */
 internal fun Project.configureKotlin() {
     val nativeLinkThrottle =
         gradle.sharedServices.registerIfAbsent(
@@ -189,9 +193,13 @@ internal fun Project.configureKotlin() {
 
     // Treat all Kotlin warnings as errors (disabled by default)
     // Override by setting warningsAsErrors=true in your ~/.gradle/gradle.properties
-    val warningsAsErrors = providers.gradleProperty("warningsAsErrors").map {
-        it.toBoolean()
-    }.orElse(false)
+    val warningsAsErrors =
+        providers
+            .gradleProperty("warningsAsErrors")
+            .map {
+                it.toBoolean()
+            }
+            .orElse(false)
 
     // `KotlinCompilationTask` covers every Kotlin compilation -- common metadata, native and JVM
     // alike. Scoping this to `KotlinJvmCompile` would compile common and native sources under

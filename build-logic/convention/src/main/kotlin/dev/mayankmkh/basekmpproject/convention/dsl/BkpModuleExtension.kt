@@ -1,8 +1,8 @@
 package dev.mayankmkh.basekmpproject.convention.dsl
 
+import javax.inject.Inject
 import org.gradle.api.Action
 import org.gradle.api.model.ObjectFactory
-import javax.inject.Inject
 
 abstract class BkpModuleExtension @Inject constructor(objects: ObjectFactory) {
     // `internal`, so a build script can only reach the features through the block below. Direct

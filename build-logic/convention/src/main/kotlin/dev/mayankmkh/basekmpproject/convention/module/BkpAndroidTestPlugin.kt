@@ -11,7 +11,8 @@ import org.gradle.kotlin.dsl.configure
 class BkpAndroidTestPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
-            // AGP 9 has built-in Kotlin support; `org.jetbrains.kotlin.android` must not be applied.
+            // AGP 9 has built-in Kotlin support; `org.jetbrains.kotlin.android` must not be
+            // applied.
             apply(plugin = "com.android.test")
             apply(plugin = "bkp.quality.style")
             apply(plugin = "bkp.quality.lint")

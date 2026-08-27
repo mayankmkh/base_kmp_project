@@ -18,7 +18,8 @@ import org.gradle.kotlin.dsl.dependencies
 class BkpAndroidAppPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
-            // AGP 9 has built-in Kotlin support; `org.jetbrains.kotlin.android` must not be applied.
+            // AGP 9 has built-in Kotlin support; `org.jetbrains.kotlin.android` must not be
+            // applied.
             apply(plugin = "com.android.application")
             apply(plugin = "bkp.quality.style")
             apply(plugin = "bkp.quality.lint")
@@ -34,8 +35,8 @@ class BkpAndroidAppPlugin : Plugin<Project> {
                 testOptions.animationsDisabled = true
                 configureBuildTypes(this)
 
-                // Two licence files that several JVM libraries each ship a copy of; without this the
-                // packager fails on the duplicates.
+                // Two licence files that several JVM libraries each ship a copy of; without this
+                // the packager fails on the duplicates.
                 packaging.resources.excludes.add("/META-INF/{AL2.0,LGPL2.1}")
 
                 // Off by default since AGP 8. An app is where `BuildConfig.DEBUG` and the generated

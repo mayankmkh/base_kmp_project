@@ -1,9 +1,9 @@
 package dev.mayankmkh.basekmpproject.convention
 
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import kotlin.test.assertContains
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 
 /**
  * What `bkpModule { features { } }` actually does to a module, as opposed to what the validator
@@ -11,20 +11,22 @@ import kotlin.test.assertContains
  */
 class BkpModuleFeaturesTest {
 
-    @field:TempDir
-    lateinit var projectDir: File
+    @field:TempDir lateinit var projectDir: File
 
     @Test
     fun `android app opting into demoProdFlavors gets demo and prod`() {
-        val result = TestProject(projectDir).withBuildScript(
-            androidApp(
-                """
+        val result =
+            TestProject(projectDir)
+                .withBuildScript(
+                    androidApp(
+                        """
                 bkpModule {
                     features { demoProdFlavors() }
                 }
-                """,
-            ),
-        ).run()
+                """
+                    )
+                )
+                .run()
 
         assertContains(result.output, "FLAVORS=demo,prod")
     }

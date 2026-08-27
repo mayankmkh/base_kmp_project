@@ -14,7 +14,8 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 class BkpValidationGraphPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         // Each project validates only itself. Walking `rootProject.allprojects` from
-        // `gradle.projectsEvaluated` -- and the extraProperties flag that made that walk happen once
+        // `gradle.projectsEvaluated` -- and the extraProperties flag that made that walk happen
+        // once
         // -- read and mutated other projects' models, which project isolation forbids. Every module
         // that has a bkp primary plugin also gets this one, so per-project checks cover exactly the
         // same set, and now fail at the offending project rather than after the whole build has
@@ -27,31 +28,35 @@ class BkpValidationGraphPlugin : Plugin<Project> {
 
     private fun validateProject(project: Project) {
         val primaryPlugins = PRIMARY_PLUGIN_IDS.filter(project.pluginManager::hasPlugin)
-        val hasAndroidApp = project.pluginManager.hasPlugin("bkp.android.app") ||
-            project.pluginManager.hasPlugin("bkp.android.app.compose")
+        val hasAndroidApp =
+            project.pluginManager.hasPlugin("bkp.android.app") ||
+                project.pluginManager.hasPlugin("bkp.android.app.compose")
         val hasAndroidAppFirebase = project.pluginManager.hasPlugin("bkp.android.app.firebase")
         val hasAndroidLib = project.pluginManager.hasPlugin("bkp.android.lib")
         val hasAndroidTest = project.pluginManager.hasPlugin("bkp.android.test")
-        val hasKmpFeature = project.pluginManager.hasPlugin("bkp.kmp.feature") ||
-            project.pluginManager.hasPlugin("bkp.kmp.feature.compose")
+        val hasKmpFeature =
+            project.pluginManager.hasPlugin("bkp.kmp.feature") ||
+                project.pluginManager.hasPlugin("bkp.kmp.feature.compose")
         val hasWebApp = project.pluginManager.hasPlugin("bkp.web.app")
-        // `bkp.kmp.feature*` and `bkp.web.app` are both built on `bkp.kmp.lib*`, so the lib group is
-        // only the module's own primary when neither of them claimed it first.
-        val hasKmpLibOnly = !hasKmpFeature && !hasWebApp && (
-            project.pluginManager.hasPlugin("bkp.kmp.lib") ||
-                project.pluginManager.hasPlugin("bkp.kmp.lib.compose")
-            )
+        // `bkp.kmp.feature*` and `bkp.web.app` are both built on `bkp.kmp.lib*`, so the lib group
+        // is only the module's own primary when neither of them claimed it first.
+        val hasKmpLibOnly =
+            !hasKmpFeature &&
+                !hasWebApp &&
+                (project.pluginManager.hasPlugin("bkp.kmp.lib") ||
+                    project.pluginManager.hasPlugin("bkp.kmp.lib.compose"))
         val hasDesktopApp = project.pluginManager.hasPlugin("bkp.desktop.app")
 
-        val activeGroups = listOfNotNull(
-            "androidApp".takeIf { hasAndroidApp },
-            "androidLib".takeIf { hasAndroidLib },
-            "androidTest".takeIf { hasAndroidTest },
-            "kmpFeature".takeIf { hasKmpFeature },
-            "kmpLib".takeIf { hasKmpLibOnly },
-            "desktopApp".takeIf { hasDesktopApp },
-            "webApp".takeIf { hasWebApp },
-        )
+        val activeGroups =
+            listOfNotNull(
+                "androidApp".takeIf { hasAndroidApp },
+                "androidLib".takeIf { hasAndroidLib },
+                "androidTest".takeIf { hasAndroidTest },
+                "kmpFeature".takeIf { hasKmpFeature },
+                "kmpLib".takeIf { hasKmpLibOnly },
+                "desktopApp".takeIf { hasDesktopApp },
+                "webApp".takeIf { hasWebApp },
+            )
 
         if (activeGroups.size > 1) {
             throw GradleException(
@@ -59,15 +64,19 @@ class BkpValidationGraphPlugin : Plugin<Project> {
             )
         }
 
-        // Ahead of the extension lookup on purpose: the firebase plugin creates no `bkpModule`, so a
-        // module that applies it and nothing else has no extension and would return early.
+        // Ahead of the extension lookup on purpose: the firebase plugin creates no `bkpModule`, so
+        // a module that applies it and nothing else has no extension and would return early.
         if (hasAndroidAppFirebase && !hasAndroidApp) {
-            throw GradleException("${project.path}: bkp.android.app.firebase requires a bkp.android.app* primary plugin")
+            throw GradleException(
+                "${project.path}: bkp.android.app.firebase requires a bkp.android.app* primary plugin"
+            )
         }
 
         val extension = project.extensions.findByType<BkpModuleExtension>() ?: return
         if (activeGroups.isEmpty()) {
-            throw GradleException("${project.path}: bkpModule extension is present but no bkp primary plugin is applied")
+            throw GradleException(
+                "${project.path}: bkpModule extension is present but no bkp primary plugin is applied"
+            )
         }
 
         val primary = primaryPlugins.first()
@@ -75,7 +84,9 @@ class BkpValidationGraphPlugin : Plugin<Project> {
         val isKmpPrimary = primary.startsWith("bkp.kmp")
 
         if (!isAndroidApp && extension.features.demoProdFlavorsEnabled) {
-            throw GradleException("${project.path}: demoProdFlavors() is only supported for bkp.android.app* plugins")
+            throw GradleException(
+                "${project.path}: demoProdFlavors() is only supported for bkp.android.app* plugins"
+            )
         }
 
         if (isKmpPrimary) validateTargets(project)
@@ -91,7 +102,8 @@ class BkpValidationGraphPlugin : Plugin<Project> {
      */
     private fun validateTargets(project: Project) {
         val kotlin = project.extensions.getByType<KotlinMultiplatformExtension>()
-        val declared = (kotlin as ExtensionAware).extensions.getByType<BkpTargets>().declaredTargetNames
+        val declared =
+            (kotlin as ExtensionAware).extensions.getByType<BkpTargets>().declaredTargetNames
 
         if (declared.isEmpty()) {
             throw GradleException(
@@ -101,7 +113,10 @@ class BkpValidationGraphPlugin : Plugin<Project> {
 
         // KGP always registers a `metadata` target of its own; it is not a platform and is never
         // declared, so comparing raw target names would reject every module.
-        val created = kotlin.targets.filterNot { it.platformType == KotlinPlatformType.common }.map { it.name }
+        val created =
+            kotlin.targets
+                .filterNot { it.platformType == KotlinPlatformType.common }
+                .map { it.name }
         val undeclared = created - declared
         if (undeclared.isNotEmpty()) {
             throw GradleException(
@@ -112,17 +127,18 @@ class BkpValidationGraphPlugin : Plugin<Project> {
     }
 
     companion object {
-        private val PRIMARY_PLUGIN_IDS = setOf(
-            "bkp.android.app",
-            "bkp.android.app.compose",
-            "bkp.android.lib",
-            "bkp.android.test",
-            "bkp.kmp.lib",
-            "bkp.kmp.lib.compose",
-            "bkp.kmp.feature",
-            "bkp.kmp.feature.compose",
-            "bkp.desktop.app",
-            "bkp.web.app",
-        )
+        private val PRIMARY_PLUGIN_IDS =
+            setOf(
+                "bkp.android.app",
+                "bkp.android.app.compose",
+                "bkp.android.lib",
+                "bkp.android.test",
+                "bkp.kmp.lib",
+                "bkp.kmp.lib.compose",
+                "bkp.kmp.feature",
+                "bkp.kmp.feature.compose",
+                "bkp.desktop.app",
+                "bkp.web.app",
+            )
     }
 }

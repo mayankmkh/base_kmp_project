@@ -1,9 +1,9 @@
 package dev.mayankmkh.basekmpproject.convention
 
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import kotlin.test.assertContains
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 
 /**
  * One test per `throw GradleException` in `BkpValidationGraphPlugin`, plus the positive cases those
@@ -25,53 +25,62 @@ import kotlin.test.assertContains
  */
 class BkpValidationGraphPluginTest {
 
-    @field:TempDir
-    lateinit var projectDir: File
+    @field:TempDir lateinit var projectDir: File
 
     @Test
     fun `kmp module declaring no targets is rejected`() {
-        val result = TestProject(projectDir).withBuildScript(
-            """
+        val result =
+            TestProject(projectDir)
+                .withBuildScript(
+                    """
             plugins { id("bkp.kmp.lib") }
-            """,
-        ).configureAndFail()
+            """
+                )
+                .configureAndFail()
 
         assertContains(result.output, "no targets declared")
     }
 
     @Test
     fun `target created outside bkpTargets is rejected`() {
-        val result = TestProject(projectDir).withBuildScript(
-            """
+        val result =
+            TestProject(projectDir)
+                .withBuildScript(
+                    """
             plugins { id("bkp.kmp.lib") }
 
             kotlin {
                 bkpTargets { default() }
                 macosArm64()
             }
-            """,
-        ).configureAndFail()
+            """
+                )
+                .configureAndFail()
 
         assertContains(result.output, "macosArm64 created outside")
     }
 
     @Test
     fun `kmp module declaring targets configures`() {
-        TestProject(projectDir).withBuildScript(
-            """
+        TestProject(projectDir)
+            .withBuildScript(
+                """
             plugins { id("bkp.kmp.lib") }
 
             kotlin {
                 bkpTargets { default() }
             }
-            """,
-        ).run()
+            """
+            )
+            .run()
     }
 
     @Test
     fun `demoProdFlavors outside an android app is rejected`() {
-        val result = TestProject(projectDir).withBuildScript(
-            """
+        val result =
+            TestProject(projectDir)
+                .withBuildScript(
+                    """
             plugins { id("bkp.kmp.lib") }
 
             kotlin {
@@ -81,10 +90,14 @@ class BkpValidationGraphPluginTest {
             bkpModule {
                 features { demoProdFlavors() }
             }
-            """,
-        ).configureAndFail()
+            """
+                )
+                .configureAndFail()
 
-        assertContains(result.output, "demoProdFlavors() is only supported for bkp.android.app* plugins")
+        assertContains(
+            result.output,
+            "demoProdFlavors() is only supported for bkp.android.app* plugins",
+        )
     }
 
     /**
@@ -97,8 +110,10 @@ class BkpValidationGraphPluginTest {
      */
     @Test
     fun `firebase plugin without an android app primary is rejected`() {
-        val result = TestProject(projectDir).withBuildScript(
-            """
+        val result =
+            TestProject(projectDir)
+                .withBuildScript(
+                    """
             plugins {
                 id("com.android.application")
                 id("bkp.android.app.firebase")
@@ -108,9 +123,13 @@ class BkpValidationGraphPluginTest {
                 namespace = "dev.mayankmkh.basekmpproject.test"
                 compileSdk = libs.versions.android.compileSdk.get().toInt()
             }
-            """,
-        ).configureAndFail()
+            """
+                )
+                .configureAndFail()
 
-        assertContains(result.output, "bkp.android.app.firebase requires a bkp.android.app* primary plugin")
+        assertContains(
+            result.output,
+            "bkp.android.app.firebase requires a bkp.android.app* primary plugin",
+        )
     }
 }

@@ -32,7 +32,9 @@ import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinWasmJsTargetDsl
  * bundles cost about 40s on a cold build, nothing on a warm one, and stay inside `build/`.
  */
 @OptIn(ExperimentalWasmDsl::class)
-internal fun KotlinMultiplatformExtension.wasmJsBrowser(configure: KotlinWasmJsTargetDsl.() -> Unit = {}) {
+internal fun KotlinMultiplatformExtension.wasmJsBrowser(
+    configure: KotlinWasmJsTargetDsl.() -> Unit = {}
+) {
     wasmJs {
         browser()
         binaries.executable()

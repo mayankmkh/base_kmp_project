@@ -1,8 +1,8 @@
 package dev.mayankmkh.basekmpproject.convention
 
+import java.io.File
 import org.gradle.testkit.runner.BuildResult
 import org.gradle.testkit.runner.GradleRunner
-import java.io.File
 
 /**
  * A throwaway single-module build for exercising the convention plugins.
@@ -15,13 +15,15 @@ import java.io.File
 internal class TestProject(private val dir: File) {
 
     fun withBuildScript(script: String): TestProject {
-        val catalog = requireNotNull(System.getProperty("bkp.test.versionCatalog")) {
-            "bkp.test.versionCatalog is not set; run these tests through Gradle, not the IDE's plain JUnit runner"
-        }
+        val catalog =
+            requireNotNull(System.getProperty("bkp.test.versionCatalog")) {
+                "bkp.test.versionCatalog is not set; run these tests through Gradle, not the IDE's plain JUnit runner"
+            }
         // `invariantSeparatorsPath`: the path is interpolated into Kotlin source, where a Windows
         // backslash would be an escape sequence.
-        dir.resolve("settings.gradle.kts").writeText(
-            """
+        dir.resolve("settings.gradle.kts")
+            .writeText(
+                """
             dependencyResolutionManagement {
                 repositories {
                     google()
@@ -32,11 +34,14 @@ internal class TestProject(private val dir: File) {
                 }
             }
             rootProject.name = "bkp-test"
-            """.trimIndent(),
-        )
-        // TestKit's daemon otherwise runs on Gradle's 512M/384M defaults, which AGP plus KGP plus the
+            """
+                    .trimIndent()
+            )
+        // TestKit's daemon otherwise runs on Gradle's 512M/384M defaults, which AGP plus KGP plus
+        // the
         // Kotlin DSL compiler exhaust -- the daemon dies of metaspace part-way through the suite.
-        dir.resolve("gradle.properties").writeText("org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=1g\n")
+        dir.resolve("gradle.properties")
+            .writeText("org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=1g\n")
         dir.resolve("build.gradle.kts").writeText(script.trimIndent())
         return this
     }
@@ -48,8 +53,8 @@ internal class TestProject(private val dir: File) {
     }
 
     /**
-     * Runs [tasks], defaulting to `help` -- the cheapest task that still forces the whole project to
-     * configure, which is where the convention plugins and the validator do their work.
+     * Runs [tasks], defaulting to `help` -- the cheapest task that still forces the whole project
+     * to configure, which is where the convention plugins and the validator do their work.
      */
     fun run(vararg tasks: String): BuildResult = runner(tasks).build()
 
@@ -63,9 +68,10 @@ internal class TestProject(private val dir: File) {
     // -- publishing the plugin to a local repository per test -- buys nothing here and costs a
     // third-party plugin plus a resolve on every run.
     @Suppress("WithPluginClasspathUsage")
-    private fun runner(tasks: Array<out String>): GradleRunner = GradleRunner.create()
-        .withProjectDir(dir)
-        .withPluginClasspath()
-        .withArguments(*tasks.ifEmpty { arrayOf("help") }, "--stacktrace")
-        .forwardOutput()
+    private fun runner(tasks: Array<out String>): GradleRunner =
+        GradleRunner.create()
+            .withProjectDir(dir)
+            .withPluginClasspath()
+            .withArguments(*tasks.ifEmpty { arrayOf("help") }, "--stacktrace")
+            .forwardOutput()
 }

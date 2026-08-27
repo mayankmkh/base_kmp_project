@@ -25,7 +25,7 @@ enum class BkpFlavor(val dimension: FlavorDimension, val applicationIdSuffix: St
  */
 fun configureFlavors(
     applicationExtension: ApplicationExtension,
-    flavorConfigurationBlock: ApplicationProductFlavor.(flavor: BkpFlavor) -> Unit = {}
+    flavorConfigurationBlock: ApplicationProductFlavor.(flavor: BkpFlavor) -> Unit = {},
 ) {
     applicationExtension.apply {
         FlavorDimension.entries.forEach { flavorDimension ->

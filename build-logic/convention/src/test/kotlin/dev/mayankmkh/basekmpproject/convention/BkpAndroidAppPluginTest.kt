@@ -1,10 +1,10 @@
 package dev.mayankmkh.basekmpproject.convention
 
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import kotlin.test.assertContains
 import kotlin.test.assertFalse
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 
 /**
  * What `bkp.android.app` hands a module that declares nothing but its own identity, and -- the half
@@ -13,8 +13,7 @@ import kotlin.test.assertFalse
  */
 class BkpAndroidAppPluginTest {
 
-    @field:TempDir
-    lateinit var projectDir: File
+    @field:TempDir lateinit var projectDir: File
 
     @Test
     fun `android app inherits the build type convention`() {
@@ -38,28 +37,31 @@ class BkpAndroidAppPluginTest {
 
     @Test
     fun `android app with its own proguard rules gets them appended`() {
-        val result = TestProject(projectDir)
-            .withBuildScript(androidApp())
-            .withFile("proguard-rules.pro", "# rules\n")
-            .run()
+        val result =
+            TestProject(projectDir)
+                .withBuildScript(androidApp())
+                .withFile("proguard-rules.pro", "# rules\n")
+                .run()
 
         assertContains(result.output, ",proguard-rules.pro")
     }
 
     /**
-     * Everything the convention sets is a plain property assigned while the plugin is applied, and a
-     * module's own `android { }` block runs afterwards -- so an app that wants something else says so
-     * and wins. That is what lets several app modules share one convention and still differ.
+     * Everything the convention sets is a plain property assigned while the plugin is applied, and
+     * a module's own `android { }` block runs afterwards -- so an app that wants something else
+     * says so and wins. That is what lets several app modules share one convention and still
+     * differ.
      *
      * `proguardFiles` is the exception, and the assertion below pins it: it appends rather than
      * assigns, so a module can add to the list but cannot take the convention's entries back out.
      */
     @Test
     fun `module settings override the convention`() {
-        val result = TestProject(projectDir)
-            .withBuildScript(
-                androidApp(
-                    """
+        val result =
+            TestProject(projectDir)
+                .withBuildScript(
+                    androidApp(
+                        """
                     buildTypes {
                         debug { applicationIdSuffix = ".dbg" }
                         release {
@@ -70,11 +72,11 @@ class BkpAndroidAppPluginTest {
                     }
                     buildFeatures { buildConfig = false }
                     defaultConfig { testInstrumentationRunner = "com.example.Runner" }
-                    """,
-                ),
-            )
-            .withFile("extra-rules.pro", "# rules\n")
-            .run()
+                    """
+                    )
+                )
+                .withFile("extra-rules.pro", "# rules\n")
+                .run()
 
         assertContains(result.output, "DEBUG_SUFFIX=.dbg")
         assertContains(result.output, "RELEASE_SUFFIX=.rel")

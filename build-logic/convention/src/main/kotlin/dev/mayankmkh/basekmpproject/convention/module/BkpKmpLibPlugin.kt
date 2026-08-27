@@ -29,7 +29,8 @@ class BkpKmpLibPlugin : Plugin<Project> {
             val kotlin = extensions.getByType<KotlinMultiplatformExtension>()
             (kotlin as ExtensionAware).extensions.create<BkpTargets>("bkpTargets", this, kotlin)
 
-            // Unconditional: the compiler baseline has nothing to do with which platforms the module
+            // Unconditional: the compiler baseline has nothing to do with which platforms the
+            // module
             // picks, and hanging it off the Android target would drop warnings-as-errors and the
             // shared free compiler args from a module that omits Android.
             configureKotlin()

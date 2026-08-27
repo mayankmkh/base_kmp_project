@@ -39,6 +39,36 @@ class BkpModuleFeaturesTest {
     }
 
     /**
+     * The synchronous half of the [dev.mayankmkh.basekmpproject.convention.dsl.BkpTargets]
+     * contract: a target declared inside `exception` has its source sets available to the rest of
+     * the script, not at some later point in configuration.
+     */
+    @Test
+    fun `documented target exception selects a smaller set synchronously`() {
+        val result =
+            TestProject(projectDir)
+                .withBuildScript(
+                    """
+            plugins { id("bkp.kmp.lib") }
+
+            kotlin {
+                bkpTargets {
+                    exception("This module wraps a native-only SDK") {
+                        android()
+                        ios()
+                        jvm()
+                    }
+                }
+                println("ANDROID_SOURCE_SET=" + sourceSets.getByName("androidMain").name)
+            }
+            """
+                )
+                .run()
+
+        assertContains(result.output, "ANDROID_SOURCE_SET=androidMain")
+    }
+
+    /**
      * The reporting `finalizeDsl` is registered from the build script, so it runs after the one
      * `BkpAndroidAppPlugin` registers during apply -- which is where the flavors come from. Reading
      * `productFlavors` from a task's `doLast` would work too, but this keeps the whole assertion at

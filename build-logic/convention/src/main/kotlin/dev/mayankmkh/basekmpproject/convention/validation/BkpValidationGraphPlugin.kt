@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.convention.validation
 
+import dev.mayankmkh.basekmpproject.convention.dsl.BKP_DEFAULT_PLATFORMS
 import dev.mayankmkh.basekmpproject.convention.dsl.BkpModuleExtension
 import dev.mayankmkh.basekmpproject.convention.dsl.BkpTargets
 import org.gradle.api.GradleException
@@ -28,24 +29,17 @@ class BkpValidationGraphPlugin : Plugin<Project> {
 
     private fun validateProject(project: Project) {
         val primaryPlugins = PRIMARY_PLUGIN_IDS.filter(project.pluginManager::hasPlugin)
-        val hasAndroidApp =
-            project.pluginManager.hasPlugin("bkp.android.app") ||
-                project.pluginManager.hasPlugin("bkp.android.app.compose")
-        val hasAndroidAppFirebase = project.pluginManager.hasPlugin("bkp.android.app.firebase")
-        val hasAndroidLib = project.pluginManager.hasPlugin("bkp.android.lib")
-        val hasAndroidTest = project.pluginManager.hasPlugin("bkp.android.test")
-        val hasKmpFeature =
-            project.pluginManager.hasPlugin("bkp.kmp.feature") ||
-                project.pluginManager.hasPlugin("bkp.kmp.feature.compose")
-        val hasWebApp = project.pluginManager.hasPlugin("bkp.web.app")
+        val hasAndroidApp = project.hasAnyPlugin(BKP_ANDROID_APP, BKP_ANDROID_APP_COMPOSE)
+        val hasAndroidAppFirebase = project.pluginManager.hasPlugin(BKP_ANDROID_APP_FIREBASE)
+        val hasAndroidLib = project.pluginManager.hasPlugin(BKP_ANDROID_LIB)
+        val hasAndroidTest = project.pluginManager.hasPlugin(BKP_ANDROID_TEST)
+        val hasKmpFeature = project.hasAnyPlugin(BKP_KMP_FEATURE, BKP_KMP_FEATURE_COMPOSE)
+        val hasWebApp = project.pluginManager.hasPlugin(BKP_WEB_APP)
         // `bkp.kmp.feature*` and `bkp.web.app` are both built on `bkp.kmp.lib*`, so the lib group
         // is only the module's own primary when neither of them claimed it first.
         val hasKmpLibOnly =
-            !hasKmpFeature &&
-                !hasWebApp &&
-                (project.pluginManager.hasPlugin("bkp.kmp.lib") ||
-                    project.pluginManager.hasPlugin("bkp.kmp.lib.compose"))
-        val hasDesktopApp = project.pluginManager.hasPlugin("bkp.desktop.app")
+            !hasKmpFeature && !hasWebApp && project.hasAnyPlugin(BKP_KMP_LIB, BKP_KMP_LIB_COMPOSE)
+        val hasDesktopApp = project.pluginManager.hasPlugin(BKP_DESKTOP_APP)
 
         val activeGroups =
             listOfNotNull(
@@ -80,7 +74,7 @@ class BkpValidationGraphPlugin : Plugin<Project> {
         }
 
         val primary = primaryPlugins.first()
-        val isAndroidApp = primary.startsWith("bkp.android.app")
+        val isAndroidApp = primary.startsWith(BKP_ANDROID_APP)
         val isKmpPrimary = primary.startsWith("bkp.kmp")
 
         if (!isAndroidApp && extension.features.demoProdFlavorsEnabled) {
@@ -89,7 +83,62 @@ class BkpValidationGraphPlugin : Plugin<Project> {
             )
         }
 
-        if (isKmpPrimary) validateTargets(project)
+        // A feature module that wants Compose has its own primary; reaching for the library's
+        // Compose variant instead leaves the feature conventions applied without them.
+        if (
+            project.pluginManager.hasPlugin(BKP_KMP_FEATURE) &&
+                project.pluginManager.hasPlugin(BKP_KMP_LIB_COMPOSE) &&
+                !project.pluginManager.hasPlugin(BKP_KMP_FEATURE_COMPOSE) &&
+                !hasWebApp
+        ) {
+            throw GradleException(
+                "${project.path}: incompatible bkp convention plugins: " +
+                    "$BKP_KMP_FEATURE, $BKP_KMP_LIB_COMPOSE. Use $BKP_KMP_FEATURE_COMPOSE."
+            )
+        }
+
+        validateComposeCombination(project, hasAndroidApp, hasKmpFeature, hasKmpLibOnly, hasWebApp)
+
+        // `bkp.web.app` declares the wasm target itself and is deliberately single-platform, so it
+        // is exempt from the default-or-exception rule while still being checked for targets
+        // created behind the DSL's back.
+        if (isKmpPrimary) validateTargets(project, requireDefaultOrException = !hasWebApp)
+    }
+
+    /**
+     * Rejects the raw Compose plugins sitting next to a non-Compose bkp primary.
+     *
+     * That combination compiles, which is the problem: the module gets the Compose compiler without
+     * the dependencies and settings the matching bkp Compose convention would have brought, and the
+     * difference only shows up later as a missing artifact or a version skew. Modules whose Compose
+     * arrived *through* a bkp Compose convention are the same plugins applied for the right reason,
+     * so they fall through to the `else` branch untouched.
+     */
+    private fun validateComposeCombination(
+        project: Project,
+        hasAndroidApp: Boolean,
+        hasKmpFeature: Boolean,
+        hasKmpLibOnly: Boolean,
+        hasWebApp: Boolean,
+    ) {
+        val composeApplied =
+            project.hasAnyPlugin("org.jetbrains.compose", "org.jetbrains.kotlin.plugin.compose")
+        if (!composeApplied || hasWebApp) return
+
+        val hasAndroidAppCompose = project.pluginManager.hasPlugin(BKP_ANDROID_APP_COMPOSE)
+        val hasFeatureCompose = project.pluginManager.hasPlugin(BKP_KMP_FEATURE_COMPOSE)
+        val hasLibCompose = project.pluginManager.hasPlugin(BKP_KMP_LIB_COMPOSE)
+        val replacement =
+            when {
+                hasAndroidApp && !hasAndroidAppCompose -> BKP_ANDROID_APP_COMPOSE
+                hasKmpFeature && !hasFeatureCompose -> BKP_KMP_FEATURE_COMPOSE
+                hasKmpLibOnly && !hasLibCompose -> BKP_KMP_LIB_COMPOSE
+                else -> return
+            }
+        throw GradleException(
+            "${project.path}: raw Compose plugins were combined with a non-Compose bkp convention. " +
+                "Use $replacement so Compose compiler and dependencies stay consistent."
+        )
     }
 
     /**
@@ -100,14 +149,24 @@ class BkpValidationGraphPlugin : Plugin<Project> {
      * declaration itself and cannot be flagged. What is caught is the case that matters: a target
      * that exists without having been declared.
      */
-    private fun validateTargets(project: Project) {
+    private fun validateTargets(project: Project, requireDefaultOrException: Boolean) {
         val kotlin = project.extensions.getByType<KotlinMultiplatformExtension>()
-        val declared =
-            (kotlin as ExtensionAware).extensions.getByType<BkpTargets>().declaredTargetNames
+        val bkpTargets = (kotlin as ExtensionAware).extensions.getByType<BkpTargets>()
 
-        if (declared.isEmpty()) {
+        if (bkpTargets.declaredTargetNames.isEmpty()) {
             throw GradleException(
                 "${project.path}: no targets declared. Add `kotlin { bkpTargets { default() } }` to the build script."
+            )
+        }
+
+        if (
+            requireDefaultOrException &&
+                bkpTargets.selectedPlatforms != BKP_DEFAULT_PLATFORMS &&
+                bkpTargets.documentedExceptionReason == null
+        ) {
+            throw GradleException(
+                "${project.path}: a non-default bkp target set requires " +
+                    "`bkpTargets { exception(\"reason\") { ... } }`."
             )
         }
 
@@ -117,7 +176,7 @@ class BkpValidationGraphPlugin : Plugin<Project> {
             kotlin.targets
                 .filterNot { it.platformType == KotlinPlatformType.common }
                 .map { it.name }
-        val undeclared = created - declared
+        val undeclared = created - bkpTargets.declaredTargetNames
         if (undeclared.isNotEmpty()) {
             throw GradleException(
                 "${project.path}: ${undeclared.sorted().joinToString()} created outside " +
@@ -126,19 +185,34 @@ class BkpValidationGraphPlugin : Plugin<Project> {
         }
     }
 
+    private fun Project.hasAnyPlugin(vararg ids: String): Boolean =
+        ids.any(pluginManager::hasPlugin)
+
     companion object {
+        private const val BKP_ANDROID_APP = "bkp.android.app"
+        private const val BKP_ANDROID_APP_COMPOSE = "bkp.android.app.compose"
+        private const val BKP_ANDROID_APP_FIREBASE = "bkp.android.app.firebase"
+        private const val BKP_ANDROID_LIB = "bkp.android.lib"
+        private const val BKP_ANDROID_TEST = "bkp.android.test"
+        private const val BKP_DESKTOP_APP = "bkp.desktop.app"
+        private const val BKP_WEB_APP = "bkp.web.app"
+        private const val BKP_KMP_LIB = "bkp.kmp.lib"
+        private const val BKP_KMP_LIB_COMPOSE = "bkp.kmp.lib.compose"
+        private const val BKP_KMP_FEATURE = "bkp.kmp.feature"
+        private const val BKP_KMP_FEATURE_COMPOSE = "bkp.kmp.feature.compose"
+
         private val PRIMARY_PLUGIN_IDS =
             setOf(
-                "bkp.android.app",
-                "bkp.android.app.compose",
-                "bkp.android.lib",
-                "bkp.android.test",
-                "bkp.kmp.lib",
-                "bkp.kmp.lib.compose",
-                "bkp.kmp.feature",
-                "bkp.kmp.feature.compose",
-                "bkp.desktop.app",
-                "bkp.web.app",
+                BKP_ANDROID_APP,
+                BKP_ANDROID_APP_COMPOSE,
+                BKP_ANDROID_LIB,
+                BKP_ANDROID_TEST,
+                BKP_KMP_LIB,
+                BKP_KMP_LIB_COMPOSE,
+                BKP_KMP_FEATURE,
+                BKP_KMP_FEATURE_COMPOSE,
+                BKP_DESKTOP_APP,
+                BKP_WEB_APP,
             )
     }
 }

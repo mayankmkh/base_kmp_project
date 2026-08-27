@@ -14,14 +14,45 @@
  * limitations under the License.
  */
 
+import com.diffplug.gradle.spotless.SpotlessCheck
+import com.diffplug.gradle.spotless.SpotlessTask
+import com.diffplug.spotless.LineEnding
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     `kotlin-dsl`
     alias(libs.plugins.android.lint)
+    alias(libs.plugins.spotless)
 }
 
 group = "dev.mayankmkh.buildlogic"
+
+// This project defines `bkp.quality.style`, so it cannot apply it: the plugin does not exist
+// until this project is built. Spotless is configured by hand instead, with the same formatter,
+// the same targets and the same ktfmt version from the catalog, so the convention plugin sources
+// are held to the rules they impose on every other module. The two configurations have to be kept
+// in agreement -- change one, change the other, or they fight over the same files.
+//
+// detekt is deliberately not duplicated here: `androidx.lint:lint-gradle` (applied via
+// `lintChecks` below) covers the plugin-authoring failure modes that matter for this code -- eager
+// task realization, `Project` captured into task actions, configuration-cache hazards -- and it
+// already runs as part of `check`.
+spotless {
+    lineEndings = LineEnding.UNIX
+
+    val ktfmtVersion = libs.versions.ktfmt.get()
+    val generatedOutput = "**/build"
+
+    kotlin {
+        target("src/**/*.kt")
+        targetExclude(generatedOutput)
+        ktfmt(ktfmtVersion).kotlinlangStyle()
+    }
+    kotlinGradle {
+        targetExclude(generatedOutput)
+        ktfmt(ktfmtVersion).kotlinlangStyle()
+    }
+}
 
 // Configure the build-logic plugins to target JDK 17
 // This matches the JDK used to build the project, and is not related to what is running on device.
@@ -79,13 +110,28 @@ tasks {
         pluginClasspath.from(testPluginClasspath)
     }
 
+    // Spotless stages formatted copies of every source file under `build/spotless-clean` and
+    // removes them once its own task finishes. Lint's JVM analysis walks the build directory, so
+    // `check` running the two in parallel makes lint fail with `FileNotFoundException` on a file
+    // Spotless has just cleaned up. They are independent otherwise, so ordering is the whole fix.
+    // The lint plugin registers these tasks from the variant API, so they do not exist yet by name
+    // at script-evaluation time -- hence the lazy match rather than `named(...)`.
+    configureEach {
+        if (name.startsWith("lintAnalyze")) {
+            mustRunAfter(withType<SpotlessTask>(), withType<SpotlessCheck>())
+        }
+    }
+
     test {
         useJUnitPlatform()
         // The synthetic projects apply the real version catalog rather than a stub, so a test fails
         // when a plugin asks for a key the project does not actually have.
         systemProperty(
             "bkp.test.versionCatalog",
-            isolated.rootProject.projectDirectory.file("../gradle/libs.versions.toml").asFile.absolutePath,
+            isolated.rootProject.projectDirectory
+                .file("../gradle/libs.versions.toml")
+                .asFile
+                .absolutePath,
         )
     }
 }
@@ -94,23 +140,28 @@ gradlePlugin {
     plugins {
         register("bkpAndroidApp") {
             id = "bkp.android.app"
-            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidAppPlugin"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidAppPlugin"
         }
         register("bkpAndroidAppCompose") {
             id = "bkp.android.app.compose"
-            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidAppComposePlugin"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidAppComposePlugin"
         }
         register("bkpAndroidAppFirebase") {
             id = "bkp.android.app.firebase"
-            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidAppFirebasePlugin"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidAppFirebasePlugin"
         }
         register("bkpAndroidLib") {
             id = "bkp.android.lib"
-            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidLibPlugin"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidLibPlugin"
         }
         register("bkpAndroidTest") {
             id = "bkp.android.test"
-            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidTestPlugin"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpAndroidTestPlugin"
         }
         register("bkpKmpLib") {
             id = "bkp.kmp.lib"
@@ -118,19 +169,23 @@ gradlePlugin {
         }
         register("bkpKmpLibCompose") {
             id = "bkp.kmp.lib.compose"
-            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpKmpLibComposePlugin"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpLibComposePlugin"
         }
         register("bkpKmpFeature") {
             id = "bkp.kmp.feature"
-            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpKmpFeaturePlugin"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpFeaturePlugin"
         }
         register("bkpKmpFeatureCompose") {
             id = "bkp.kmp.feature.compose"
-            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpKmpFeatureComposePlugin"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpFeatureComposePlugin"
         }
         register("bkpDesktopApp") {
             id = "bkp.desktop.app"
-            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpDesktopAppPlugin"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpDesktopAppPlugin"
         }
         register("bkpWebApp") {
             id = "bkp.web.app"
@@ -138,15 +193,18 @@ gradlePlugin {
         }
         register("bkpQualityStyle") {
             id = "bkp.quality.style"
-            implementationClass = "dev.mayankmkh.basekmpproject.convention.quality.BkpQualityStylePlugin"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.quality.BkpQualityStylePlugin"
         }
         register("bkpQualityLint") {
             id = "bkp.quality.lint"
-            implementationClass = "dev.mayankmkh.basekmpproject.convention.quality.BkpQualityLintPlugin"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.quality.BkpQualityLintPlugin"
         }
         register("bkpValidationGraph") {
             id = "bkp.validation.graph"
-            implementationClass = "dev.mayankmkh.basekmpproject.convention.validation.BkpValidationGraphPlugin"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.validation.BkpValidationGraphPlugin"
         }
     }
 }

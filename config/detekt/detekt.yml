@@ -32,6 +32,11 @@ naming:
     constantPattern: '[A-Z][A-Za-z0-9]*'
 
 style:
+  MagicNumber:
+    # detekt's default exclude list enumerates test source sets by name and predates KMP's naming, so
+    # it covers `commonTest` and `jvmTest` but not `androidHostTest`, `webTest`, or whatever the next
+    # target adds. These globs cover every KMP test source set plus the Android `src/test` layout.
+    excludes: ['**/src/*Test*/**', '**/src/test/**', '**/*.kts']
   UnusedPrivateFunction:
     # `@Preview` functions are never called from code. Extend this list if we add multipreview
     # annotations of our own.

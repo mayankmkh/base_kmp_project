@@ -9,11 +9,20 @@ internal data class AndroidSdkConfig(
     val targetSdk: Int,
 )
 
-internal fun Project.androidSdkConfig(): AndroidSdkConfig = AndroidSdkConfig(
-    compileSdk = versionAsInt("android-compileSdk"),
-    minSdk = versionAsInt("android-minSdk"),
-    targetSdk = versionAsInt("android-targetSdk"),
-)
+internal fun Project.androidSdkConfig(): AndroidSdkConfig =
+    AndroidSdkConfig(
+        compileSdk = versionAsInt("android-compileSdk"),
+        minSdk = versionAsInt("android-minSdk"),
+        targetSdk = versionAsInt("android-targetSdk"),
+    )
 
 internal fun Project.versionAsInt(versionAlias: String): Int =
-    libs.findVersion(versionAlias).get().requiredVersion.toInt()
+    libs
+        .findVersion(versionAlias)
+        .orElseThrow {
+            IllegalStateException(
+                "Convention plugins require version catalog entry '$versionAlias'."
+            )
+        }
+        .requiredVersion
+        .toInt()

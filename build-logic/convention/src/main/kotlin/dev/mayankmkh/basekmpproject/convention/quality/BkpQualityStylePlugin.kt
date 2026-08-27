@@ -18,10 +18,18 @@ class BkpQualityStylePlugin : Plugin<Project> {
         with(target) {
             apply(plugin = "com.diffplug.spotless")
 
+            // From the catalog rather than a constant here because `build-logic` configures
+            // Spotless by hand -- it defines this plugin, so it cannot apply it -- and the two must
+            // agree or they fight over the same files. Read out here because the `Project` receiver
+            // is shadowed inside the `SpotlessExtension` block, where `libs` would not resolve.
+            val ktfmtVersion = libs.findVersion("ktfmt").get().requiredVersion
+
             extensions.configure<SpotlessExtension> {
                 // Spotless defaults to GIT_ATTRIBUTES_FAST_ALLSAME, which resolves line endings at
-                // configuration time by locating a `git` binary on PATH and reading the system, user
-                // and repo git config plus every `.gitattributes` from the file up to the filesystem
+                // configuration time by locating a `git` binary on PATH and reading the system,
+                // user
+                // and repo git config plus every `.gitattributes` from the file up to the
+                // filesystem
                 // root. One of those reads is not stable across runs, and it took the whole
                 // configuration cache with it: `./gradlew build` reported "cannot be reused because
                 // an input to unknown location has changed" on every single run, including two
@@ -43,12 +51,12 @@ class BkpQualityStylePlugin : Plugin<Project> {
                 kotlin {
                     target("src/**/*.kt")
                     targetExclude(generatedOutput)
-                    ktfmt(KTFMT_VERSION).kotlinlangStyle()
+                    ktfmt(ktfmtVersion).kotlinlangStyle()
                 }
                 // Build scripts were formatted by nothing before this block.
                 kotlinGradle {
                     targetExclude(generatedOutput)
-                    ktfmt(KTFMT_VERSION).kotlinlangStyle()
+                    ktfmt(ktfmtVersion).kotlinlangStyle()
                 }
             }
 
@@ -63,7 +71,7 @@ class BkpQualityStylePlugin : Plugin<Project> {
                 // `isolated.rootProject` reads the root's directory without touching its mutable
                 // `Project` model, which is what project isolation forbids.
                 config.setFrom(
-                    isolated.rootProject.projectDirectory.file("config/detekt/detekt.yml"),
+                    isolated.rootProject.projectDirectory.file("config/detekt/detekt.yml")
                 )
                 buildUponDefaultConfig.set(true)
                 // Currently a no-op in 2.0.0-alpha.6 -- the release variant tasks are registered
@@ -81,9 +89,10 @@ class BkpQualityStylePlugin : Plugin<Project> {
                 "detektPlugins"(libs.findLibrary("detekt.composeRules").get())
             }
 
-            val detektAll = tasks.register("detektAll") {
-                dependsOn(tasks.withType<Detekt>())
-            }
+            val detektAll =
+                tasks.register("detektAll") {
+                    dependsOn(tasks.withType<Detekt>())
+                }
 
             // `tasks.matching { }` has to realize every task in the project to test the predicate.
             // `check` comes from `lifecycle-base`, which the primary plugin's Kotlin/Android
@@ -95,11 +104,5 @@ class BkpQualityStylePlugin : Plugin<Project> {
                 }
             }
         }
-    }
-
-    private companion object {
-        // Pinned deliberately: spotless bundles a default ktfmt, so leaving it implicit means a
-        // spotless upgrade reformats the whole repo as a side effect of a version bump.
-        const val KTFMT_VERSION = "0.63"
     }
 }

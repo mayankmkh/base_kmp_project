@@ -104,6 +104,20 @@ class ClientTest {
     }
 
     @Test
+    fun `the engine overload wires the stack up with no token at all`() = runTest {
+        val engine = MockEngine { respondOk() }
+
+        // What a test in another module gets: the real plugin stack, canned responses, and -- via
+        // `AnonymousBearerTokenSource` -- an unauthenticated request.
+        createHttpClient(engine, config).get("/thing")
+
+        val request = engine.requestHistory.single()
+        assertEquals("https://api.example.com/thing", request.url.toString())
+        assertEquals("bkp", request.headers["X-Client"])
+        assertNull(request.headers[HttpHeaders.Authorization])
+    }
+
+    @Test
     fun `every target ships an engine createHttpClient can find`() {
         // `HttpClient { }` resolves one off the classpath and throws where the source set declares
         // none, which the tests above cannot see -- they hand it a MockEngine.

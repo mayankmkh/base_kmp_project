@@ -33,6 +33,9 @@ koinBom = "4.2.2"
 kotlin = "2.4.10"
 kotlinResult = "2.3.1"
 kotlinx-coroutines = "1.11.0"
+# Supplies the `Worker` and `Blob` externals the SQLDelight web-worker driver is handed on
+# wasmJs. Kotlin/Wasm has no browser API in its stdlib, so this is not optional there.
+kotlinx-browser = "0.5.0"
 kotlinxSerialization = "1.11.0"
 # Pinned rather than left to Spotless's bundled default, which would otherwise reformat the whole
 # repository as a side effect of a Spotless version bump.
@@ -102,6 +105,8 @@ kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+
+kotlinx-browser = { group = "org.jetbrains.kotlinx", name = "kotlinx-browser", version.ref = "kotlinx-browser" }
 
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 

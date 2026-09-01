@@ -46,6 +46,7 @@ include(
     ":shared:libs:coroutines-x",
     ":shared:libs:arch:core",
     ":shared:libs:networking",
+    ":shared:libs:posts",
     ":shared:libs:prefs",
     ":shared:libs:designsystem",
 )

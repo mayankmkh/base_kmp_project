@@ -1,4 +1,3 @@
--keep class com.arkivanov.decompose.extensions.compose.mainthread.SwingMainThreadChecker
 
 # Standalone ProGuard, unlike R8, ignores the META-INF/proguard rules that dependencies embed in
 # their jars. Compose Desktop's own defaults cover coroutines, serialization and datetime, so what

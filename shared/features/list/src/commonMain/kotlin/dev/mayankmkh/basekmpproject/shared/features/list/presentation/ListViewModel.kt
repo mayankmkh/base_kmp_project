@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.shared.features.list.presentation
 
+import androidx.lifecycle.viewModelScope
 import dev.mayankmkh.basekmpproject.shared.features.list.domain.GetItemsUseCase
 import dev.mayankmkh.basekmpproject.shared.features.list.domain.ItemsModel
 import dev.mayankmkh.basekmpproject.shared.features.list.presentation.ListViewModel.Event
@@ -17,7 +18,7 @@ internal class ListViewModel(getItems: GetItemsUseCase) : ViewModel<Event>() {
             .mapLatestToUiStateFlow()
             .onStart { emit(UiState.InProgress) }
             .stateIn(
-                scope = coroutineScope,
+                scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = UiState.Initial,
             )
@@ -26,7 +27,7 @@ internal class ListViewModel(getItems: GetItemsUseCase) : ViewModel<Event>() {
         send(Event.ItemClicked(item))
     }
 
-    internal sealed class Event : ViewModel.Event {
-        internal data class ItemClicked(val item: String) : Event()
+    internal sealed interface Event : ViewModel.Event {
+        data class ItemClicked(val item: String) : Event
     }
 }

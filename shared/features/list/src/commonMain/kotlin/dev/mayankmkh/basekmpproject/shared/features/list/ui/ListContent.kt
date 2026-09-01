@@ -14,24 +14,44 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.mayankmkh.basekmpproject.shared.features.list.domain.ItemsModel
-import dev.mayankmkh.basekmpproject.shared.features.list.nav.ListComponent
+import dev.mayankmkh.basekmpproject.shared.features.list.presentation.ListViewModel
 import dev.mayankmkh.basekmpproject.shared.libs.arch.core.presentation.UiState
+import org.koin.compose.viewmodel.koinViewModel
+
+@Composable
+fun ListScreen(onItemSelected: (String) -> Unit, modifier: Modifier = Modifier) {
+    val viewModel: ListViewModel = koinViewModel()
+    val currentOnItemSelected by rememberUpdatedState(onItemSelected)
+
+    LaunchedEffect(viewModel) {
+        viewModel.eventsFlow.collect { event ->
+            when (event) {
+                is ListViewModel.Event.ItemClicked -> currentOnItemSelected(event.item)
+            }
+        }
+    }
+
+    ListContent(viewModel = viewModel, modifier = modifier)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ListContent(component: ListComponent, modifier: Modifier = Modifier) {
-    val viewModel = component.viewModel
-
+internal fun ListContent(
+    viewModel: ListViewModel,
+    modifier: Modifier = Modifier,
+) {
     val uiState by viewModel.uiStateFlow.collectAsState()
 
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text(text = "Decompose-Dagger Sample") }) },
+        topBar = { TopAppBar(title = { Text(text = "Navigation 3 Sample") }) },
     ) { paddingValues ->
         Box(Modifier.fillMaxSize()) {
             when (val viewState = uiState) {

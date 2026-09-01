@@ -42,8 +42,6 @@ The framework was configured inside `cocoapods { framework { … } }`:
 ```kotlin
 framework {
     baseName = "SharedApp"      // via bkpModule.cocoapods.frameworkBaseName
-    export(libs.decompose.decompose)
-    export(libs.essenty.lifecycle)
 }
 ```
 
@@ -53,7 +51,7 @@ framework {
   *Non-Trivial Decisions #6*.
 - **Deployment target:** iOS 16.0 (was `cocoapods.ios.deploymentTarget`; now inherited from the
   Xcode target's `IPHONEOS_DEPLOYMENT_TARGET`, which is 18.2)
-- **Exports preserved:** `libs.decompose.decompose`, `libs.essenty.lifecycle`
+- **Exports:** none; the Swift app only consumes the framework's own entry point.
 
 ### Kotlin Files Using `cocoapods.*` Imports
 
@@ -101,9 +99,6 @@ listOf(iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
     iosTarget.binaries.framework {
         baseName = "SharedApp"
         isStatic = true
-
-        export(libs.decompose.decompose)
-        export(libs.essenty.lifecycle)
     }
 }
 ```

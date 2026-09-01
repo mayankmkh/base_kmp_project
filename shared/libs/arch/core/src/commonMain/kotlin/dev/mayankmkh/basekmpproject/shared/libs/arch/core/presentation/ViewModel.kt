@@ -1,35 +1,20 @@
 package dev.mayankmkh.basekmpproject.shared.libs.arch.core.presentation
 
-import com.arkivanov.essenty.instancekeeper.InstanceKeeper
-import dev.mayankmkh.basekmpproject.shared.libs.arch.core.presentation.ViewModel.Event
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
-// Abstract by intent: these are extension points, not types anyone should be able to instantiate.
-// `AbstractClassCanBeConcreteClass` only sees that every member happens to be concrete.
-@Suppress("AbstractClassCanBeConcreteClass")
-abstract class BasicViewModel : InstanceKeeper.Instance {
-    protected val coroutineScope: CoroutineScope =
-        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+// Keeps the project's presentation base type while delegating retention and clearing to AndroidX.
+abstract class BasicViewModel : androidx.lifecycle.ViewModel()
 
-    override fun onDestroy() {
-        coroutineScope.cancel()
-    }
-}
-
-@Suppress("AbstractClassCanBeConcreteClass")
-abstract class ViewModel<E : Event> : BasicViewModel() {
+abstract class ViewModel<E : ViewModel.Event> : BasicViewModel() {
     private val eventChannel = Channel<E>(Channel.BUFFERED)
     val eventsFlow: Flow<E> = eventChannel.receiveAsFlow()
 
     protected fun send(event: E) {
-        coroutineScope.launch { eventChannel.send(event) }
+        viewModelScope.launch { eventChannel.send(event) }
     }
 
     interface Event

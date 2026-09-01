@@ -5,11 +5,12 @@ import dev.mayankmkh.basekmpproject.shared.features.details.domain.DetailReposit
 import dev.mayankmkh.basekmpproject.shared.features.details.domain.GetItemUseCase
 import dev.mayankmkh.basekmpproject.shared.features.details.presentation.DetailsViewModel
 import org.koin.core.module.dsl.factoryOf
+import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
 val detailsFeatureModule = module {
     factoryOf(::DetailRepositoryImpl) bind DetailRepository::class
     factoryOf(::GetItemUseCase)
-    factoryOf(::DetailsViewModel)
+    viewModelOf(::DetailsViewModel)
 }

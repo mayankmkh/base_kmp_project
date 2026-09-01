@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.shared.features.details.presentation
 
+import androidx.lifecycle.viewModelScope
 import dev.mayankmkh.basekmpproject.shared.features.details.domain.GetItemUseCase
 import dev.mayankmkh.basekmpproject.shared.features.details.domain.Item
 import dev.mayankmkh.basekmpproject.shared.features.details.presentation.DetailsViewModel.Event
@@ -21,7 +22,7 @@ internal class DetailsViewModel(private val itemId: String, getItem: GetItemUseC
             }
             .onStart { emit(UiState.InProgress) }
             .stateIn(
-                scope = coroutineScope,
+                scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = UiState.Initial,
             )

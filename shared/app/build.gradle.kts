@@ -31,10 +31,6 @@ kotlin {
                 if (buildType == NativeBuildType.RELEASE) {
                     binaryOption("preCodegenInlineThreshold", "40")
                 }
-
-                export(libs.decompose.decompose)
-                export(libs.essenty.lifecycle)
-                export(libs.essenty.backHandler)
             }
         }
     }
@@ -51,10 +47,10 @@ kotlin {
                 }
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.touchlab.kermit)
-                api(libs.decompose.decompose)
-                api(libs.essenty.lifecycle)
-                api(libs.essenty.backHandler)
-                api(libs.decompose.extensions.compose)
+                api(libs.androidx.navigation3.runtime)
+                implementation(libs.jetbrains.androidx.navigation3.ui)
+                implementation(libs.androidx.lifecycle.viewmodel.compose)
+                implementation(libs.androidx.lifecycle.viewmodel.navigation3)
             }
         }
         androidMain {

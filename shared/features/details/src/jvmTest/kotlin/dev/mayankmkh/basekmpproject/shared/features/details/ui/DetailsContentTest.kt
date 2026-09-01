@@ -10,7 +10,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import dev.mayankmkh.basekmpproject.shared.features.details.domain.DetailRepository
 import dev.mayankmkh.basekmpproject.shared.features.details.domain.Item
-import dev.mayankmkh.basekmpproject.shared.features.details.nav.DetailsComponent
 import dev.mayankmkh.basekmpproject.shared.features.details.presentation.DetailsViewModel
 import dev.mayankmkh.basekmpproject.shared.features.details.testing.FakeDetailRepository
 import dev.mayankmkh.basekmpproject.shared.features.details.testing.detailsViewModel
@@ -49,7 +48,7 @@ class DetailsContentTest {
 
     @Test
     fun `puts the item's title in the bar and its text below`() = runComposeUiTest {
-        setContent { DetailsContent(component(FakeDetailRepository())) }
+        setContent { DetailsContent(viewModel(FakeDetailRepository())) }
 
         onNodeWithText("Detail Screen First").assertIsDisplayed()
         onNodeWithText("First body").assertIsDisplayed()
@@ -57,7 +56,7 @@ class DetailsContentTest {
 
     @Test
     fun `spins while the item is still on its way`() = runComposeUiTest {
-        setContent { DetailsContent(component(NeverAnswers)) }
+        setContent { DetailsContent(viewModel(NeverAnswers)) }
 
         onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertIsDisplayed()
     }
@@ -66,7 +65,7 @@ class DetailsContentTest {
     fun `shows what went wrong when the item cannot be loaded`() = runComposeUiTest {
         val repository = FakeDetailRepository(failure = IllegalStateException("boom"))
 
-        setContent { DetailsContent(component(repository)) }
+        setContent { DetailsContent(viewModel(repository)) }
 
         onNodeWithText("boom", substring = true).assertIsDisplayed()
     }
@@ -76,22 +75,15 @@ class DetailsContentTest {
         val viewModel = detailsViewModel(dispatcher)
         val events = mutableListOf<DetailsViewModel.Event>()
         scope.launch { viewModel.eventsFlow.toList(events) }
-        setContent { DetailsContent(component(viewModel)) }
+        setContent { DetailsContent(viewModel) }
 
         onNodeWithContentDescription("Close button").performClick()
 
         assertEquals(DetailsViewModel.Event.Close, events.single())
     }
 
-    private fun component(repository: DetailRepository) =
-        component(detailsViewModel(dispatcher, repository = repository))
-
-    private fun component(viewModel: DetailsViewModel) =
-        object : DetailsComponent() {
-            override val viewModel = viewModel
-
-            override fun processEvent(event: DetailsViewModel.Event) = Unit
-        }
+    private fun viewModel(repository: DetailRepository) =
+        detailsViewModel(dispatcher, repository = repository)
 
     /** Stands in for a fetch that is still in flight, so the screen stays on its loading branch. */
     private object NeverAnswers : DetailRepository {

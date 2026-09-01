@@ -11,7 +11,6 @@ import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
 import dev.mayankmkh.basekmpproject.shared.features.list.domain.Item
-import dev.mayankmkh.basekmpproject.shared.features.list.nav.ListComponent
 import dev.mayankmkh.basekmpproject.shared.features.list.presentation.ListViewModel
 import dev.mayankmkh.basekmpproject.shared.features.list.testing.items
 import dev.mayankmkh.basekmpproject.shared.features.list.testing.listViewModel
@@ -53,7 +52,7 @@ class ListContentTest {
 
     @Test
     fun `shows a row for every item`() = runComposeUiTest {
-        setContent { ListContent(component(flowOf(Ok(items)))) }
+        setContent { ListContent(viewModel(flowOf(Ok(items)))) }
 
         onNodeWithText("First").assertIsDisplayed()
         onNodeWithText("Second").assertIsDisplayed()
@@ -61,14 +60,16 @@ class ListContentTest {
 
     @Test
     fun `spins while the items are still on their way`() = runComposeUiTest {
-        setContent { ListContent(component(flow { awaitCancellation() })) }
+        setContent { ListContent(viewModel(flow { awaitCancellation() })) }
 
         onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertIsDisplayed()
     }
 
     @Test
     fun `shows what went wrong when the items cannot be loaded`() = runComposeUiTest {
-        setContent { ListContent(component(flowOf(Err(IllegalStateException("boom"))))) }
+        setContent {
+            ListContent(viewModel(flowOf(Err(IllegalStateException("boom")))))
+        }
 
         onNodeWithText("boom", substring = true).assertIsDisplayed()
     }
@@ -78,7 +79,7 @@ class ListContentTest {
         val viewModel = listViewModel(dispatcher, flowOf(Ok(items)))
         val events = mutableListOf<ListViewModel.Event>()
         scope.launch { viewModel.eventsFlow.toList(events) }
-        setContent { ListContent(component(viewModel)) }
+        setContent { ListContent(viewModel) }
 
         onNodeWithText("Second").performClick()
 
@@ -86,13 +87,6 @@ class ListContentTest {
         assertEquals(ListViewModel.Event.ItemClicked("2"), events.single())
     }
 
-    private fun component(results: Flow<Result<Collection<Item>, Throwable>>) =
-        component(listViewModel(dispatcher, results))
-
-    private fun component(viewModel: ListViewModel) =
-        object : ListComponent() {
-            override val viewModel = viewModel
-
-            override fun processEvent(event: ListViewModel.Event) = Unit
-        }
+    private fun viewModel(results: Flow<Result<Collection<Item>, Throwable>>): ListViewModel =
+        listViewModel(dispatcher, results)
 }

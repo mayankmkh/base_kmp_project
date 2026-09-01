@@ -247,8 +247,8 @@ The convention core owns reusable bundles in
 - `:shared:libs:coroutines-x`
 - `:shared:libs:networking`
 - `:shared:libs:designsystem`
-- Decompose + Essenty lifecycle coroutines
-- Koin BOM + Koin core
+- AndroidX ViewModel + Compose integration
+- Koin BOM + Koin core + Compose ViewModel integration
 
 This is the only difference between `bkp.kmp.lib` and `bkp.kmp.feature`.
 

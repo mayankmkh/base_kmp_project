@@ -15,22 +15,43 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import base_kmp_project.shared.features.details.generated.resources.Res
 import base_kmp_project.shared.features.details.generated.resources.arrow_back_24px
 import dev.mayankmkh.basekmpproject.shared.features.details.domain.Item
-import dev.mayankmkh.basekmpproject.shared.features.details.nav.DetailsComponent
+import dev.mayankmkh.basekmpproject.shared.features.details.presentation.DetailsViewModel
 import dev.mayankmkh.basekmpproject.shared.libs.arch.core.presentation.UiState
 import org.jetbrains.compose.resources.painterResource
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
+
+@Composable
+fun DetailsScreen(itemId: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    val viewModel: DetailsViewModel = koinViewModel(parameters = { parametersOf(itemId) })
+    val currentOnBack by rememberUpdatedState(onBack)
+
+    LaunchedEffect(viewModel) {
+        viewModel.eventsFlow.collect { event ->
+            when (event) {
+                DetailsViewModel.Event.Close -> currentOnBack()
+            }
+        }
+    }
+
+    DetailsContent(viewModel = viewModel, modifier = modifier)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailsContent(component: DetailsComponent, modifier: Modifier = Modifier) {
-    val viewModel = component.viewModel
-
+internal fun DetailsContent(
+    viewModel: DetailsViewModel,
+    modifier: Modifier = Modifier,
+) {
     val uiState by viewModel.uiStateFlow.collectAsState()
 
     val title =

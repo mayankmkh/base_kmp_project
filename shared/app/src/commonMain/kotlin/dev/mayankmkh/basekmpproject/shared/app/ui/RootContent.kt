@@ -2,35 +2,55 @@ package dev.mayankmkh.basekmpproject.shared.app.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.arkivanov.decompose.ExperimentalDecomposeApi
-import com.arkivanov.decompose.extensions.compose.stack.Children
-import com.arkivanov.decompose.extensions.compose.stack.animation.fade
-import com.arkivanov.decompose.extensions.compose.stack.animation.predictiveback.predictiveBackAnimation
-import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
-import dev.mayankmkh.basekmpproject.shared.app.nav.RootComponent
-import dev.mayankmkh.basekmpproject.shared.app.nav.RootComponent.Child.DetailsChild
-import dev.mayankmkh.basekmpproject.shared.app.nav.RootComponent.Child.ListChild
-import dev.mayankmkh.basekmpproject.shared.features.details.ui.DetailsContent
-import dev.mayankmkh.basekmpproject.shared.features.list.ui.ListContent
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreProvider
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.runtime.NavEntryDecorator
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.ui.NavDisplay
+import dev.mayankmkh.basekmpproject.shared.app.nav.DetailsRoute
+import dev.mayankmkh.basekmpproject.shared.app.nav.ListRoute
+import dev.mayankmkh.basekmpproject.shared.features.details.ui.DetailsScreen
+import dev.mayankmkh.basekmpproject.shared.features.list.ui.ListScreen
 
-@OptIn(ExperimentalDecomposeApi::class)
 @Composable
-fun RootContent(component: RootComponent, modifier: Modifier = Modifier) {
-    Children(
-        stack = component.stack,
-        modifier = modifier,
-        // Follows the back gesture frame by frame where the platform reports one (Android 14+, and
-        // iOS through the overlay in `MainViewController`); falls back to the plain fade elsewhere.
-        animation =
-            predictiveBackAnimation(
-                backHandler = component.backHandler,
-                fallbackAnimation = stackAnimation(fade()),
-                onBack = component::onBackClicked,
-            ),
-    ) {
-        when (val child = it.instance) {
-            is ListChild -> ListContent(component = child.component)
-            is DetailsChild -> DetailsContent(component = child.component)
+internal fun RootContent(
+    backStack: NavBackStack<NavKey>,
+    modifier: Modifier = Modifier,
+) {
+    val viewModelStoreProvider =
+        rememberViewModelStoreProvider(parent = LocalViewModelStoreOwner.current)
+    val entryDecorators: List<NavEntryDecorator<NavKey>> =
+        listOf(
+            rememberSaveableStateHolderNavEntryDecorator(),
+            rememberViewModelStoreNavEntryDecorator(viewModelStoreProvider),
+        )
+    val entryProvider: (NavKey) -> NavEntry<NavKey> = entryProvider {
+        entry<ListRoute> {
+            ListScreen(
+                onItemSelected = { itemId ->
+                    val destination = DetailsRoute(itemId)
+                    if (backStack.lastOrNull() != destination) backStack += destination
+                }
+            )
+        }
+        entry<DetailsRoute> { route ->
+            DetailsScreen(
+                itemId = route.itemId,
+                onBack = { backStack.removeLastOrNull() },
+            )
         }
     }
+
+    NavDisplay(
+        backStack = backStack,
+        onBack = { backStack.removeLastOrNull() },
+        entryDecorators = entryDecorators,
+        entryProvider = entryProvider,
+        modifier = modifier,
+    )
 }

@@ -2,50 +2,44 @@ package dev.mayankmkh.basekmpproject.webapp
 
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
-import com.arkivanov.decompose.DefaultComponentContext
-import com.arkivanov.decompose.ExperimentalDecomposeApi
-import com.arkivanov.decompose.router.webhistory.withWebHistory
-import com.arkivanov.essenty.lifecycle.LifecycleRegistry
-import com.arkivanov.essenty.lifecycle.resume
-import com.arkivanov.essenty.lifecycle.stop
+import com.github.terrakok.navigation3.browser.ChronologicalBrowserNavigation
+import com.github.terrakok.navigation3.browser.buildBrowserHistoryFragment
+import com.github.terrakok.navigation3.browser.getBrowserHistoryFragmentName
+import com.github.terrakok.navigation3.browser.getBrowserHistoryFragmentParameters
 import dev.mayankmkh.basekmpproject.shared.app.App
 import dev.mayankmkh.basekmpproject.shared.app.di.initKoin
-import dev.mayankmkh.basekmpproject.shared.app.nav.DefaultRootComponent
-import kotlinx.browser.document
+import dev.mayankmkh.basekmpproject.shared.app.nav.DetailsRoute
+import dev.mayankmkh.basekmpproject.shared.app.nav.ListRoute
+import dev.mayankmkh.basekmpproject.shared.app.rememberAppBackStack
 
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalDecomposeApi::class)
+@OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     initKoin()
-
-    val lifecycle = LifecycleRegistry()
-
-    // Binds the stack to the browser history: the state keeper restores the tree across reloads and
-    // `deepLink` carries the URL the tab was opened with.
-    val root = withWebHistory { stateKeeper, deepLink ->
-        DefaultRootComponent(
-            componentContext =
-                DefaultComponentContext(lifecycle = lifecycle, stateKeeper = stateKeeper),
-            deepLinkUrl = deepLink,
-        )
-    }
-
-    lifecycle.attachToDocument()
-
     ComposeViewport {
-        App(root)
+        val backStack = rememberAppBackStack()
+        ChronologicalBrowserNavigation(
+            backStack = backStack,
+            saveKey = { route ->
+                when (route) {
+                    ListRoute -> buildBrowserHistoryFragment("list")
+                    is DetailsRoute ->
+                        buildBrowserHistoryFragment(
+                            name = "details",
+                            parameters = mapOf("id" to route.itemId),
+                        )
+                    else -> null
+                }
+            },
+            restoreKey = { fragment ->
+                when (getBrowserHistoryFragmentName(fragment)) {
+                    "list" -> ListRoute
+                    "details" ->
+                        getBrowserHistoryFragmentParameters(fragment)["id"]?.let(::DetailsRoute)
+                    else -> null
+                }
+            },
+        )
+
+        App(backStack = backStack)
     }
 }
-
-// A backgrounded tab keeps running, so without this the tree stays resumed and its collectors and
-// timers keep working while nothing is on screen.
-private fun LifecycleRegistry.attachToDocument() {
-    fun onVisibilityChanged() {
-        if (isDocumentHidden()) stop() else resume()
-    }
-
-    onVisibilityChanged()
-    document.addEventListener(type = "visibilitychange", callback = { onVisibilityChanged() })
-}
-
-// `kotlinx-browser` binds neither `Document.hidden` nor `Document.visibilityState`.
-private fun isDocumentHidden(): Boolean = js("document.hidden")

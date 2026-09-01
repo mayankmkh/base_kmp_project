@@ -44,6 +44,14 @@ kotlin {
                 }
                 with(projects.shared.libs) {
                     implementation(prefs)
+                    // The app module owns the object graph, so it is what hands the data
+                    // layer its platform pieces: a `DatabaseContext` and a configured
+                    // `HttpClient`. (`networking` itself arrives with the feature bundle.)
+                    implementation(database)
+                    implementation(posts)
+                    // Same story: the platform pieces of the connectivity monitor are the app
+                    // module's to supply.
+                    implementation(connectivity)
                 }
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.touchlab.kermit)

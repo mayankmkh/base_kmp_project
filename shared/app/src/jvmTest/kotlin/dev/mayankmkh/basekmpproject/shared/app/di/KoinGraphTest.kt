@@ -1,6 +1,10 @@
 package dev.mayankmkh.basekmpproject.shared.app.di
 
 import co.touchlab.kermit.LoggerConfig
+import io.ktor.client.HttpClientConfig
+import io.ktor.client.engine.HttpClientEngine
+import io.ktor.http.ContentType
+import io.ktor.http.Url
 import kotlin.test.Test
 import kotlinx.coroutines.CoroutineDispatcher
 import org.koin.dsl.module
@@ -20,6 +24,18 @@ class KoinGraphTest {
         // Verification reflects over the public constructors of every declared type, blind to the
         // definition body. These types are built by hand inside a `single { }` lambda, so their own
         // constructor parameters never come from the graph and would read as missing bindings.
-        val LAMBDA_BUILT = listOf(CoroutineDispatcher::class, LoggerConfig::class)
+        val LAMBDA_BUILT =
+            listOf(
+                CoroutineDispatcher::class,
+                LoggerConfig::class,
+                // `NetworkConfig`'s own fields, filled in from `BaseUrls` rather than the graph.
+                Url::class,
+                ContentType::class,
+                Map::class,
+                // `HttpClient`'s constructor: the engine is resolved off the classpath by
+                // `HttpClient { }` and the config block is the lambda itself.
+                HttpClientEngine::class,
+                HttpClientConfig::class,
+            )
     }
 }

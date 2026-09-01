@@ -47,7 +47,7 @@ fun createHttpClient(
         config,
         bearerTokenSource,
         json,
-        tokenClient(json, logLevel, clientLogger),
+        lazy { tokenClient(json, logLevel, clientLogger) },
         ktorPlatformLogger(clientLogger),
         logLevel,
     )
@@ -76,7 +76,7 @@ fun createHttpClient(
             config,
             bearerTokenSource,
             json,
-            tokenClient(json, logLevel, clientLogger),
+            lazy { tokenClient(json, logLevel, clientLogger) },
             clientLogger,
             logLevel,
         )
@@ -92,7 +92,10 @@ internal fun HttpClientConfig<*>.installNetworking(
     config: NetworkConfig,
     bearerTokenSource: BearerTokenSource,
     json: Json,
-    tokenClient: HttpClient,
+    // `Lazy` because most apps never reach the refresh path: an anonymous `BearerTokenSource`
+    // returns no access token, so the client below would be an engine, a connection pool and its
+    // threads built at startup and held for the process lifetime without ever serving a request.
+    tokenClient: Lazy<HttpClient>,
     clientLogger: Logger,
     logLevel: LogLevel,
 ) {
@@ -126,7 +129,7 @@ internal fun HttpClientConfig<*>.installNetworking(
                         if (oldTokens?.accessToken != bearerTokens?.accessToken) {
                             bearerTokens
                         } else {
-                            refreshTokenFromClient(bearerTokenSource, tokenClient)
+                            refreshTokenFromClient(bearerTokenSource, tokenClient.value)
                             getBearerTokensFromSource(bearerTokenSource)
                         }
                     }

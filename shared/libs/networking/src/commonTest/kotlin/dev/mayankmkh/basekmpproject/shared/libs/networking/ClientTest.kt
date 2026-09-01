@@ -133,7 +133,7 @@ class ClientTest {
                 config = config,
                 bearerTokenSource = source,
                 json = createJson(),
-                tokenClient = source.tokenClient,
+                tokenClient = lazyOf(source.tokenClient),
                 clientLogger = SilentLogger,
                 logLevel = LogLevel.NONE,
             )

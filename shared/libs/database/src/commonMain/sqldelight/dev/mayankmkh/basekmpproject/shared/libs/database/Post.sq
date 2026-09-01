@@ -12,6 +12,13 @@ CREATE TABLE post (
 
 CREATE INDEX post_position ON post(position);
 
+-- A row exists once the feed endpoint has returned successfully, including when it returned an
+-- empty list. Keeping this beside the rows makes "not fetched yet" distinguishable from "fetched
+-- and empty" without preferences that could drift away from the database.
+CREATE TABLE post_feed_state (
+    singleton INTEGER NOT NULL PRIMARY KEY CHECK (singleton = 0)
+);
+
 selectAll:
 SELECT *
 FROM post
@@ -32,3 +39,11 @@ DELETE FROM post;
 countAll:
 SELECT count(*)
 FROM post;
+
+feedInitializationCount:
+SELECT count(*)
+FROM post_feed_state;
+
+markFeedInitialized:
+INSERT OR IGNORE INTO post_feed_state(singleton)
+VALUES (0);

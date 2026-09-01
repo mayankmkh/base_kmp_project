@@ -50,7 +50,7 @@ class ListRepositoryImplTest {
             val repository = repository(engine, store)
 
             repository.getItems().test {
-                // Store's validator treats the initial empty table as a cache miss.
+                // The persisted initialization marker tells Store this feed still needs fetching.
                 assertEquals(FEED_ITEMS, awaitItem().getOrThrow { it }.toList())
                 cancelAndIgnoreRemainingEvents()
             }
@@ -61,16 +61,26 @@ class ListRepositoryImplTest {
         }
 
     @Test
-    fun `an empty server feed is emitted after the initial empty cache triggers a fetch`() =
+    fun `an empty server feed stays valid after the initial fetch`() =
         runTest(dispatcher) {
             val engine = MockEngine { respondJson("[]") }
+            val store = createInMemoryPostsLocalStore()
+            val repository = repository(engine, store)
 
-            repository(engine, createInMemoryPostsLocalStore()).getItems().test {
+            repository.getItems().test {
+                assertTrue(awaitItem().getOrThrow { it }.isEmpty())
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            // A second subscription reads the persisted initialized marker. Empty means the
+            // server's authoritative feed is empty, not that the cache has never been filled.
+            repository.getItems().test {
                 assertTrue(awaitItem().getOrThrow { it }.isEmpty())
                 cancelAndIgnoreRemainingEvents()
             }
 
             assertEquals(1, engine.requestHistory.size)
+            assertTrue(store.observeFeedInitialized().first())
         }
 
     @Test

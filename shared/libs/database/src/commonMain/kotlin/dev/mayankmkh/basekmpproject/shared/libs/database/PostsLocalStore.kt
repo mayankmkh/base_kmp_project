@@ -41,6 +41,13 @@ class PostsLocalStore(private val provider: PostsDatabaseSource) {
         }
     }
 
+    /** Whether the feed endpoint has completed successfully at least once. */
+    fun observeFeedInitialized(): Flow<Boolean> = withDatabase { database ->
+        database.postQueries.feedInitializationCount().asFlow().map { query ->
+            query.awaitAsOne() > 0L
+        }
+    }
+
     suspend fun count(): Long = provider.database().postQueries.countAll().awaitAsOne()
 
     /**
@@ -62,6 +69,7 @@ class PostsLocalStore(private val provider: PostsDatabaseSource) {
                     position = index.toLong(),
                 )
             }
+            database.postQueries.markFeedInitialized()
         }
     }
 

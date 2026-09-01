@@ -46,7 +46,9 @@ spotless = "8.9.0"
 # Room is the Android-recommended option but publishes no wasmJs target, so it cannot back a
 # module built for `bkpTargets { default() }`. SQLDelight covers all four platforms.
 sqldelight = "2.2.1"
-store5 = "5.1.0-alpha10"
+# The docs currently show 5.1.0, but Maven has no stable artifact yet. alpha11 is the latest
+# published release (2026-08-29).
+store5 = "5.1.0-alpha11"
 touchlabKermit = "2.1.0"
 truth = "1.4.5"
 turbine = "1.2.0"

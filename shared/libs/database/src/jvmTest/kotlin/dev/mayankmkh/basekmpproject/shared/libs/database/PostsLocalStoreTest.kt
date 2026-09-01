@@ -3,7 +3,9 @@ package dev.mayankmkh.basekmpproject.shared.libs.database
 import app.cash.turbine.test
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 
@@ -28,6 +30,25 @@ class PostsLocalStoreTest {
         store.replaceAll(listOf(entity("2")))
 
         assertEquals(listOf("2"), store.observeAll().first().map { it.id })
+    }
+
+    @Test
+    fun `an empty feed response is recorded as initialized`() = runTest {
+        val store = createInMemoryPostsLocalStore()
+        assertFalse(store.observeFeedInitialized().first())
+
+        store.replaceAll(emptyList())
+
+        assertTrue(store.observeFeedInitialized().first())
+    }
+
+    @Test
+    fun `a detail upsert does not claim the whole feed was initialized`() = runTest {
+        val store = createInMemoryPostsLocalStore()
+
+        store.upsert(entity("1"))
+
+        assertFalse(store.observeFeedInitialized().first())
     }
 
     @Test

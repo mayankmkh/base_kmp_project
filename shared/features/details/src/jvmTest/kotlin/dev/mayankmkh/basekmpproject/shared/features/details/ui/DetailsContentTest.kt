@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
+import com.github.michaelbull.result.Result
 import dev.mayankmkh.basekmpproject.shared.features.details.domain.DetailRepository
 import dev.mayankmkh.basekmpproject.shared.features.details.domain.Item
 import dev.mayankmkh.basekmpproject.shared.features.details.presentation.DetailsViewModel
@@ -21,6 +22,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -87,6 +90,8 @@ class DetailsContentTest {
 
     /** Stands in for a fetch that is still in flight, so the screen stays on its loading branch. */
     private object NeverAnswers : DetailRepository {
-        override suspend fun getItem(id: String): Item = awaitCancellation()
+        override fun getItem(id: String): Flow<Result<Item, Throwable>> = flow {
+            awaitCancellation()
+        }
     }
 }

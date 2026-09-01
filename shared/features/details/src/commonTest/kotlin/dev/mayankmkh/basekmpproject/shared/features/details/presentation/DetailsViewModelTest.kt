@@ -10,7 +10,6 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -60,16 +59,12 @@ class DetailsViewModelTest {
             viewModel.uiStateFlow.test {
                 assertEquals(UiState.Initial, awaitItem())
                 assertEquals(UiState.InProgress, awaitItem())
-                // Not the same instance: the use case runs the repository through `withContext`,
-                // and
-                // coroutines rebuilds an exception crossing that boundary to splice in the caller's
-                // stack, so only the type and message survive.
-                val failure = assertIs<UiState.Failure>(awaitItem())
-                assertIs<IllegalStateException>(failure.error)
-                assertEquals("boom", failure.error.message)
+                // The same instance this time: the flow use case catches the throwable and wraps
+                // it in an `Err` without crossing a `withContext` boundary, so nothing rebuilds it.
+                assertEquals(UiState.Failure(error), awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            assertEquals("boom", failureListener.failures.single().message)
+            assertEquals(error, failureListener.failures.single())
         }
 
     @Test

@@ -24,7 +24,7 @@ import dev.mayankmkh.basekmpproject.shared.libs.networking.NetworkConfig
 import dev.mayankmkh.basekmpproject.shared.libs.networking.createHttpClient
 import dev.mayankmkh.basekmpproject.shared.libs.networking.prodBaseUrls
 import dev.mayankmkh.basekmpproject.shared.libs.posts.PostsApi
-import dev.mayankmkh.basekmpproject.shared.libs.prefs.KeyValueStore
+import dev.mayankmkh.basekmpproject.shared.libs.prefs.CredentialsPreferences
 import dev.mayankmkh.basekmpproject.shared.libs.prefs.PrefContext
 import io.ktor.client.plugins.logging.Logger as KtorLogger
 import io.ktor.http.Url
@@ -68,10 +68,19 @@ private val archModule = module {
     singleOf(::AppUseCaseFailureListener) bind UseCaseFailureListener::class
 }
 
+/**
+ * Preferences, in the one shape this template still needs them.
+ *
+ * `CredentialsPreferences` is what makes the auth path in `:shared:libs:networking` a real one
+ * rather than a sketch: swapping the `BearerTokenSource` binding below for a `single` that reads
+ * from this store is the whole of adding sign-in, and nothing in the client changes. The explicit
+ * `single` rather than `singleOf(::CredentialsPreferences)` is because the class has two one-arg
+ * constructors -- the other takes a `DataStore` for tests -- and the reflective form cannot tell
+ * which one is meant.
+ */
 private val prefsModule = module {
-    includes(jsonModule)
     factory { createPrefContext() }
-    singleOf(::KeyValueStore)
+    single { CredentialsPreferences(get<PrefContext>()) }
 }
 
 /**

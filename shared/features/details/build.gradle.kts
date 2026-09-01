@@ -8,7 +8,18 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                implementation(projects.shared.libs.prefs)
+                implementation(projects.shared.libs.database)
+                implementation(projects.shared.libs.posts)
+            }
+        }
+        commonTest {
+            dependencies {
+                implementation(libs.ktor.client.mock)
+            }
+        }
+        jvmTest {
+            dependencies {
+                implementation(libs.sqldelight.sqlite.driver)
             }
         }
     }

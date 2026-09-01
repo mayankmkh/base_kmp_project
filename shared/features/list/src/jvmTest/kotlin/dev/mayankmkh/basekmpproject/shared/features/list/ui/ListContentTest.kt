@@ -6,12 +6,15 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.v2.runComposeUiTest
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
 import dev.mayankmkh.basekmpproject.shared.features.list.domain.Item
 import dev.mayankmkh.basekmpproject.shared.features.list.presentation.ListViewModel
+import dev.mayankmkh.basekmpproject.shared.features.list.testing.FakeListRepository
 import dev.mayankmkh.basekmpproject.shared.features.list.testing.items
 import dev.mayankmkh.basekmpproject.shared.features.list.testing.listViewModel
 import kotlin.test.AfterTest
@@ -72,6 +75,39 @@ class ListContentTest {
         }
 
         onNodeWithText("boom", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `says so when the feed comes back with nothing in it`() = runComposeUiTest {
+        setContent { ListContent(viewModel(flowOf(Ok(emptyList())))) }
+
+        // A successful fetch of nothing, not a failure: no error text and nothing to retry.
+        onNodeWithText("Nothing here yet.", substring = true).assertIsDisplayed()
+        onNodeWithText("Retry").assertDoesNotExist()
+    }
+
+    @Test
+    fun `the retry button asks for another fetch`() = runComposeUiTest {
+        val repository = FakeListRepository(flowOf(Err(IllegalStateException("boom"))))
+        setContent { ListContent(listViewModel(dispatcher, repository = repository)) }
+
+        onNodeWithText("Retry").performClick()
+
+        assertEquals(1, repository.refreshCount)
+    }
+
+    @Test
+    fun `pulling the list down asks for another fetch`() = runComposeUiTest {
+        val repository = FakeListRepository(flowOf(Ok(items)))
+        setContent { ListContent(listViewModel(dispatcher, repository = repository)) }
+
+        onNodeWithText("First").performTouchInput {
+            // Past the indicator's threshold: a shorter drag settles back without refreshing.
+            swipeDown(startY = centerY, endY = centerY + 800f)
+        }
+        waitForIdle()
+
+        assertEquals(1, repository.refreshCount)
     }
 
     @Test

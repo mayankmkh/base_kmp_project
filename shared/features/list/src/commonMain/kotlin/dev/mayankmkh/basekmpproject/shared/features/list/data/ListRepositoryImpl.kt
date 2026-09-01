@@ -6,57 +6,56 @@ import dev.mayankmkh.basekmpproject.shared.features.list.domain.ListRepository
 import dev.mayankmkh.basekmpproject.shared.libs.arch.core.data.NetworkBoundCollectionResource
 import dev.mayankmkh.basekmpproject.shared.libs.arch.core.data.NetworkBoundResource
 import dev.mayankmkh.basekmpproject.shared.libs.coroutines.x.dispatchers.AppDispatchers
-import dev.mayankmkh.basekmpproject.shared.libs.prefs.ItemEntity
-import dev.mayankmkh.basekmpproject.shared.libs.prefs.KeyValueStore
+import dev.mayankmkh.basekmpproject.shared.libs.database.PostEntity
+import dev.mayankmkh.basekmpproject.shared.libs.database.PostsLocalStore
+import dev.mayankmkh.basekmpproject.shared.libs.networking.getOrThrow
+import dev.mayankmkh.basekmpproject.shared.libs.posts.PostDto
+import dev.mayankmkh.basekmpproject.shared.libs.posts.PostsApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 internal class ListRepositoryImpl(
-    private val keyValueStore: KeyValueStore,
+    private val postsApi: PostsApi,
+    private val postsLocalStore: PostsLocalStore,
     private val appDispatchers: AppDispatchers,
     private val failureListener: NetworkBoundResource.OnFailureListener,
 ) : ListRepository {
-    override fun getItems(): Flow<Result<Collection<Item>, Throwable>> {
-        return object :
-                NetworkBoundCollectionResource<List<ItemDto>, Item>(
+
+    override fun getItems(): Flow<Result<Collection<Item>, Throwable>> =
+        object :
+                NetworkBoundCollectionResource<List<PostDto>, Item>(
                     appDispatchers,
                     failureListener,
                 ) {
-                override suspend fun processResponse(response: List<ItemDto>) = response.map {
+                override fun loadFromDb() =
+                    postsLocalStore.observeAll().map { posts -> posts.map { it.toItem() } }
+
+                override suspend fun loadFromNetwork() = postsApi.getPosts().getOrThrow()
+
+                override suspend fun processResponse(response: List<PostDto>) = response.map {
                     it.toItem()
                 }
 
                 override suspend fun saveCallResult(item: Collection<Item>) {
-                    keyValueStore.saveItems(item.map { it.toItemEntity() })
+                    postsLocalStore.replaceAll(item.map { it.toPostEntity() })
                 }
-
-                override suspend fun shouldFetch(data: Collection<Item>?) = data.isNullOrEmpty()
-
-                override fun loadFromDb() =
-                    keyValueStore.getItemsFlow().map { list -> list?.map { it.toItem() } }
-
-                override suspend fun loadFromNetwork() =
-                    List(ITEMS_COUNT) { index ->
-                        ItemDto(
-                            id = index.toString(),
-                            title = "Item $index",
-                            text = "Item $index. ".repeat(ITEM_REPEAT_COUNT),
-                        )
-                    }
             }
             .asFlow()
+
+    override suspend fun refresh() {
+        val posts = postsApi.getPosts().getOrThrow()
+        // Writing the cache is the whole job: `getItems` is observing the same table, so its
+        // collector sees the new feed without this returning anything.
+        postsLocalStore.replaceAll(posts.map { it.toPostEntity() })
     }
 
-    private data class ItemDto(val id: String, val title: String, val text: String)
+    private fun PostDto.toItem() = Item(id = id.toString(), title = title, text = body)
 
-    private fun ItemDto.toItem() = Item(id, title, text)
+    // Straight to the cache format. Going via `toItem` would put the *display* mapping on the
+    // write path, so trimming a title for the UI would silently change what gets persisted.
+    private fun PostDto.toPostEntity() = PostEntity(id = id.toString(), title = title, body = body)
 
-    private fun Item.toItemEntity() = ItemEntity(id, title, text)
+    private fun PostEntity.toItem() = Item(id = id, title = title, text = body)
 
-    private fun ItemEntity.toItem() = Item(id, title, text)
-
-    companion object {
-        private const val ITEMS_COUNT = 100
-        private const val ITEM_REPEAT_COUNT = 1000
-    }
+    private fun Item.toPostEntity() = PostEntity(id = id, title = title, body = text)
 }

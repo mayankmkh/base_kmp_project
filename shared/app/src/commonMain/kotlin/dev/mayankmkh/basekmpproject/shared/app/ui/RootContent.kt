@@ -32,7 +32,7 @@ internal fun RootContent(
     val entryProvider: (NavKey) -> NavEntry<NavKey> = entryProvider {
         entry<ListRoute> {
             ListScreen(
-                onItemSelected = { itemId ->
+                onItemSelect = { itemId ->
                     val destination = DetailsRoute(itemId)
                     if (backStack.lastOrNull() != destination) backStack += destination
                 }

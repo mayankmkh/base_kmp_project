@@ -42,6 +42,9 @@ kotlinxSerialization = "1.11.0"
 ktfmt = "0.63"
 ktor = "3.5.2"
 spotless = "8.9.0"
+# Room is the Android-recommended option but publishes no wasmJs target, so it cannot back a
+# module built for `bkpTargets { default() }`. SQLDelight covers all four platforms.
+sqldelight = "2.2.1"
 touchlabKermit = "2.1.0"
 truth = "1.4.5"
 turbine = "1.2.0"
@@ -120,6 +123,17 @@ ktor-client-mock = { group = "io.ktor", name = "ktor-client-mock", version.ref =
 ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 
+# `async-extensions` is what makes `generateAsync` queries awaitable; `coroutines-extensions`
+# turns a query into a `Flow` that re-emits when the tables it reads are written. Both are needed
+# for a database-as-single-source-of-truth repository.
+sqldelight-runtime = { group = "app.cash.sqldelight", name = "runtime", version.ref = "sqldelight" }
+sqldelight-async-extensions = { group = "app.cash.sqldelight", name = "async-extensions", version.ref = "sqldelight" }
+sqldelight-coroutines-extensions = { group = "app.cash.sqldelight", name = "coroutines-extensions", version.ref = "sqldelight" }
+sqldelight-android-driver = { group = "app.cash.sqldelight", name = "android-driver", version.ref = "sqldelight" }
+sqldelight-native-driver = { group = "app.cash.sqldelight", name = "native-driver", version.ref = "sqldelight" }
+sqldelight-sqlite-driver = { group = "app.cash.sqldelight", name = "sqlite-driver", version.ref = "sqldelight" }
+sqldelight-web-worker-driver = { group = "app.cash.sqldelight", name = "web-worker-driver", version.ref = "sqldelight" }
+
 michael-bull-kotlin-result = { group = "com.michael-bull.kotlin-result", name = "kotlin-result", version.ref = "kotlinResult" }
 
 touchlab-kermit = { group = "co.touchlab", name = "kermit", version.ref = "touchlabKermit" }
@@ -175,6 +189,7 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kotlin-powerAssert = { id = "org.jetbrains.kotlin.plugin.power-assert", version.ref = "kotlin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
 
 # New V3 convention plugins
 bkp-android-app = { id = "bkp.android.app" }

@@ -47,6 +47,7 @@ include(
     ":shared:libs:arch:core",
     ":shared:libs:networking",
     ":shared:libs:connectivity",
+    ":shared:libs:database",
     ":shared:libs:posts",
     ":shared:libs:prefs",
     ":shared:libs:designsystem",

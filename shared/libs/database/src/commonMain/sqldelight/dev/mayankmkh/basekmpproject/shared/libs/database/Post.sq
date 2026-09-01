@@ -1,0 +1,34 @@
+-- The local cache of the posts feed. This table is the single source of truth the UI observes:
+-- the network writes into it and never reaches the presentation layer directly, so cached rows
+-- render offline and a refresh shows up as a table change rather than as a separate result.
+CREATE TABLE post (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    -- Preserves feed order independently of `id`, which is text and would otherwise sort
+    -- lexicographically ("10" before "2").
+    position INTEGER NOT NULL
+);
+
+CREATE INDEX post_position ON post(position);
+
+selectAll:
+SELECT *
+FROM post
+ORDER BY position;
+
+selectById:
+SELECT *
+FROM post
+WHERE id = ?;
+
+upsert:
+INSERT OR REPLACE INTO post(id, title, body, position)
+VALUES (?, ?, ?, ?);
+
+deleteAll:
+DELETE FROM post;
+
+countAll:
+SELECT count(*)
+FROM post;

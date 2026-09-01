@@ -6,10 +6,8 @@ import com.github.michaelbull.result.getOrElse
 /**
  * Unwraps an API result, throwing the failure's underlying cause.
  *
- * `NetworkBoundResource.loadFromNetwork` signals failure by throwing -- it wraps the call in its
- * own `runCatching` to decide between emitting cached data and surfacing the error. So a repository
- * feeding it a `Result` has to convert, and this is that conversion in one place instead of once
- * per repository. It lives beside [ApiError] rather than in an API module so the next one does not
- * need its own copy.
+ * Store5's `Fetcher.of` turns thrown failures into `StoreReadResponse.Error`, so a repository
+ * feeding it a `Result` has to unwrap the API error. This keeps that conversion beside [ApiError]
+ * instead of repeating it in every Store fetcher.
  */
 fun <V> Result<V, ApiError>.getOrThrow(): V = getOrElse { throw it.throwable }

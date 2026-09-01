@@ -26,8 +26,8 @@ class PostsLocalStore(private val provider: PostsDatabaseSource) {
      * Emits the cached feed, then again after every write to `post`.
      *
      * `flatMapLatest` over a one-shot `flow { emit(database()) }` is what defers opening the
-     * database until somebody collects -- building the flow itself stays non-suspending, so the
-     * repository can hand it to a `NetworkBoundResource` without a coroutine in hand.
+     * database until somebody collects -- building the flow itself stays non-suspending, which is
+     * what Store5's `SourceOfTruth.reader` contract requires.
      */
     fun observeAll(): Flow<List<PostEntity>> = withDatabase { database ->
         database.postQueries.selectAll().asFlow().map { query ->

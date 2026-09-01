@@ -5,10 +5,8 @@ import co.touchlab.kermit.StaticConfig
 import co.touchlab.kermit.platformLogWriter
 import dev.mayankmkh.basekmpproject.shared.app.config.AppUseCaseFailureListener
 import dev.mayankmkh.basekmpproject.shared.app.config.KermitKtorLogger
-import dev.mayankmkh.basekmpproject.shared.app.config.NBRFailureListener
 import dev.mayankmkh.basekmpproject.shared.features.details.di.detailsFeatureModule
 import dev.mayankmkh.basekmpproject.shared.features.list.di.listFeatureModule
-import dev.mayankmkh.basekmpproject.shared.libs.arch.core.data.NetworkBoundResource
 import dev.mayankmkh.basekmpproject.shared.libs.arch.core.domain.UseCaseFailureListener
 import dev.mayankmkh.basekmpproject.shared.libs.connectivity.ConnectivityContext
 import dev.mayankmkh.basekmpproject.shared.libs.connectivity.ConnectivityMonitor
@@ -28,6 +26,9 @@ import dev.mayankmkh.basekmpproject.shared.libs.prefs.CredentialsPreferences
 import dev.mayankmkh.basekmpproject.shared.libs.prefs.PrefContext
 import io.ktor.client.plugins.logging.Logger as KtorLogger
 import io.ktor.http.Url
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
 import org.koin.core.context.startKoin
 import org.koin.core.module.dsl.singleOf
@@ -36,6 +37,7 @@ import org.koin.dsl.KoinAppDeclaration
 import org.koin.dsl.bind
 import org.koin.dsl.includes
 import org.koin.dsl.module
+import org.koin.dsl.onClose
 
 fun initKoin(config: KoinAppDeclaration? = null) {
     startKoin {
@@ -57,14 +59,21 @@ private val jsonModule = module {
     }
 }
 
-private val dispatchersModule = module { single { AppDispatchers() } }
+private val dispatchersModule = module {
+    single { AppDispatchers() }
+    // Store5 uses GlobalScope unless its builder receives one. This scope intentionally lives as
+    // long as the application graph and is shared by the two singleton repositories.
+    single<CoroutineScope> { CoroutineScope(SupervisorJob() + get<AppDispatchers>().disk) } onClose
+        { scope ->
+            scope?.cancel()
+        }
+}
 
 internal val loggerModule = module {
     single { Logger(StaticConfig(logWriterList = listOf(platformLogWriter()))) }
 }
 
 private val archModule = module {
-    singleOf(::NBRFailureListener) bind NetworkBoundResource.OnFailureListener::class
     singleOf(::AppUseCaseFailureListener) bind UseCaseFailureListener::class
 }
 

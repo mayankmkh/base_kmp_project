@@ -12,10 +12,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 /**
  * Follows the default network through `ConnectivityManager`.
  *
- * `registerNetworkCallback` with a request rather than `registerDefaultNetworkCallback`, which
- * needs API 24 and this module's `minSdk` is 23. `NET_CAPABILITY_VALIDATED` is the interesting bit
- * in the capabilities: a network can be connected and still have no route out, and treating that as
- * online would trigger a refresh that cannot work.
+ * `registerNetworkCallback` uses an explicit internet-capable request so capability changes drive
+ * the monitor. `NET_CAPABILITY_VALIDATED` is the interesting bit: a network can be connected and
+ * still have no route out, and treating that as online would trigger a refresh that cannot work.
  */
 actual fun createConnectivityMonitor(context: ConnectivityContext): ConnectivityMonitor =
     ConnectivityMonitor {

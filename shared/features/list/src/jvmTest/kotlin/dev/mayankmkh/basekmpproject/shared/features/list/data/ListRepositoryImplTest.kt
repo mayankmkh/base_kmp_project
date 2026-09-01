@@ -4,8 +4,6 @@ import app.cash.turbine.test
 import com.github.michaelbull.result.getError
 import com.github.michaelbull.result.getOrThrow
 import dev.mayankmkh.basekmpproject.shared.features.list.domain.Item
-import dev.mayankmkh.basekmpproject.shared.features.list.testing.testDispatchers
-import dev.mayankmkh.basekmpproject.shared.libs.arch.core.data.NetworkBoundResource
 import dev.mayankmkh.basekmpproject.shared.libs.database.PostEntity
 import dev.mayankmkh.basekmpproject.shared.libs.database.PostsLocalStore
 import dev.mayankmkh.basekmpproject.shared.libs.database.createInMemoryPostsLocalStore
@@ -26,6 +24,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 
@@ -51,9 +50,7 @@ class ListRepositoryImplTest {
             val repository = repository(engine, store)
 
             repository.getItems().test {
-                // No initial emission: `NetworkBoundResource` only emits cached data before
-                // fetching
-                // when there is some, and here there is none.
+                // Store's validator treats the initial empty table as a cache miss.
                 assertEquals(FEED_ITEMS, awaitItem().getOrThrow { it }.toList())
                 cancelAndIgnoreRemainingEvents()
             }
@@ -61,6 +58,19 @@ class ListRepositoryImplTest {
             assertEquals(1, engine.requestHistory.size)
             // Cached, so the next cold read has something to show offline.
             assertEquals(FEED_ITEMS.map { it.id }, store.observeAllOnce().map { it.id })
+        }
+
+    @Test
+    fun `an empty server feed is emitted after the initial empty cache triggers a fetch`() =
+        runTest(dispatcher) {
+            val engine = MockEngine { respondJson("[]") }
+
+            repository(engine, createInMemoryPostsLocalStore()).getItems().test {
+                assertTrue(awaitItem().getOrThrow { it }.isEmpty())
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            assertEquals(1, engine.requestHistory.size)
         }
 
     @Test
@@ -106,17 +116,10 @@ class ListRepositoryImplTest {
     fun `a fetch that fails on an empty cache reports the failure`() =
         runTest(dispatcher) {
             val engine = MockEngine { respondError(HttpStatusCode.InternalServerError) }
-            val failures = RecordingFetchFailureListener()
-
-            repository(engine, createInMemoryPostsLocalStore(), failures).getItems().test {
+            repository(engine, createInMemoryPostsLocalStore()).getItems().test {
                 assertNotNull(awaitItem().getError())
                 cancelAndIgnoreRemainingEvents()
             }
-
-            // Announced to the app's listener too, which is how a fetch failure gets logged even
-            // when
-            // the screen has cached rows to keep showing.
-            assertEquals(1, failures.failures.size)
         }
 
     @Test
@@ -133,25 +136,15 @@ class ListRepositoryImplTest {
             assertEquals(listOf("7"), store.observeAllOnce().map { it.id })
         }
 
-    private fun repository(
+    private fun TestScope.repository(
         engine: MockEngine,
         store: PostsLocalStore,
-        failureListener: NetworkBoundResource.OnFailureListener = RecordingFetchFailureListener(),
     ) =
         ListRepositoryImpl(
             postsApi = PostsApi(createHttpClient(engine, config)),
             postsLocalStore = store,
-            appDispatchers = testDispatchers(dispatcher),
-            failureListener = failureListener,
+            storeScope = backgroundScope,
         )
-
-    private class RecordingFetchFailureListener : NetworkBoundResource.OnFailureListener {
-        val failures = mutableListOf<Throwable>()
-
-        override fun onFetchFailed(throwable: Throwable) {
-            failures += throwable
-        }
-    }
 
     private companion object {
         val config =

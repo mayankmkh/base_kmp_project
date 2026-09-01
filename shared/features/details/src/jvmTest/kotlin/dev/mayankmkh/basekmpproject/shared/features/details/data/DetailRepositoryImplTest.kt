@@ -4,8 +4,6 @@ import app.cash.turbine.test
 import com.github.michaelbull.result.getError
 import com.github.michaelbull.result.getOrThrow
 import dev.mayankmkh.basekmpproject.shared.features.details.domain.Item
-import dev.mayankmkh.basekmpproject.shared.features.details.testing.testDispatchers
-import dev.mayankmkh.basekmpproject.shared.libs.arch.core.data.NetworkBoundResource
 import dev.mayankmkh.basekmpproject.shared.libs.database.PostEntity
 import dev.mayankmkh.basekmpproject.shared.libs.database.PostsLocalStore
 import dev.mayankmkh.basekmpproject.shared.libs.database.createInMemoryPostsLocalStore
@@ -25,6 +23,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 
@@ -99,35 +98,21 @@ class DetailRepositoryImplTest {
     fun `a post the server does not have comes back as a failure`() =
         runTest(dispatcher) {
             val engine = MockEngine { respondError(HttpStatusCode.NotFound) }
-            val failures = RecordingFetchFailureListener()
-
-            repository(engine, createInMemoryPostsLocalStore(), failures).getItem("999").test {
+            repository(engine, createInMemoryPostsLocalStore()).getItem("999").test {
                 assertNotNull(awaitItem().getError())
                 cancelAndIgnoreRemainingEvents()
             }
-
-            assertEquals(1, failures.failures.size)
         }
 
-    private fun repository(
+    private fun TestScope.repository(
         engine: MockEngine,
         store: PostsLocalStore,
-        failureListener: NetworkBoundResource.OnFailureListener = RecordingFetchFailureListener(),
     ) =
         DetailRepositoryImpl(
             postsApi = PostsApi(createHttpClient(engine, config)),
             postsLocalStore = store,
-            appDispatchers = testDispatchers(dispatcher),
-            failureListener = failureListener,
+            storeScope = backgroundScope,
         )
-
-    private class RecordingFetchFailureListener : NetworkBoundResource.OnFailureListener {
-        val failures = mutableListOf<Throwable>()
-
-        override fun onFetchFailed(throwable: Throwable) {
-            failures += throwable
-        }
-    }
 
     private companion object {
         val config =

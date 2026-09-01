@@ -10,6 +10,7 @@ kotlin {
             dependencies {
                 implementation(projects.shared.libs.database)
                 implementation(projects.shared.libs.posts)
+                implementation(libs.store5)
             }
         }
         commonTest {

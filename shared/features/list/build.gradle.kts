@@ -16,6 +16,7 @@ kotlin {
                 // Tells the view model when there is a network again, which is what turns the
                 // cached read into stale-while-revalidate rather than just stale.
                 implementation(projects.shared.libs.connectivity)
+                implementation(libs.store5)
             }
         }
         commonTest {

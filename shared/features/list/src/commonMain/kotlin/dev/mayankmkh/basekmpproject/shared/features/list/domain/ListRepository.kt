@@ -7,8 +7,8 @@ internal interface ListRepository {
     /**
      * The cached feed, kept current.
      *
-     * Backed by the database rather than by the network, so it emits whatever is cached straight
-     * away and emits again once a fetch has written. It fetches only when there is nothing cached.
+     * Backed by a Store5 source of truth, so it emits whatever SQLDelight has cached and emits
+     * again once the fetcher writes. Store's validator fetches only when the cached feed is empty.
      */
     fun getItems(): Flow<Result<Collection<Item>, Throwable>>
 

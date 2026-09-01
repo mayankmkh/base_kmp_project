@@ -5,8 +5,7 @@ internal interface PrefKey {
 }
 
 internal enum class PrefFile(val fileName: String) {
-    CREDENTIALS("credentials"),
-    KEY_VALUE("keyValue"),
+    CREDENTIALS("credentials")
 }
 
 internal val PrefFile.dataStoreFileName

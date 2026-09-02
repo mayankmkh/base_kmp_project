@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+from collections import deque
 import difflib
 import fnmatch
+from functools import lru_cache
 import json
 import os
 from pathlib import Path
@@ -14,19 +16,6 @@ import subprocess
 import sys
 from typing import Any, Iterable
 
-
-RULE_IDS = (
-    "DEP-FEATURE-FEATURE-PUBLIC-PRESENTATION-ONLY",
-    "DEP-ROLE-DENIED",
-    "EXC-EXPIRED",
-    "FEATURE-PUBLIC-SURFACE-OUTSIDE-API",
-    "GRAPH-CYCLE-LOGICAL",
-    "GRAPH-CYCLE-PHYSICAL",
-    "MOD-PATH-ROLE-MISMATCH",
-    "MOD-ROLE-MISSING",
-    "MOD-ROLE-MULTIPLE",
-    "POLICY-DRIFT",
-)
 
 RULE_TEXT = {
     "DEP-FEATURE-FEATURE-PUBLIC-PRESENTATION-ONLY": "A Feature may consume only another Feature's public presentation API.",
@@ -40,6 +29,7 @@ RULE_TEXT = {
     "MOD-ROLE-MULTIPLE": "A module may own exactly one Helix role.",
     "POLICY-DRIFT": "The checked-in dependency policy must match the normative policy block.",
 }
+RULE_IDS = tuple(RULE_TEXT)
 
 ROLE_METADATA = {
     "app": ("app/*", "Composition roots and platform entry points"),
@@ -57,10 +47,6 @@ ROLE_METADATA = {
 }
 
 SECTION_NAMES = ("stage", "module-roles", "workflow", "policy-prohibitions", "future-commands")
-DECLARATION = re.compile(
-    r"^[ \t]*(?:(?:public|expect|actual|open|abstract|final|const|lateinit|inline|suspend|operator|infix|tailrec|external|value)[ \t]+)*(?:data[ \t]+class|enum[ \t]+class|sealed[ \t]+(?:class|interface)|class|interface|object|fun|val|var|typealias)[ \t]+([A-Za-z_]\w*)",
-    re.MULTILINE,
-)
 PUBLIC_DECLARATION = re.compile(
     r"^(?:public[ \t]+)?(?:data[ \t]+class|enum[ \t]+class|sealed[ \t]+(?:class|interface)|class|interface|object|fun|val|var|typealias)[ \t]+([A-Za-z_]\w*)",
     re.MULTILINE,
@@ -97,6 +83,11 @@ def path_size(paths: Iterable[Path]) -> dict[str, int]:
         byte_count += len(data)
         line_count += data.count(b"\n") + (1 if data and not data.endswith(b"\n") else 0)
     return {"bytes": byte_count, "lines": line_count, "estimatedTokens": (byte_count + 3) // 4}
+
+
+def line_at(text: str, pos: int) -> str:
+    end = text.find("\n", pos)
+    return text[pos : len(text) if end == -1 else end]
 
 
 class Repository:
@@ -188,25 +179,26 @@ class Repository:
         return sorted(set(result))
 
 
-def reverse_map(graph: dict[str, Any]) -> dict[str, list[str]]:
+def adjacency(graph: dict[str, Any], src: str, dst: str) -> dict[str, list[str]]:
     result = {node["path"]: [] for node in graph["nodes"]}
     for edge in graph["edges"]:
-        result.setdefault(edge["to"], []).append(edge["from"])
+        result.setdefault(edge[src], []).append(edge[dst])
     return {key: sorted(set(value)) for key, value in sorted(result.items())}
+
+
+def reverse_map(graph: dict[str, Any]) -> dict[str, list[str]]:
+    return adjacency(graph, "to", "from")
 
 
 def forward_map(graph: dict[str, Any]) -> dict[str, list[str]]:
-    result = {node["path"]: [] for node in graph["nodes"]}
-    for edge in graph["edges"]:
-        result.setdefault(edge["from"], []).append(edge["to"])
-    return {key: sorted(set(value)) for key, value in sorted(result.items())}
+    return adjacency(graph, "from", "to")
 
 
 def closure(starts: Iterable[str], adjacency: dict[str, list[str]]) -> list[str]:
     seen = set(starts)
-    queue = list(sorted(starts))
+    queue = deque(sorted(starts))
     while queue:
-        item = queue.pop(0)
+        item = queue.popleft()
         for next_item in adjacency.get(item, []):
             if next_item not in seen:
                 seen.add(next_item)
@@ -268,12 +260,12 @@ def command_graph(repo: Repository, args: argparse.Namespace) -> int:
     return 0
 
 
-def codeowners(repo: Repository, module: dict[str, Any]) -> list[str]:
-    path = repo.root / ".github/CODEOWNERS"
+@lru_cache(maxsize=None)
+def codeowner_rules(root: Path) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    path = root / ".github/CODEOWNERS"
     if not path.exists():
-        return ["unassigned"]
-    owners: list[str] = []
-    module_dir = module["projectDir"] + "/"
+        return ()
+    rules = []
     for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -281,9 +273,16 @@ def codeowners(repo: Repository, module: dict[str, Any]) -> list[str]:
         parts = line.split()
         if len(parts) < 2:
             continue
-        pattern = parts[0].lstrip("/")
+        rules.append((parts[0].lstrip("/"), tuple(parts[1:])))
+    return tuple(rules)
+
+
+def codeowners(repo: Repository, module: dict[str, Any]) -> list[str]:
+    owners: tuple[str, ...] = ()
+    module_dir = module["projectDir"] + "/"
+    for pattern, candidates in codeowner_rules(repo.root):
         if fnmatch.fnmatch(module_dir, pattern) or fnmatch.fnmatch(module_dir.rstrip("/"), pattern):
-            owners = parts[1:]
+            owners = candidates
     return sorted(set(owners)) or ["unassigned"]
 
 
@@ -339,11 +338,13 @@ def command_impact(repo: Repository, args: argparse.Namespace) -> int:
         source = nodes[edge["from"]]
         destination = nodes[edge["to"]]
         allowed = policy.get("roles", {}).get(source.get("role"), {}).get("allow", [])
-        legal_special = source.get("role") == destination.get("role") == "app"
-        legal_feature = source.get("role") == destination.get("role") == "feature"
+        same_role_ok = (
+            source.get("role") == destination.get("role")
+            and source.get("role") in ("app", "feature")
+        )
         if source.get("role") == "testkit":
             continue
-        if destination.get("role") not in allowed and not legal_special and not legal_feature:
+        if destination.get("role") not in allowed and not same_role_ok:
             surprising.append(f"{edge['from']} -> {edge['to']} (forbidden by role policy)")
         elif source.get("role") == "feature" and destination.get("role") == "capability_impl":
             surprising.append(f"{edge['from']} -> {edge['to']} (Feature depends on Capability impl)")
@@ -382,18 +383,10 @@ def command_impact(repo: Repository, args: argparse.Namespace) -> int:
 
 
 def public_api_size(repo: Repository, node: dict[str, Any]) -> int:
-    count = 0
-    for path in repo.files_in_dirs(node.get("publicApiDirs", [])):
-        text = path.read_text(encoding="utf-8")
-        for line in text.splitlines():
-            if line.startswith(("internal ", "private ", "protected ")):
-                continue
-            if re.match(r"^(?:public\s+)?(?:data\s+class|enum\s+class|sealed\s+(?:class|interface)|class|interface|object|fun|val|var|typealias)\b", line):
-                count += 1
-    return count
+    return len(declaration_lines(repo.files_in_dirs(node.get("publicApiDirs", []))))
 
 
-def git_cochange(repo: Repository, node: dict[str, Any], features: list[str]) -> dict[str, Any]:
+def git_commits(repo: Repository) -> tuple[list[list[str]] | None, str | None]:
     try:
         result = subprocess.run(
             ["git", "log", "-n", "200", "--format=__HELIX_COMMIT__%x20%H", "--name-only"],
@@ -404,16 +397,27 @@ def git_cochange(repo: Repository, node: dict[str, Any], features: list[str]) ->
         )
     except OSError as error:
         reason = str(error).splitlines()[0] if str(error).splitlines() else error.__class__.__name__
-        return {"status": "skipped", "note": f"git history unavailable: {reason}"}
+        return None, f"git history unavailable: {reason}"
     if result.returncode:
         detail = (result.stderr or result.stdout).strip().splitlines()
         reason = detail[0] if detail else f"git exited {result.returncode}"
-        return {"status": "skipped", "note": f"git history unavailable: {reason}"}
+        return None, f"git history unavailable: {reason}"
     commits = []
     for chunk in result.stdout.split("__HELIX_COMMIT__"):
         lines = [line.strip() for line in chunk.splitlines() if line.strip()]
         if lines:
             commits.append(lines[1:])
+    return commits, None
+
+
+def git_cochange(
+    node: dict[str, Any],
+    features: list[str],
+    commits: list[list[str]] | None,
+    unavailable_note: str | None,
+) -> dict[str, Any]:
+    if commits is None:
+        return {"status": "skipped", "note": unavailable_note or "git history unavailable"}
     module_prefix = node["projectDir"].rstrip("/") + "/"
     module_commits = 0
     shared = 0
@@ -443,6 +447,7 @@ def command_doctor(repo: Repository, args: argparse.Namespace) -> int:
     exceptions_data = json.loads((repo.root / "config/helix/exceptions.json").read_text(encoding="utf-8"))
     reverses = reverse_map(graph)
     features = [node["projectDir"] for node in graph["nodes"] if node.get("role") == "feature"]
+    commits, git_note = git_commits(repo)
     pressure = []
     recommendations = []
     for node in selected:
@@ -456,7 +461,7 @@ def command_doctor(repo: Repository, args: argparse.Namespace) -> int:
             "publicApiDeclarations": public_api_size(repo, node),
             "contextSurface": path_size(files),
             "liveExceptions": sorted(relevant_exceptions, key=lambda entry: (entry.get("expires", ""), entry.get("rule", ""))),
-            "gitCoChange": git_cochange(repo, node, features),
+            "gitCoChange": git_cochange(node, features, commits, git_note),
         }
         pressure.append(item)
         if node.get("role") == "capability_impl" and node["path"].endswith("-impl"):
@@ -551,7 +556,7 @@ def declaration_lines(paths: Iterable[Path]) -> list[str]:
     for path in paths:
         text = path.read_text(encoding="utf-8")
         for match in PUBLIC_DECLARATION.finditer(text):
-            line = text[match.start() : text.find("\n", match.start()) if "\n" in text[match.start() :] else len(text)].strip()
+            line = line_at(text, match.start()).strip()
             if line and not line.startswith(("internal ", "private ", "protected ")):
                 values.append(f"{path.name}: {line}")
     return sorted(set(values))
@@ -562,7 +567,12 @@ def file_payload(repo: Repository, paths: Iterable[Path], files_only: bool) -> l
     for path in sorted(set(paths)):
         relative = path.relative_to(repo.root).as_posix()
         data = path.read_text(encoding="utf-8")
-        item: dict[str, Any] = {"path": relative, "bytes": len(data.encode("utf-8")), "lines": len(data.splitlines())}
+        size = path_size([path])
+        item: dict[str, Any] = {
+            "path": relative,
+            "bytes": size["bytes"],
+            "lines": size["lines"],
+        }
         if not files_only:
             item["content"] = data
         values.append(item)
@@ -583,11 +593,7 @@ def protected_notes(repo: Repository, node: dict[str, Any]) -> list[str]:
 
 
 def module_tasks(node: dict[str, Any]) -> list[str]:
-    tasks = [f"{node['path']}:spotlessCheck", f"{node['path']}:detektAll"]
-    test_task = tests_for(node)
-    if test_task:
-        tasks.append(test_task)
-    return tasks
+    return [f"{node['path']}:verifyFastModule"]
 
 
 def command_context(repo: Repository, args: argparse.Namespace) -> int:
@@ -620,7 +626,9 @@ def command_context(repo: Repository, args: argparse.Namespace) -> int:
         local_fixture_files
         + [
             path
-            for path in kotlin_files(repo.root / "testkit/common")
+            for testkit in graph["nodes"]
+            if testkit.get("role") == "testkit"
+            for path in kotlin_files(repo.root / testkit["projectDir"])
             if path.name.endswith("Fixtures.kt")
         ]
     )
@@ -802,7 +810,7 @@ def fixture_declarations(
                 continue
             if owner_visibility == "private" or (owner_visibility == "internal" and not allow_internal):
                 continue
-            line = text[match.start() : text.find("\n", match.start()) if "\n" in text[match.start() :] else len(text)].strip()
+            line = line_at(text, match.start()).strip()
             if not line:
                 continue
             values.append(
@@ -824,7 +832,14 @@ def name_tokens(value: str) -> list[str]:
 
 def command_gallery(repo: Repository, args: argparse.Namespace) -> int:
     graph = repo.graph(args.no_refresh)
-    common_fixtures = kotlin_files(repo.root / "testkit/common")
+    testkit_fixture_files = [
+        path
+        for node in graph["nodes"]
+        if node.get("role") == "testkit"
+        for path in kotlin_files(repo.root / node["projectDir"])
+        if path.name.endswith("Fixtures.kt")
+    ]
+    shared_fixtures = fixture_declarations(testkit_fixture_files)
     modules = []
     for node in graph["nodes"]:
         if node.get("role") != "feature":
@@ -833,9 +848,13 @@ def command_gallery(repo: Repository, args: argparse.Namespace) -> int:
         entries = composables(api_files)
         module_files = kotlin_files(repo.root / node["projectDir"])
         local_fixture_files = [path for path in module_files if path.name.endswith("Fixtures.kt")]
-        fixtures = fixture_declarations(
-            local_fixture_files + common_fixtures,
-            include_internal=local_fixture_files,
+        fixtures = sorted(
+            fixture_declarations(
+                local_fixture_files,
+                include_internal=local_fixture_files,
+            )
+            + shared_fixtures,
+            key=lambda item: (item["name"], item["file"], item["signature"]),
         )
         cells = []
         for entry in entries:
@@ -987,7 +1006,11 @@ def self_check_rules(repo: Repository) -> None:
     ).read_text(encoding="utf-8")
     found = set(re.findall(r'"([A-Z][A-Z0-9]+(?:-[A-Z0-9]+)+)"', kotlin))
     found.update(re.findall(r"\[([A-Z][A-Z0-9-]+)\]", kotlin))
-    found = {item for item in found if item in RULE_IDS or item.endswith("DRIFT")}
+    policy = json.loads(
+        (repo.root / "config/helix/dependency-policy.json").read_text(encoding="utf-8")
+    )
+    found.update(item["id"] for item in policy.get("conditionalAllows", []))
+    found = {item for item in found if item in RULE_IDS}
     if found != set(RULE_IDS):
         raise CliError(f"Python/Kotlin rule ID drift: Python={sorted(RULE_IDS)}, Kotlin={sorted(found)}")
 
@@ -1031,41 +1054,39 @@ def parser() -> argparse.ArgumentParser:
     graph.add_argument("module", nargs="?")
     graph.add_argument("--json", action="store_true")
     graph.add_argument("--no-refresh", action="store_true")
+    graph.set_defaults(func=command_graph)
     impact = commands.add_parser("impact")
     impact.add_argument("target")
     impact.add_argument("--json", action="store_true")
     impact.add_argument("--no-refresh", action="store_true")
+    impact.set_defaults(func=command_impact)
     doctor = commands.add_parser("doctor")
     doctor.add_argument("scope", nargs="?")
     doctor.add_argument("--explain", action="store_true")
     doctor.add_argument("--json", action="store_true")
     doctor.add_argument("--no-refresh", action="store_true")
+    doctor.set_defaults(func=command_doctor)
     context = commands.add_parser("context")
     context.add_argument("target")
     context.add_argument("--json", action="store_true")
     context.add_argument("--no-refresh", action="store_true")
     context.add_argument("--files-only", action="store_true")
+    context.set_defaults(func=command_context)
     gallery = commands.add_parser("gallery")
     gallery.add_argument("--json", action="store_true")
     gallery.add_argument("--no-refresh", action="store_true")
+    gallery.set_defaults(func=command_gallery)
     agents = commands.add_parser("agents")
     agents.add_argument("--apply", action="store_true")
+    agents.set_defaults(func=command_agents)
     return result
 
 
 def main() -> int:
     args = parser().parse_args()
     repo = Repository(Path(os.environ.get("HELIX_KMP_REPO_ROOT", Path(__file__).resolve().parents[3])))
-    commands = {
-        "graph": command_graph,
-        "impact": command_impact,
-        "doctor": command_doctor,
-        "context": command_context,
-        "gallery": command_gallery,
-        "agents": command_agents,
-    }
     try:
-        return commands[args.command](repo, args)
+        return args.func(repo, args)
     except (CliError, OSError, json.JSONDecodeError) as error:
         print(f"helix-kmp: {error}", file=sys.stderr)
         return 2

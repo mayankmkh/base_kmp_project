@@ -30,6 +30,8 @@ SETTINGS_BACKUP="$WORK_DIR/settings.gradle.kts"
 AGENTS_BACKUP="$WORK_DIR/AGENTS.md"
 STATUS_BEFORE="$WORK_DIR/status-before.txt"
 STATUS_AFTER="$WORK_DIR/status-after.txt"
+POSTS_PROBE="$REPO_ROOT/feature/posts/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/posts/PostContent.kt"
+POSTS_PROBE_BACKUP="$WORK_DIR/PostContent.kt"
 
 SAMPLE_DIRS="
 capability/sample-api
@@ -63,6 +65,9 @@ cleanup() {
     fi
     if [ -f "$AGENTS_BACKUP" ]; then
         cp "$AGENTS_BACKUP" "$AGENTS_FILE"
+    fi
+    if [ -f "$POSTS_PROBE_BACKUP" ]; then
+        cp "$POSTS_PROBE_BACKUP" "$POSTS_PROBE"
     fi
 }
 
@@ -113,6 +118,37 @@ else
     log "  ok: invalid module names are rejected"
 fi
 "$CLI" verify --fast --affected --dry-run > /dev/null || fail "verify --dry-run"
+
+# Isolate the affected-module mapper from unrelated in-flight working-tree edits by putting a
+# minimal Git status producer first on PATH. The real file is still changed and restored here; the
+# shim only makes that one change the mapper's complete input.
+log "checking affected verification maps one Feature file to one module lifecycle"
+FAKE_BIN="$WORK_DIR/bin"
+FAKE_GIT="$FAKE_BIN/git"
+mkdir -p "$FAKE_BIN"
+printf '%s\n' \
+    '#!/usr/bin/env bash' \
+    'case "$*" in' \
+    '    *" diff --name-only "*) exit 0 ;;' \
+    '    *" status --porcelain"*) echo " M feature/posts/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/posts/PostContent.kt"; exit 0 ;;' \
+    'esac' \
+    'exec "$HELIX_KMP_REAL_GIT" "$@"' > "$FAKE_GIT"
+chmod +x "$FAKE_GIT"
+cp "$POSTS_PROBE" "$POSTS_PROBE_BACKUP"
+printf '\n' >> "$POSTS_PROBE"
+AFFECTED_DRY_RUN="$(
+    PATH="$FAKE_BIN:$PATH" HELIX_KMP_REAL_GIT="$(command -v git)" \
+        "$CLI" verify --fast --affected --base HEAD --dry-run
+)" || fail "affected Feature dry-run"
+cp "$POSTS_PROBE_BACKUP" "$POSTS_PROBE"
+AFFECTED_MODULE_TASKS="$(
+    printf '%s\n' "$AFFECTED_DRY_RUN" | tr ' ' '\n' | grep ':verifyFastModule$' || true
+)"
+if [ "$AFFECTED_MODULE_TASKS" = ":feature:posts:verifyFastModule" ]; then
+    log "  ok: only :feature:posts:verifyFastModule was selected"
+else
+    fail "affected Feature dry-run selected unexpected module tasks: $AFFECTED_MODULE_TASKS"
+fi
 
 # --------------------------------------------------------------------------
 # 2. fast P1 graph-backed surface (no scaffolding)

@@ -56,12 +56,12 @@ to_package_segment() {
     echo "$1" | tr -d '-'
 }
 
+package_dir() {
+    echo "$1" | tr '.' '/'
+}
+
 require_module_name() {
     local name="$1"
-    case "$name" in
-        [a-z]*) ;;
-        *) die "module name '$name' must start with a lowercase letter" ;;
-    esac
     if echo "$name" | grep -qv '^[a-z][a-z0-9-]*$'; then
         die "module name '$name' must match [a-z][a-z0-9-]* (lowercase, digits, hyphens)"
     fi
@@ -186,7 +186,7 @@ create_feature() {
     camel="$(to_camel "$name")"
     segment="$(to_package_segment "$name")"
     package="$PACKAGE_ROOT.feature.$segment"
-    package_dir="$(echo "$package" | tr '.' '/')"
+    package_dir="$(package_dir "$package")"
 
     info "create feature :feature:$name"
     render_tree "$TEMPLATE_ROOT/feature" "$module_dir" \
@@ -247,10 +247,10 @@ create_capability() {
     info "create capability :capability:$name-api and :capability:$name-impl"
     render_tree "$TEMPLATE_ROOT/capability-api" "$api_dir" \
         "NAME=$pascal" "name=$camel" "PACKAGE=$api_package" \
-        "PACKAGE_DIR=$(echo "$api_package" | tr '.' '/')"
+        "PACKAGE_DIR=$(package_dir "$api_package")"
     render_tree "$TEMPLATE_ROOT/capability-impl" "$impl_dir" \
         "NAME=$pascal" "name=$camel" "PACKAGE=$impl_package" \
-        "PACKAGE_DIR=$(echo "$impl_package" | tr '.' '/')" \
+        "PACKAGE_DIR=$(package_dir "$impl_package")" \
         "API_PACKAGE=$api_package" "API_ACCESSOR=$api_accessor"
 
     if [ "$DRY_RUN" = "1" ]; then
@@ -287,8 +287,8 @@ create_cell() {
     local segment package package_dir cell_camel
     segment="$(to_package_segment "$feature")"
     package="$PACKAGE_ROOT.feature.$segment"
-    package_dir="$(echo "$package" | tr '.' '/')"
-    cell_camel="$(echo "$cell" | cut -c1 | tr '[:upper:]' '[:lower:]')$(echo "$cell" | cut -c2-)"
+    package_dir="$(package_dir "$package")"
+    cell_camel="$(to_camel "$cell")"
 
     local cell_file="$module_dir/src/commonMain/kotlin/$package_dir/api/${cell}Cell.kt"
     [ -e "$cell_file" ] && die "${cell}Cell already exists in feature/$feature"
@@ -395,36 +395,10 @@ module_paths() {
     sed -n 's/^    "\(:[^"]*\)",$/\1/p' "$SETTINGS_FILE"
 }
 
-module_dir_for_path() {
-    echo "$1" | sed 's/^://; s/:/\//g'
-}
-
-# The fast tier's per-module tasks. `detektAll` and `spotlessCheck` exist in every module that
-# applies a bkp primary plugin; the test task name depends on the module's target selection, so it
-# is read off the build script rather than assumed.
-#
-# The selection mirrors `verifyFast` in the root build script, which depends on whichever of
-# `jvmTest` and `test` a project actually registers and on nothing else. So a module with no JVM
-# target contributes no test task here either -- `bkp.web.app` declares `wasmJs` alone, and asking
-# for `:app:web:test` would fail the whole invocation on an unknown task.
+# The convention plugins own the concrete fast-task selection behind this per-module lifecycle.
 tasks_for_module() {
     local path="$1"
-    local dir
-    dir="$REPO_ROOT/$(module_dir_for_path "$path")"
-    local build_file="$dir/build.gradle.kts"
-    [ -f "$build_file" ] || return 0
-
-    echo "$path:spotlessCheck"
-    echo "$path:detektAll"
-    if grep -q 'bkpTargets' "$build_file"; then
-        if grep -qE 'default\(\)|jvm\(\)' "$build_file"; then
-            echo "$path:jvmTest"
-        fi
-    elif grep -q 'libs.plugins.bkp.web.app' "$build_file"; then
-        : # wasmJs only -- no `test` and no `jvmTest`, exactly as `verifyFast` sees it.
-    else
-        echo "$path:test"
-    fi
+    echo "$path:verifyFastModule"
 }
 
 # Changed files vs. the base ref plus everything uncommitted, relative to the repo root.
@@ -497,7 +471,6 @@ cmd_verify() {
 
     if [ "$tier" = "full" ]; then
         [ "$affected" = "0" ] || die "--affected applies to the fast tier only"
-        info "Helix verification tier: FULL"
         run_gradle "$dry_run" verifyFull
         return $?
     fi
@@ -505,7 +478,6 @@ cmd_verify() {
     run_python agents || return $?
 
     if [ "$affected" = "0" ]; then
-        info "Helix verification tier: FAST (repository-wide)"
         run_gradle "$dry_run" verifyFast
         return $?
     fi
@@ -513,7 +485,7 @@ cmd_verify() {
     [ -n "$base" ] || base="$(default_base_ref)"
     info "Helix verification tier: FAST (affected, base: ${base:-<none, working tree only>})"
 
-    local files file global=0 modules="" path dir
+    local files file global=0 modules="" path
     files="$(changed_files "$base")"
     if [ -z "$files" ]; then
         info "No changed files; nothing to verify."
@@ -531,20 +503,30 @@ $files
 EOF
 
     if [ "$global" = "0" ]; then
-        for path in $(module_paths); do
-            dir="$(module_dir_for_path "$path")"
-            while IFS= read -r file; do
-                case "$file" in
-                    "$dir"/*)
-                        case " $modules " in
-                            *" $path "*) ;;
-                            *) modules="$modules $path" ;;
-                        esac
-                        ;;
+        local known_modules matched_modules="" first remainder second candidate
+        known_modules="$(module_paths | tr '\n' ' ')"
+        while IFS= read -r file; do
+            first="${file%%/*}"
+            remainder="${file#*/}"
+            second="${remainder%%/*}"
+            candidate=""
+            case " $known_modules " in
+                *" :$first:$second "*) candidate=":$first:$second" ;;
+                *" :$first "*) candidate=":$first" ;;
+            esac
+            if [ -n "$candidate" ]; then
+                case " $matched_modules " in
+                    *" $candidate "*) ;;
+                    *) matched_modules="$matched_modules $candidate" ;;
                 esac
-            done <<EOF
+            fi
+        done <<EOF
 $files
 EOF
+        for path in $known_modules; do
+            case " $matched_modules " in
+                *" $path "*) modules="$modules $path" ;;
+            esac
         done
     fi
 
@@ -608,8 +590,8 @@ Usage:
   helix-kmp verify --full [--dry-run]
   helix-kmp verify --agents [--apply]
       --fast            ./gradlew verifyFast
-      --fast --affected module-scoped jvmTest/detektAll/spotlessCheck for the modules touched
-                        since <ref> (default origin/main) plus the working tree, followed by
+      --fast --affected module-scoped verifyFastModule lifecycles for the modules touched since
+                        <ref> (default origin/main) plus the working tree, followed by
                         checkModuleGraph and checkHelixPolicySync. Falls back to the whole fast
                         tier when build-logic, settings, the catalog or config/ changed.
       --full            ./gradlew verifyFull

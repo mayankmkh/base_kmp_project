@@ -6,6 +6,12 @@
 **Kotlin version:** 2.4.10 → 2.4.10 (no change needed — already past 2.4.0-Beta2)
 **Status:** Completed successfully, with a scope deviation — see *Non-Trivial Decisions #1*
 
+> **Historical document.** Every path and Gradle task name below is as of 2026-08-14. The Helix
+> adoption (phase 4, 2026-09-02) moved this module from `shared/app` to `app/shared`, so `:shared:app`
+> is now `:app:shared` and `shared/app/…` is now `app/shared/…` — the Xcode build phase, for example,
+> runs `./gradlew :app:shared:embedAndSignAppleFrameworkForXcode -i` today. Read the report for the
+> reasoning, not for paths to copy.
+
 ---
 
 ## Scope deviation (read this first)

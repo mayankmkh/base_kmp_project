@@ -5,16 +5,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
 import __PACKAGE__.__CELL__Content
 import __PACKAGE__.__CELL__ViewModel
+import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -44,14 +40,7 @@ internal fun __CELL__Cell(
     val viewModel: __CELL__ViewModel =
         koinViewModel(key = instanceKey.value, parameters = { parametersOf(id, instanceKey) })
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val currentOnOutput by rememberUpdatedState(onOutput)
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    LaunchedEffect(viewModel, lifecycleOwner) {
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.outputs.collect { currentOnOutput(it) }
-        }
-    }
+    CollectWhileStarted(viewModel.outputs, onOutput)
 
     Box(modifier.fillMaxSize().padding(contentPadding)) {
         __CELL__Content(state = state, onAction = viewModel::onAction)

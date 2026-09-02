@@ -7,22 +7,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.feature.posts.PostDetailContent
 import dev.mayankmkh.basekmpproject.feature.posts.PostDetailUiCommand
 import dev.mayankmkh.basekmpproject.feature.posts.PostDetailViewModel
+import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
-import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -51,20 +46,12 @@ internal fun PostDetailCell(
         )
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val currentOnOutput by rememberUpdatedState(onOutput)
-    val lifecycleOwner = LocalLifecycleOwner.current
 
-    LaunchedEffect(viewModel, lifecycleOwner) {
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            launch { viewModel.outputs.collect { currentOnOutput(it) } }
-            launch {
-                viewModel.uiCommands.collect { command ->
-                    when (command) {
-                        is PostDetailUiCommand.ShowRefreshFailed ->
-                            snackbarHostState.showSnackbar(command.message)
-                    }
-                }
-            }
+    CollectWhileStarted(viewModel.outputs, onOutput)
+    CollectWhileStarted(viewModel.uiCommands) { command ->
+        when (command) {
+            is PostDetailUiCommand.ShowRefreshFailed ->
+                snackbarHostState.showSnackbar(command.message)
         }
     }
 

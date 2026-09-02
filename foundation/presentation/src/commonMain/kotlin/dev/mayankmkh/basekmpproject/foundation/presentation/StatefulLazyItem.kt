@@ -43,8 +43,6 @@ public class KeyedOwnerRegistry internal constructor() {
         owners.values.forEach { it.viewModelStore.clear() }
         owners.clear()
     }
-
-    internal fun ownerCount(): Int = owners.size
 }
 
 private class ItemViewModelStoreOwner : ViewModelStoreOwner {

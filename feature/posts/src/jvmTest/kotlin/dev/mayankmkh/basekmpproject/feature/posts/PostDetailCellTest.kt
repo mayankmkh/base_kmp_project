@@ -11,26 +11,24 @@ import dev.mayankmkh.basekmpproject.feature.posts.api.postsFeatureModule
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.testkit.FakePostsCommands
 import dev.mayankmkh.basekmpproject.testkit.FakePostsQueries
+import dev.mayankmkh.basekmpproject.testkit.MainDispatcherRule
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 
 @OptIn(ExperimentalTestApi::class)
 class PostDetailCellTest {
-    private val dispatcher = UnconfinedTestDispatcher()
+    private val mainDispatcherRule = MainDispatcherRule(UnconfinedTestDispatcher())
     private val queries = FakePostsQueries()
 
     @BeforeTest
     fun setUp() {
-        Dispatchers.setMain(dispatcher)
+        mainDispatcherRule.starting()
         startKoin {
             modules(
                 postsFeatureModule,
@@ -45,7 +43,7 @@ class PostDetailCellTest {
     @AfterTest
     fun tearDown() {
         stopKoin()
-        Dispatchers.resetMain()
+        mainDispatcherRule.finished()
     }
 
     @Test

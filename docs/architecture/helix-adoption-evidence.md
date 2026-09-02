@@ -209,6 +209,8 @@ Recorded, not fixed (follow-ups, none blocks Feature development):
   days.
 - `PostsCapabilityImpl.postResources` never evicts; every post ever opened stays hot for the
   application lifetime (`stateIn(scope)` per post).
+- `StatefulLazyItem` rebuilds the active-key value set in `SideEffect`; changing that reconciliation
+  is behavior-sensitive and should wait for measured composition cost.
 - `StoreResource` serialises overlapping refreshes behind a mutex rather than sharing the
   in-flight fetch.
 - `PUBLIC_TOP_LEVEL` matching in the graph task is line-based; a one-line

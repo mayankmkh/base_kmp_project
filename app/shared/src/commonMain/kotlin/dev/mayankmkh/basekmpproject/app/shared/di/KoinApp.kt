@@ -5,6 +5,7 @@ import co.touchlab.kermit.StaticConfig
 import co.touchlab.kermit.platformLogWriter
 import dev.mayankmkh.basekmpproject.app.shared.config.KermitKtorLogger
 import dev.mayankmkh.basekmpproject.capability.identity.impl.identityCapabilityModule
+import dev.mayankmkh.basekmpproject.capability.posts.impl.PostsDatabaseSource
 import dev.mayankmkh.basekmpproject.capability.posts.impl.postsCapabilityModule
 import dev.mayankmkh.basekmpproject.feature.posts.api.postsFeatureModule
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
@@ -16,10 +17,9 @@ import dev.mayankmkh.basekmpproject.foundation.runtime.dispatchers.AppDispatcher
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityContext
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.createConnectivityMonitor
+import dev.mayankmkh.basekmpproject.storage.database.AppDatabaseProvider
+import dev.mayankmkh.basekmpproject.storage.database.AppDatabaseSource
 import dev.mayankmkh.basekmpproject.storage.database.DatabaseContext
-import dev.mayankmkh.basekmpproject.storage.database.PostsDatabaseProvider
-import dev.mayankmkh.basekmpproject.storage.database.PostsDatabaseSource
-import dev.mayankmkh.basekmpproject.storage.database.PostsLocalStore
 import io.ktor.client.plugins.logging.Logger as KtorLogger
 import io.ktor.http.Url
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -120,8 +120,11 @@ private val connectivityModule = module {
  */
 private val databaseModule = module {
     factory { createDatabaseContext() }
-    singleOf(::PostsDatabaseProvider) bind PostsDatabaseSource::class
-    singleOf(::PostsLocalStore)
+    singleOf(::AppDatabaseProvider) bind AppDatabaseSource::class
+    single<PostsDatabaseSource> {
+        val appDatabaseSource = get<AppDatabaseSource>()
+        PostsDatabaseSource { appDatabaseSource.database() }
+    }
 }
 
 // Declared last: top-level properties initialise in source order, so a list assembled any earlier

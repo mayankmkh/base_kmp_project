@@ -28,6 +28,8 @@ RULE_TEXT = {
     "MOD-ROLE-MISSING": "Every runtime module must apply exactly one Helix role convention plugin.",
     "MOD-ROLE-MULTIPLE": "A module may own exactly one Helix role.",
     "POLICY-DRIFT": "The checked-in dependency policy must match the normative policy block.",
+    "STORAGE-MIGRATION-DUPLICATE": "SQLDelight migration versions must be unique across schema-contributing modules.",
+    "STORAGE-MIGRATION-NAME": "SQLDelight migration file names must be positive integers.",
 }
 RULE_IDS = tuple(RULE_TEXT)
 
@@ -42,7 +44,7 @@ ROLE_METADATA = {
     "platform": ("platform/*", "Platform and OS seams"),
     "platform_api": ("platform/*-api", "Platform seam contracts"),
     "platform_impl": ("platform/*-impl", "Platform seam implementations"),
-    "storage": ("storage/*", "Shared product databases"),
+    "storage": ("storage/*", "Assembles schemas and verifies merged database migrations"),
     "testkit": ("testkit/*", "Test-only fakes and fixtures"),
 }
 
@@ -643,6 +645,8 @@ def command_context(repo: Repository, args: argparse.Namespace) -> int:
         "MOD-PATH-ROLE-MISMATCH",
         "GRAPH-CYCLE-PHYSICAL",
         "GRAPH-CYCLE-LOGICAL",
+        "STORAGE-MIGRATION-DUPLICATE",
+        "STORAGE-MIGRATION-NAME",
     ]
     if role == "feature":
         role_rules += ["DEP-ROLE-DENIED", "DEP-FEATURE-FEATURE-PUBLIC-PRESENTATION-ONLY", "FEATURE-PUBLIC-SURFACE-OUTSIDE-API"]

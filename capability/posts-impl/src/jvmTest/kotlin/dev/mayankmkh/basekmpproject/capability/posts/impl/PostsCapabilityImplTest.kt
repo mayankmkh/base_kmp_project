@@ -8,9 +8,6 @@ import dev.mayankmkh.basekmpproject.foundation.resource.ResourceOperation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
-import dev.mayankmkh.basekmpproject.storage.database.PostEntity
-import dev.mayankmkh.basekmpproject.storage.database.PostsLocalStore
-import dev.mayankmkh.basekmpproject.storage.database.createInMemoryPostsLocalStore
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond

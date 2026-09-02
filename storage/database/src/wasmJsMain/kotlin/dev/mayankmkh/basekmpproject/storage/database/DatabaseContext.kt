@@ -2,7 +2,7 @@ package dev.mayankmkh.basekmpproject.storage.database
 
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.worker.WebWorkerDriver
-import dev.mayankmkh.basekmpproject.storage.database.generated.PostsDatabase
+import dev.mayankmkh.basekmpproject.storage.database.db.AppDatabase
 import kotlin.js.ExperimentalWasmJsInterop
 import org.w3c.dom.Worker
 
@@ -19,7 +19,7 @@ actual class DatabaseContext
  */
 @OptIn(ExperimentalWasmJsInterop::class)
 internal actual suspend fun createDriver(context: DatabaseContext): SqlDriver =
-    WebWorkerDriver(createSqlJsWorker()).also { PostsDatabase.Schema.create(it).await() }
+    WebWorkerDriver(createSqlJsWorker()).also { AppDatabase.Schema.create(it).await() }
 
 // `new Worker(new URL(...))` rather than a string path: the bundler has to see the URL literally to
 // emit the worker as a separate chunk and rewrite it to the hashed filename it actually ships.

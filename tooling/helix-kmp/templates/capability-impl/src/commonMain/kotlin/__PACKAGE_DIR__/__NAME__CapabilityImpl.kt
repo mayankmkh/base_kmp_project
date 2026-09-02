@@ -13,9 +13,10 @@ import kotlinx.coroutines.flow.map
 // no consumer can reach past the API.
 //
 // Next step: this scaffold holds its records in memory. When it owns a real resource, follow
-// `:capability:posts-impl`: a Store5 `Store` over `:foundation:network` and `:storage:database`, a
-// scope taken from `ApplicationRuntimeScope.childScope(...)`, and `ResourceObservation` from
-// `:foundation:resource` in place of a bare `Flow`.
+// `:capability:posts-impl`: a Store5 `Store` over `:foundation:network`, capability-owned
+// SQLDelight sources under its `db/` package composed by `:storage:database`, a scope taken from
+// `ApplicationRuntimeScope.childScope(...)`, and `ResourceObservation` from `:foundation:resource`
+// in place of a bare `Flow`.
 /** In-memory implementation of the __name__ Capability. */
 internal class __NAME__CapabilityImpl : __NAME__Queries, __NAME__Commands {
     private val records = MutableStateFlow(emptyList<__NAME__Record>())

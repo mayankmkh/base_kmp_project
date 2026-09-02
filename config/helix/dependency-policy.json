@@ -43,8 +43,7 @@
         "foundation_api",
         "foundation_runtime",
         "platform",
-        "platform_api",
-        "storage"
+        "platform_api"
       ]
     },
     "foundation_api": {
@@ -78,6 +77,7 @@
     },
     "storage": {
       "allow": [
+        "capability_impl",
         "foundation_api",
         "foundation_runtime"
       ]

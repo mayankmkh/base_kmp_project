@@ -135,8 +135,9 @@ class BkpValidationGraphPlugin : Plugin<Project> {
                         .distinct()
                         .sorted()
                 )
-                // Directories, deliberately: the task filters them to `*Main/kotlin/**/*.kt` while
-                // it runs. Handing over a resolved file tree instead would freeze the file list
+                // Directories, deliberately: the task filters them to `*Main/kotlin/**/*.kt` and
+                // `*/sqldelight/**/*.sqm` while it runs. Handing over a resolved file tree instead
+                // would freeze the file list
                 // into the configuration-cache entry, and a declaration added to a new file would
                 // then go unseen by the source rules until something else forced reconfiguration.
                 sourceDirectories.from(

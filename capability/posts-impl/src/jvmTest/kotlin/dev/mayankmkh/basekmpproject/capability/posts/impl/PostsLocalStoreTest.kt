@@ -1,4 +1,4 @@
-package dev.mayankmkh.basekmpproject.storage.database
+package dev.mayankmkh.basekmpproject.capability.posts.impl
 
 import app.cash.turbine.test
 import kotlin.test.Test

@@ -16,8 +16,8 @@ expect class DatabaseContext
  *
  * Suspending because two of the four platforms genuinely are: the Web Worker driver can only be
  * talked to over `postMessage`, and creating the schema on a fresh desktop file is a query like any
- * other. `PostsDatabaseProvider` is what keeps callers from paying that cost more than once.
+ * other. `AppDatabaseProvider` is what keeps callers from paying that cost more than once.
  */
 internal expect suspend fun createDriver(context: DatabaseContext): SqlDriver
 
-internal const val DatabaseName = "posts.db"
+internal const val DatabaseName = "app.db"

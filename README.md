@@ -20,7 +20,7 @@ The path and the role must agree; `./gradlew checkModuleGraph` enforces both.
 | `:capability:identity-api` | capability_api | Session state and sign-in/sign-out commands; credentials never cross the API |
 | `:capability:identity-impl` | capability_impl | Credential persistence and session ownership; supplies `BearerTokenSource` |
 | `:capability:posts-api` | capability_api | `PostsQueries`, `PostsCommands`, and the `Post` / `PostFeed` product models |
-| `:capability:posts-impl` | capability_impl | The posts implementation -- Store5 over network and database, `internal` but for its Koin module |
+| `:capability:posts-impl` | capability_impl | Store5/network implementation and the posts-owned SQLDelight schema; `internal` but for its Koin module |
 | `:feature:posts` | feature | The posts Screens, Cells, ViewModels and Outputs |
 | `:foundation:network` | foundation_runtime | Ktor client setup, `ApiError`, result mapping |
 | `:foundation:preferences` | foundation_runtime | DataStore-backed key-value preference stores |
@@ -28,7 +28,7 @@ The path and the role must agree; `./gradlew checkModuleGraph` enforces both.
 | `:foundation:resource` | foundation_api | `ResourceObservation`, freshness, refresh QoS, problem taxonomy |
 | `:foundation:runtime` | foundation_runtime | Application scope, dispatchers, logging |
 | `:platform:connectivity` | platform | Network-reachability seam, per platform |
-| `:storage:database` | storage | SQLDelight database and its per-platform drivers |
+| `:storage:database` | storage | Assembles capability schemas, drivers, merged migrations, and the product cache `app.db` |
 | `:testkit:common` | testkit | `runMainTest`, fakes and fixtures -- test code only |
 | `:ui:design-system` | ui | Theme and stateless rendering; no ViewModel, no Koin, no navigation |
 
@@ -74,6 +74,21 @@ The scaffolds come from hand-written templates in `tooling/helix-kmp/templates/`
 `:feature:posts` / `:capability:posts-*` reference slice. They compile and pass `detektAll`,
 `spotlessCheck` and `checkModuleGraph` as written -- no reformatting pass required. If you change a
 template, run `tooling/helix-kmp/tests/run-tests.sh`.
+
+### Persisting data from a Capability
+
+Apply SQLDelight in the Capability implementation, declare `AppDatabase` in its `<package>.db`,
+and keep its `.sq`/`.sqm` files under the matching `src/commonMain/sqldelight/<package>/db/`
+directory. Expose a narrow `<X>DatabaseSource`, then register the implementation as both a
+SQLDelight contributor and a normal dependency of `:storage:database`; `:app:shared` bridges the
+assembled database to that source. Use one physical database by default (hard budget: five), keep
+migration numbers unique repo-wide, and put cross-capability joins/projections in storage-owned
+`.sq` files when they are genuinely assembly-level.
+
+The `.sq` schema must describe the exact migrated shape, including column order and defaults. As
+part of `check`, the storage assembly verifies the merged sequence from the checked-in snapshots in
+`storage/database/src/commonMain/sqldelight/databases/`; the capability-impl role disables isolated
+contributor verification because repo-wide numbering is intentionally non-contiguous per module.
 
 ## Control plane
 

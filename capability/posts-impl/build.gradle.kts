@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.bkp.kmp.capability.impl)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.sqldelight)
 }
 
 kotlin {
@@ -14,7 +15,9 @@ kotlin {
                 implementation(projects.foundation.resource)
                 implementation(projects.foundation.runtime)
                 implementation(projects.platform.connectivity)
-                implementation(projects.storage.database)
+                api(libs.sqldelight.runtime)
+                api(libs.sqldelight.async.extensions)
+                implementation(libs.sqldelight.coroutines.extensions)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.michael.bull.kotlin.result)
                 implementation(libs.store5)
@@ -25,6 +28,15 @@ kotlin {
                 implementation(libs.ktor.client.mock)
                 implementation(libs.sqldelight.sqlite.driver)
             }
+        }
+    }
+}
+
+sqldelight {
+    databases {
+        create("AppDatabase") {
+            packageName.set("dev.mayankmkh.basekmpproject.capability.posts.impl.db")
+            generateAsync.set(true)
         }
     }
 }

@@ -69,7 +69,7 @@ path and the role must agree (`MOD-PATH-ROLE-MISMATCH`).
 | `platform/*` | `platform` | Platform and OS seams |
 | `platform/*-api` | `platform_api` | Platform seam contracts |
 | `platform/*-impl` | `platform_impl` | Platform seam implementations |
-| `storage/*` | `storage` | Shared product databases |
+| `storage/*` | `storage` | Assembles schemas and verifies merged database migrations |
 | `testkit/*` | `testkit` | Test-only fakes and fixtures |
 <!-- helix:generated:module-roles END -->
 

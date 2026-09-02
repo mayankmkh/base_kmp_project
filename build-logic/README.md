@@ -37,7 +37,7 @@ module that stops at the base — rather than applying a role plugin on top — 
 | `:foundation:resource` | `bkp.kmp.foundation.api` | resource observation and refresh QoS contracts |
 | `:foundation:presentation` | `bkp.kmp.foundation.api` + Compose opt-in | keyed presentation identity/ownership |
 | `:platform:connectivity` | `bkp.kmp.platform` | cohesive connectivity expect/actual mechanism |
-| `:storage:database` | `bkp.kmp.storage` | SQLDelight schema, drivers, and database assembly |
+| `:storage:database` | `bkp.kmp.storage` | Capability-schema assembly, SQLDelight drivers, and merged migrations |
 | `:ui:design-system` | `bkp.kmp.ui` | public application theme |
 | `:capability:identity-api` | `bkp.kmp.capability.api` | observable session state and sign-in/sign-out commands |
 | `:capability:identity-impl` | `bkp.kmp.capability.impl` | credential persistence and the `BearerTokenSource` binding |
@@ -69,10 +69,14 @@ parents without build scripts.
 | Capability API / Impl | `bkp.kmp.capability.api` / `.impl` | API is explicit; Impl receives Koin core |
 | Foundation API / Runtime | `bkp.kmp.foundation.api` / `.runtime` | API is explicit and Compose is opt-in |
 | Platform cohesive / API / Impl | `bkp.kmp.platform` / `.api` / `.impl` | API uses strict explicit API |
-| Storage | `bkp.kmp.storage` | Physical persistence assembly |
+| Storage | `bkp.kmp.storage` | Assembles capability-owned schemas and owns physical database lifecycles |
 | Testkit | `bkp.kmp.testkit` | Shared test primitives only |
 | Desktop app | `bkp.desktop.app` | Kotlin/JVM, not KMP |
 | Web app | `bkp.web.app` | KMP with a `wasmJs` browser target only |
+
+The capability-impl role plugin disables SQLDelight's isolated per-module migration verification;
+repo-wide numbering makes contributor-local gaps valid, so `:storage:database` verifies the merged
+sequence instead.
 
 Two plugins layer on top of a primary rather than replacing it:
 
@@ -256,6 +260,8 @@ The root graph tasks enforce these stable rules:
 | `DEP-FEATURE-FEATURE-PUBLIC-PRESENTATION-ONLY` | Feature imports from a peer stay below `.api` |
 | `FEATURE-PUBLIC-SURFACE-OUTSIDE-API` | Feature top-level public declarations live in `api/` |
 | `GRAPH-CYCLE-PHYSICAL`, `GRAPH-CYCLE-LOGICAL` | Project cycles before/after API/Impl family collapse |
+| `STORAGE-MIGRATION-DUPLICATE` | SQLDelight migration versions are unique across schema-contributing modules |
+| `STORAGE-MIGRATION-NAME` | SQLDelight migration file names are positive integers |
 | `EXC-EXPIRED` | Time-bounded exception registry hygiene |
 | `POLICY-DRIFT` | Derived policy equals the marked master-source JSON |
 

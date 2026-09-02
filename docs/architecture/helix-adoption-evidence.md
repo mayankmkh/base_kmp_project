@@ -5,6 +5,51 @@ decisions: [helix-adoption-plan.md](helix-adoption-plan.md) §5–§6. Date: 202
 The adoption was committed on 2026-09-02 as seven commits on `main`; those commits remain
 unpushed. This report now also records the subsequent P1 control-plane working-tree change.
 
+## Storage assembly (2026-09-02)
+
+The posts Capability implementation now owns its SQLDelight schema, migrations, local store, and
+generated `…capability.posts.impl.db.AppDatabase` interface. `:storage:database` contributes a
+comment-only assembly `.sq`, composes the posts schema into
+`…storage.database.db.AppDatabase`, and owns the platform drivers, opening, the merged migration
+sequence, and `app.db`. App bridges that assembled interface to `PostsDatabaseSource`. The
+proof-only Identity schema and cross-capability author join were removed, so the composed schema is
+version 3 and existing versions 1–3 retain their prior migration behavior.
+
+The assembly now enables SQLDelight migration verification against the checked-in version-1
+composed snapshot; contributor-local verification is disabled because repo-wide numbering makes
+its isolated gap check invalid. This wiring caught `Post.sq` placing `author_id` second without its
+`DEFAULT 0`, while SQLite migration 2 appends that column last with the default; the fresh schema
+now matches the migrated table exactly.
+
+The dependency policy now allows Storage → Capability Impl and no longer allows Capability Impl →
+Storage. `STORAGE-MIGRATION-DUPLICATE` rejects a migration version used in more than one module;
+`STORAGE-MIGRATION-NAME` rejects non-positive/non-integer `.sqm` names. Both are covered by
+`BkpHelixGraphTest`, and the migration source directories are configuration-cache-safe task inputs.
+
+Verification completed for this migration:
+
+| Command | Result |
+|---|---|
+| `./gradlew spotlessApply` | PASS, `BUILD SUCCESSFUL in 11s`, 80 tasks |
+| `./gradlew -p build-logic spotlessApply` | PASS, `BUILD SUCCESSFUL in 1s`, 4 tasks |
+| `./gradlew -p build-logic :convention:test` | PASS, `BUILD SUCCESSFUL in 29s`, 7 tasks |
+| `./gradlew :storage:database:verifyCommonMainAppDatabaseMigration :capability:posts-impl:verifyCommonMainAppDatabaseMigration --console=plain` | PASS in 4s; storage executed, contributor `SKIPPED` |
+| storage verifier with the known `Post.sq` drift temporarily restored | Expected FAIL in 2s; reported `author_id` default removal and column ordinal changes |
+| `./gradlew :storage:database:jvmTest :capability:posts-impl:jvmTest --rerun-tasks` | PASS, `BUILD SUCCESSFUL in 6s`, 31 tasks |
+| `./gradlew checkModuleGraph checkHelixPolicySync` | PASS, `BUILD SUCCESSFUL in 964ms`, no findings |
+| `./gradlew verifyFast --continue` | PASS, `BUILD SUCCESSFUL in 30s`, 1,042 tasks |
+| wasm development webpack + Android debug assemble | PASS, `BUILD SUCCESSFUL in 31s`; worker JS and `sql-wasm.wasm` emitted |
+| iOS simulator framework link | PASS, `BUILD SUCCESSFUL in 16s` |
+| `./gradlew :app:android:assembleDebug` | PASS, `BUILD SUCCESSFUL in 45s`, 327 tasks |
+| `tooling/helix-kmp/tests/run-tests.sh` | PASS; scaffolded modules verified and working tree restored |
+| `tooling/helix-kmp/helix-kmp verify --agents` | PASS, synchronized |
+
+SQLDelight issue #5320 reproduced: with no storage-owned `.sq`, the generation task succeeded but
+emitted no storage `AppDatabase`. The comment-only assembly file is therefore required. The file
+is `app.db` on every platform; the earlier `posts.db` cache is simply left behind and refetched,
+and the JVM `migrateEmptySchema` special case for pre-release desktop files was dropped with it.
+The now-unused JVM in-memory assembly helpers were removed.
+
 ## Target/owner changed
 
 | Before | After |

@@ -4,7 +4,7 @@ import android.content.Context
 import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
-import dev.mayankmkh.basekmpproject.storage.database.generated.PostsDatabase
+import dev.mayankmkh.basekmpproject.storage.database.db.AppDatabase
 
 actual class DatabaseContext(context: Context) {
     internal val appContext: Context = context.applicationContext
@@ -14,4 +14,4 @@ actual class DatabaseContext(context: Context) {
 // driver expects. `generateAsync` describes the query API, not the platform: Android's SQLite is
 // still a synchronous library, and the driver opens and migrates the file on its own.
 internal actual suspend fun createDriver(context: DatabaseContext): SqlDriver =
-    AndroidSqliteDriver(PostsDatabase.Schema.synchronous(), context.appContext, DatabaseName)
+    AndroidSqliteDriver(AppDatabase.Schema.synchronous(), context.appContext, DatabaseName)

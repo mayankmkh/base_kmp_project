@@ -227,6 +227,44 @@ class BkpHelixGraphTest {
         assertContains(second.output, "[FEATURE-PUBLIC-SURFACE-OUTSIDE-API] :feature:late")
     }
 
+    @Test
+    fun `migration versions must be unique across modules`() {
+        val result =
+            helixProject()
+                .withModule(
+                    ":capability:one-impl",
+                    roleModule("bkp.kmp.capability.impl"),
+                    mapOf("src/commonMain/sqldelight/example/2.sqm" to "-- first\n"),
+                )
+                .withModule(
+                    ":storage:database",
+                    roleModule("bkp.kmp.storage"),
+                    mapOf("src/commonMain/sqldelight/example/2.sqm" to "-- second\n"),
+                )
+                .runAndFail("checkModuleGraph")
+
+        assertContains(result.output, "[STORAGE-MIGRATION-DUPLICATE] migration version 2")
+        assertContains(result.output, "capability/one-impl/src/commonMain/sqldelight/example/2.sqm")
+        assertContains(result.output, "storage/database/src/commonMain/sqldelight/example/2.sqm")
+    }
+
+    @Test
+    fun `migration file name must be a positive integer`() {
+        val result =
+            helixProject()
+                .withModule(
+                    ":storage:database",
+                    roleModule("bkp.kmp.storage"),
+                    mapOf("src/commonMain/sqldelight/example/next.sqm" to "-- invalid\n"),
+                )
+                .runAndFail("checkModuleGraph")
+
+        assertContains(
+            result.output,
+            "[STORAGE-MIGRATION-NAME] storage/database/src/commonMain/sqldelight/example/next.sqm",
+        )
+    }
+
     private fun deniedFeatureProject(exceptionJson: String): TestProject =
         helixProject(exceptionJson)
             .withModule(
@@ -291,13 +329,13 @@ class BkpHelixGraphTest {
                 "feature": { "allow": ["ui", "capability_api", "foundation_api", "platform", "platform_api"] },
                 "ui": { "allow": ["ui", "foundation_api"] },
                 "capability_api": { "allow": ["capability_api", "foundation_api"] },
-                "capability_impl": { "allow": ["capability_api", "foundation_api", "foundation_runtime", "platform", "platform_api", "storage"] },
+                "capability_impl": { "allow": ["capability_api", "foundation_api", "foundation_runtime", "platform", "platform_api"] },
                 "foundation_api": { "allow": ["foundation_api"] },
                 "foundation_runtime": { "allow": ["foundation_api", "foundation_runtime"] },
                 "platform": { "allow": ["foundation_api", "foundation_runtime"] },
                 "platform_api": { "allow": ["foundation_api"] },
                 "platform_impl": { "allow": ["platform_api", "foundation_api", "foundation_runtime"] },
-                "storage": { "allow": ["foundation_api", "foundation_runtime"] }
+                "storage": { "allow": ["capability_impl", "foundation_api", "foundation_runtime"] }
               },
               "conditionalAllows": []
             }

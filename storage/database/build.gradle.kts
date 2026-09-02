@@ -9,13 +9,11 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                // `api`, not `implementation`: the generated `PostsDatabase` and its query types
-                // are
-                // this module's public surface, and they are declared in terms of the runtime's
-                // `Query`/`SuspendingTransacter`.
+                implementation(projects.capability.postsImpl)
+                // The assembled database is this module's public surface and its generated
+                // interface is declared in terms of SQLDelight runtime types.
                 api(libs.sqldelight.runtime)
                 api(libs.sqldelight.async.extensions)
-                implementation(libs.sqldelight.coroutines.extensions)
             }
         }
         androidMain {
@@ -57,12 +55,18 @@ kotlin {
 
 sqldelight {
     databases {
-        create("PostsDatabase") {
-            packageName.set("dev.mayankmkh.basekmpproject.storage.database.generated")
+        create("AppDatabase") {
+            packageName.set("dev.mayankmkh.basekmpproject.storage.database.db")
+            // Migrations are verified only here: this compilation unit merges every contributor.
+            // Generate a new `<version>.db` there when wanted with
+            // `./gradlew :storage:database:generateCommonMainAppDatabaseSchema`.
+            schemaOutputDirectory.set(file("src/commonMain/sqldelight/databases"))
+            verifyMigrations.set(true)
             // Required, not a preference: the only wasmJs driver is the Web Worker one, and a
             // worker can only be talked to asynchronously. Turning this on makes the generated
             // query API suspending on every target, so common code has one shape to write against.
             generateAsync.set(true)
+            dependency(project(":capability:posts-impl"))
         }
     }
 }

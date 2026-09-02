@@ -3,11 +3,10 @@ package dev.mayankmkh.basekmpproject.storage.database
 import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.native.NativeSqliteDriver
-import dev.mayankmkh.basekmpproject.storage.database.generated.PostsDatabase
+import dev.mayankmkh.basekmpproject.storage.database.db.AppDatabase
 
 actual class DatabaseContext
 
-// The native driver resolves its own location under the app's Documents directory and, like the
-// Android one, creates and migrates the file itself -- hence the `synchronous()` schema.
+// The native driver resolves the file under Application Support/databases and migrates it itself.
 internal actual suspend fun createDriver(context: DatabaseContext): SqlDriver =
-    NativeSqliteDriver(PostsDatabase.Schema.synchronous(), DatabaseName)
+    NativeSqliteDriver(AppDatabase.Schema.synchronous(), DatabaseName)

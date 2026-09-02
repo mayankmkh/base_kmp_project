@@ -1,10 +1,11 @@
-package dev.mayankmkh.basekmpproject.storage.database
+package dev.mayankmkh.basekmpproject.capability.posts.impl
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.coroutines.asFlow
-import dev.mayankmkh.basekmpproject.storage.database.generated.PostsDatabase
+import dev.mayankmkh.basekmpproject.capability.posts.impl.db.AppDatabase
+import dev.mayankmkh.basekmpproject.capability.posts.impl.db.Post
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -20,7 +21,7 @@ import kotlinx.coroutines.flow.map
  * every observation needs an explicit `awaitAsList`, and a multi-row write has to go through a
  * suspending transaction to land as one table notification instead of N.
  */
-class PostsLocalStore(private val provider: PostsDatabaseSource) {
+internal class PostsLocalStore(private val provider: PostsDatabaseSource) {
 
     /**
      * Emits the cached feed, then again after every write to `post`.
@@ -96,7 +97,7 @@ class PostsLocalStore(private val provider: PostsDatabaseSource) {
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private fun <T> withDatabase(block: (PostsDatabase) -> Flow<T>): Flow<T> =
+    private fun <T> withDatabase(block: (AppDatabase) -> Flow<T>): Flow<T> =
         flow { emit(provider.database()) }.flatMapLatest(block)
 
     // `Post` is SQLDelight's generated row type for the `post` table, emitted into this package
@@ -106,7 +107,7 @@ class PostsLocalStore(private val provider: PostsDatabaseSource) {
 }
 
 /** A cached post, free of both the wire format and SQLDelight's generated row type. */
-data class PostEntity(
+internal data class PostEntity(
     val id: String,
     val title: String,
     val body: String,

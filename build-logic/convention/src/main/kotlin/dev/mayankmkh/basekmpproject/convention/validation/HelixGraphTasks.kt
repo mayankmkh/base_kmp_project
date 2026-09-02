@@ -119,18 +119,19 @@ abstract class CheckModuleGraphTask : DefaultTask() {
                 val fields = record.split(FIELD_SEPARATOR)
                 Edge(fields[0], fields[1], fields[2])
             }
-        val sources =
+        val sourceFiles =
             sourceDirectories.files
                 .filter(File::isDirectory)
                 .flatMap { root -> root.walkTopDown().filter(File::isFile).toList() }
-                .filter(File::isMainKotlinSource)
                 .sortedBy(File::getAbsolutePath)
+        val sources = sourceFiles.filter(File::isMainKotlinSource)
         val sourcesByModule = nodes.associate { node ->
             node.path to
                 sources.filter { source ->
                     source.toPath().normalize().startsWith(node.projectDir.toPath().normalize())
                 }
         }
+        val migrations = sourceFiles.filter(File::isSqlDelightMigration)
 
         val policy = parseObject(policyFile.get().asFile)
         val findings = mutableListOf<Finding>()
@@ -138,6 +139,7 @@ abstract class CheckModuleGraphTask : DefaultTask() {
         validateEdges(edges, nodeByPath, sourcesByModule, policy, findings)
         validateFeatureSurface(nodes, sourcesByModule, findings)
         validateCycles(edges, nodes.map(Node::path), findings)
+        validateStorageMigrations(nodes, migrations, findings)
 
         val today = LocalDate.parse(currentDate.get())
         val exceptions = readExceptions(exceptionsFile.get().asFile)
@@ -360,6 +362,54 @@ abstract class CheckModuleGraphTask : DefaultTask() {
                 "dependencies cycle after api/impl family modules are collapsed",
                 "remove the cross-family back edge or introduce a lower stable contract",
             )
+    }
+
+    private fun validateStorageMigrations(
+        nodes: List<Node>,
+        migrations: List<File>,
+        findings: MutableList<Finding>,
+    ) {
+        val ownedMigrations = migrations.mapNotNull { migration ->
+            nodes
+                .firstOrNull { node ->
+                    migration.toPath().normalize().startsWith(node.projectDir.toPath().normalize())
+                }
+                ?.let { node -> node to migration }
+        }
+        val validVersions = mutableListOf<Triple<Long, Node, File>>()
+
+        ownedMigrations.forEach { (node, migration) ->
+            val version = migration.nameWithoutExtension.toLongOrNull()?.takeIf { it > 0 }
+            if (version == null) {
+                findings +=
+                    Finding(
+                        "STORAGE-MIGRATION-NAME",
+                        migration.repoRelativePath(node),
+                        "migration file name '${migration.name}' is not a positive integer version",
+                        "rename the file to a positive integer version such as N.sqm",
+                    )
+            } else {
+                validVersions += Triple(version, node, migration)
+            }
+        }
+
+        validVersions
+            .groupBy { it.first }
+            .filterValues { entries -> entries.map { it.second.path }.distinct().size > 1 }
+            .toSortedMap()
+            .forEach { (version, entries) ->
+                val paths =
+                    entries
+                        .map { (_, node, migration) -> migration.repoRelativePath(node) }
+                        .sorted()
+                findings +=
+                    Finding(
+                        "STORAGE-MIGRATION-DUPLICATE",
+                        "migration version $version",
+                        "version is used by more than one module: ${paths.joinToString()}",
+                        "renumber so migration versions are unique across all schema-contributing modules",
+                    )
+            }
     }
 
     private fun cycleFindings(
@@ -630,6 +680,7 @@ private fun parseObject(file: File): Map<String, Any?> =
     JsonSlurper().parse(file) as Map<String, Any?>
 
 private val MAIN_KOTLIN_SOURCE = Regex("/src/[^/]*Main/kotlin/")
+private val SQLDELIGHT_MIGRATION = Regex("/src/[^/]+/sqldelight/.+\\.sqm$")
 
 /**
  * The same selection the source rules used when they read a pre-resolved file tree: Kotlin files in
@@ -642,3 +693,14 @@ private fun File.isMainKotlinSource(): Boolean {
         "/generated/" !in normalized &&
         "/build/" !in normalized
 }
+
+private fun File.isSqlDelightMigration(): Boolean =
+    SQLDELIGHT_MIGRATION.containsMatchIn(invariantSeparatorsPath)
+
+private fun File.repoRelativePath(node: Node): String =
+    listOf(
+            node.relativeProjectDir,
+            relativeTo(node.projectDir).invariantSeparatorsPath,
+        )
+        .filter(String::isNotEmpty)
+        .joinToString("/")

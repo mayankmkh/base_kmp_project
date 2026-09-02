@@ -1,0 +1,3 @@
+-- Assembly-level cross-capability queries and projections belong here and may reference any
+-- contributor's tables. SQLDelight also needs at least one assembly-owned .sq file to generate
+-- the composed AppDatabase class (issue #5320).

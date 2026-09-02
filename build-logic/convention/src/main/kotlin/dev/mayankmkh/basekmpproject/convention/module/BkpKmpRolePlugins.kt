@@ -58,6 +58,13 @@ class BkpKmpCapabilityImplPlugin : Plugin<Project> {
         with(target) {
             applyRoleBase(HelixRole.CAPABILITY_IMPL)
             addCapabilityImplRoleDependencies()
+            pluginManager.withPlugin("app.cash.sqldelight") {
+                // A contributor sees only its own files, so repo-wide migration numbers look
+                // falsely gapped here. The composed sequence is verified in :storage:database.
+                tasks
+                    .matching { it.name.startsWith("verify") && it.name.endsWith("Migration") }
+                    .configureEach { enabled = false }
+            }
         }
 }
 

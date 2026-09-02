@@ -1607,12 +1607,13 @@ Product meaning remains in Feature/Capability.
 
 Physical database assembly:
 
-- SQLDelight schema root;
-- driver construction;
-- migrations;
-- database assembly.
+- contributor registration for Capability-owned SQLDelight schemas;
+- per-platform driver construction and opening;
+- the merged migration sequence;
+- assembly-level cross-capability queries/projections where needed.
 
-Storage does not become the product-facing data API.
+Storage does not own capability tables or become the product-facing data API. The App composition
+root bridges the assembled database to each Capability's narrow database-source interface.
 
 ## 7.19 App
 
@@ -1624,7 +1625,7 @@ Owns:
 - Navigation root;
 - DI graph assembly;
 - concrete Capability/Platform implementation selection;
-- application database/driver composition;
+- assembled-database binding to Capability implementations;
 - global adapter installation.
 
 Nothing depends on App.
@@ -1838,7 +1839,7 @@ This is a taxonomy of allowed roles, not a requirement to create every role or a
 - repositories;
 - REST/DTO/mapping;
 - Store5;
-- SQLDelight access;
+- capability-owned SQLDelight schema and access;
 - WebSocket/live coordinators;
 - batching;
 - command/outbox internals.
@@ -1888,7 +1889,10 @@ The responsibility remains OS/device mechanisms either way.
 
 ### `:storage:*`
 
-- database schema/driver/migrations/physical assembly.
+- contributor schema assembly;
+- per-platform drivers and database opening;
+- merged migration sequencing;
+- assembly-level cross-capability joins/projections.
 
 ### `:testkit:*`
 
@@ -1993,8 +1997,7 @@ Platform clarification:
         "foundation_api",
         "foundation_runtime",
         "platform",
-        "platform_api",
-        "storage"
+        "platform_api"
       ]
     },
     "foundation_api": {
@@ -2028,6 +2031,7 @@ Platform clarification:
     },
     "storage": {
       "allow": [
+        "capability_impl",
         "foundation_api",
         "foundation_runtime"
       ]
@@ -2072,13 +2076,13 @@ This block governs **main/application dependency edges**. Test source sets may d
 | Feature | UI, Capability API, `foundation_api`, Platform API/cohesive Platform; child Feature only through approved `.api` public presentation surface | Capability Impl, `foundation_runtime`, raw repository/data implementation, peer Feature internals |
 | UI | UI/design + `foundation_api` | Feature, ViewModel, Koin, navigation, Capability, `foundation_runtime`, repository, DB/network |
 | Capability API | other Capability APIs where semantically real + `foundation_api` | Compose, Feature, UI, `foundation_runtime`, network, DB, Store5, implementation |
-| Capability Impl | own/other Capability APIs, `foundation_api`, `foundation_runtime`, Platform APIs/cohesive Platform, Storage | Feature, UI, other business Capability Impl |
+| Capability Impl | own/other Capability APIs, `foundation_api`, `foundation_runtime`, Platform APIs/cohesive Platform | Feature, UI, Storage, other business Capability Impl |
 | Foundation API | `foundation_api` | product Feature/Capability vocabulary; `foundation_runtime` |
 | Foundation Runtime | `foundation_api`, `foundation_runtime` | product Feature/Capability vocabulary |
 | Platform | `foundation_api`, `foundation_runtime`, platform SDK/source sets | product Feature/UI internals |
 | Platform API | `foundation_api` | product Feature/UI internals; implementation/vendor details |
 | Platform Impl | own Platform API, `foundation_api`, `foundation_runtime`, platform SDK | product Feature/UI internals |
-| Storage | `foundation_api`, `foundation_runtime`, DB/tooling mechanisms | product presentation |
+| Storage | Capability Impl schema contributors, `foundation_api`, `foundation_runtime`, DB/tooling mechanisms | product presentation |
 | Anything | - | App |
 
 ## 9.2 Key prohibitions
@@ -3473,7 +3477,11 @@ Rules:
 
 - generated query/row types remain implementation details;
 - Capability implementations map DB types to product/domain models;
-- schema/driver/migration physical assembly may live in `:storage:database`;
+- each Capability implementation owns its `.sq`/`.sqm` files and generated schema interface;
+- `:storage:database` composes contributors, drivers, and opening, then verifies the merged
+  migration sequence from its checked-in snapshot;
+- assembly-owned `.sq` may express cross-capability joins/projections;
+- migration versions are unique across every schema-contributing module;
 - presentation never depends on SQLDelight.
 
 ## 17.2 One physical database is a default, not a law
@@ -3481,14 +3489,14 @@ Rules:
 Starting topology:
 
 ```text
-:storage:database
-  /cricket
-  /article
-  /identity
-  /video
+:capability:<a>-impl/db --\
+:capability:<b>-impl/db ---> :storage:database/AppDatabase -> one physical database
+:capability:<c>-impl/db --/
 ```
 
-Logical ownership remains capability-specific.
+Logical schema ownership remains capability-specific while storage owns the assembled database's
+physical lifecycle. One database is the default; the hard product budget is at most five, and an
+additional database requires a genuinely different lifecycle.
 
 Do not split databases pre-emptively.
 
@@ -7465,4 +7473,3 @@ This master was synthesized from the complete architecture discussion and its ge
 - the Claude verification review of Master Source edition 1.2 and the correctness/no-drift fixes recorded in Section 5.13.
 
 After approval, this master should supersede those artifacts as the **reasoning and documentation source of truth**. Repository code/build/ownership systems remain operational sources for derived facts as defined in Section 0.
-

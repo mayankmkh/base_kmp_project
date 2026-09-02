@@ -40,7 +40,7 @@ class BkpQualityStylePlugin : Plugin<Project> {
                 lineEndings = LineEnding.UNIX
 
                 // Spotless cannot auto-detect Android or KMP source layouts, so the target is
-                // explicit. `src/**` rather than `src/*/kotlin/**`: `androidApp` keeps its Kotlin
+                // explicit. `src/**` rather than `src/*/kotlin/**`: `:app:android` keeps its Kotlin
                 // under `src/main/java`, which a kotlin-only glob skips without saying so.
                 // `**/build` matches the directory, so Gradle *prunes* it while walking.
                 // `**/build/**` matches only files inside it, which filters the results but still

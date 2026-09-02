@@ -4,19 +4,28 @@ import dev.mayankmkh.basekmpproject.libs
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.dependencies
 
-internal fun Project.addKmpFeatureBundle() {
+internal fun Project.addFeatureRoleDependencies() {
     dependencies {
-        "commonMainImplementation"(project(":shared:libs:arch:core"))
-        "commonMainImplementation"(project(":shared:libs:coroutines-x"))
-        "commonMainImplementation"(project(":shared:libs:networking"))
-        "commonMainImplementation"(project(":shared:libs:designsystem"))
-
         "commonMainImplementation"(libs.findLibrary("androidx.lifecycle.viewmodel").get())
         "commonMainImplementation"(libs.findLibrary("androidx.lifecycle.viewmodel.compose").get())
+    }
+    addKoinDependencies(includeComposeViewModel = true)
+}
 
-        val koinBom = libs.findLibrary("koin.bom").get()
-        "commonMainImplementation"(platform(koinBom))
+internal fun Project.addAppRoleDependencies() {
+    addFeatureRoleDependencies()
+}
+
+internal fun Project.addCapabilityImplRoleDependencies() {
+    addKoinDependencies(includeComposeViewModel = false)
+}
+
+private fun Project.addKoinDependencies(includeComposeViewModel: Boolean) {
+    dependencies {
+        "commonMainImplementation"(platform(libs.findLibrary("koin.bom").get()))
         "commonMainImplementation"(libs.findLibrary("koin.core").get())
-        "commonMainImplementation"(libs.findLibrary("koin.compose.viewmodel").get())
+        if (includeComposeViewModel) {
+            "commonMainImplementation"(libs.findLibrary("koin.compose.viewmodel").get())
+        }
     }
 }

@@ -23,12 +23,8 @@ import org.junit.jupiter.api.io.TempDir
  * Both are guards against a future plugin that breaks those assumptions, not against anything a
  * module can write today.
  *
- * Two more rules are untestable for reasons of their own:
+ * One more rule is untestable for reasons of its own:
  *
- * - "incompatible bkp convention plugins" (`bkp.kmp.feature` next to `bkp.kmp.lib.compose`) -- no
- *   TestKit project can apply `bkp.kmp.feature` at all, because `addKmpFeatureBundle` declares
- *   `project(":shared:libs:…")` dependencies that a throwaway build does not have. The rule is
- *   reachable in this repository; only the harness cannot get to it.
  * - `BkpTargets.exception`'s own argument guards -- a blank reason, an `exception` that trails the
  *   selectors, a `default()` nested inside one -- fail on the shape of the call rather than on
  *   anything about the module, so a test would only be restating the `if`.
@@ -187,8 +183,8 @@ class BkpValidationGraphPluginTest {
 
     /**
      * `bkp.kmp.lib` with the raw Compose plugins bolted on. The combination compiles, so nothing
-     * else in the build would object -- the module would simply be missing whatever
-     * `bkp.kmp.lib.compose` brings beyond the two plugins.
+     * else in the build would object -- the module would simply be missing whatever a
+     * Compose-owning Helix role plugin brings beyond the two plugins.
      */
     @Test
     fun `raw Compose plugins require the Compose convention`() {
@@ -205,7 +201,7 @@ class BkpValidationGraphPluginTest {
                 )
                 .configureAndFail()
 
-        assertContains(result.output, "Use bkp.kmp.lib.compose")
+        assertContains(result.output, "Use a Compose-owning Helix role plugin")
     }
 
     @Test

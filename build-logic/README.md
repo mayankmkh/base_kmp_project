@@ -20,11 +20,39 @@ convention/src/main/kotlin/dev/mayankmkh/basekmpproject/
 The files directly under `dev/mayankmkh/basekmpproject/` are helpers shared by the plugins
 (`KotlinMultiplatform.kt`, `SharedCompose.kt`, `BkpFlavor.kt`, …).
 
-## Primary plugin model
+## Primary and role plugin model
 
-Each module must apply **exactly one** primary `bkp.*` plugin. It brings the underlying tool
-plugins, the shared configuration, and the quality and validation plugins with it — modules never
-apply Spotless, detekt, lint, or the validator by hand.
+Every adopted runtime module applies **exactly one** role plugin. KMP role plugins layer on the
+internal `bkp.kmp.lib` base, which owns targets, Kotlin configuration, power-assert, the test
+baseline, quality/lint, and local DSL validation. `bkp.kmp.lib` records no role of its own, so a
+module that stops at the base — rather than applying a role plugin on top — fails `MOD-ROLE-MISSING`.
+
+### Current module map
+
+| Module | Role plugin | Purpose |
+|---|---|---|
+| `:foundation:runtime` | `bkp.kmp.foundation.runtime` | dispatchers and application runtime scope |
+| `:foundation:network` | `bkp.kmp.foundation.runtime` | Ktor client construction and transport errors |
+| `:foundation:preferences` | `bkp.kmp.foundation.runtime` | DataStore-backed key-value preference stores |
+| `:foundation:resource` | `bkp.kmp.foundation.api` | resource observation and refresh QoS contracts |
+| `:foundation:presentation` | `bkp.kmp.foundation.api` + Compose opt-in | keyed presentation identity/ownership |
+| `:platform:connectivity` | `bkp.kmp.platform` | cohesive connectivity expect/actual mechanism |
+| `:storage:database` | `bkp.kmp.storage` | SQLDelight schema, drivers, and database assembly |
+| `:ui:design-system` | `bkp.kmp.ui` | public application theme |
+| `:capability:identity-api` | `bkp.kmp.capability.api` | observable session state and sign-in/sign-out commands |
+| `:capability:identity-impl` | `bkp.kmp.capability.impl` | credential persistence and the `BearerTokenSource` binding |
+| `:capability:posts-api` | `bkp.kmp.capability.api` | grouped `PostsQueries` / intent `PostsCommands` and their models |
+| `:capability:posts-impl` | `bkp.kmp.capability.impl` | Store5-backed posts resources; only `postsCapabilityModule` is public |
+| `:feature:posts` | `bkp.kmp.feature` | feed/detail Screens and the reference Cell, public only under `…feature.posts.api` |
+| `:testkit:common` | `bkp.kmp.testkit` | dispatcher helpers, posts fakes, and resource-observation fixtures |
+| `:app:shared` | `bkp.kmp.app` | the composition root: Koin startup, Nav3 routes, `RootContent`, and the `SharedApp` Apple framework |
+| `:app:android` | `bkp.android.app.compose` | Android shell and flavors; role `app` |
+| `:app:desktop` | `bkp.desktop.app` | Compose Desktop shell; role `app` |
+| `:app:web` | `bkp.web.app` | `wasmJs` browser shell, embeddable in a host page; role `app` |
+
+Every module in the map carries a Helix role and is validated on its path. Nothing is grandfathered:
+the adoption-era `:shared:*` tree is gone, and `:app` and `:capability` exist only as structural
+parents without build scripts.
 
 ### Plugin selection guide
 
@@ -34,10 +62,15 @@ apply Spotless, detekt, lint, or the validator by hand.
 | Android app with Compose | `bkp.android.app.compose` | adds `bkp.android.app` |
 | Android library (non-KMP) | `bkp.android.lib` | no consumers today |
 | Android test module | `bkp.android.test` | |
-| KMP library (no feature bundle) | `bkp.kmp.lib` | targets chosen per module |
-| KMP library with Compose | `bkp.kmp.lib.compose` | adds `bkp.kmp.lib` |
-| KMP feature (with shared feature deps) | `bkp.kmp.feature` | `bkp.kmp.lib` + the feature bundle |
-| KMP feature with Compose | `bkp.kmp.feature.compose` | adds `bkp.kmp.feature` |
+| Base KMP library | `bkp.kmp.lib` | Internal base only; a module that applies it alone has no role |
+| Helix KMP app root | `bkp.kmp.app` | Compose, lifecycle ViewModel, and Koin |
+| Helix Feature | `bkp.kmp.feature` | Compose, lifecycle ViewModel, and Koin; no project dependencies |
+| Helix UI | `bkp.kmp.ui` | Compose and strict explicit API |
+| Capability API / Impl | `bkp.kmp.capability.api` / `.impl` | API is explicit; Impl receives Koin core |
+| Foundation API / Runtime | `bkp.kmp.foundation.api` / `.runtime` | API is explicit and Compose is opt-in |
+| Platform cohesive / API / Impl | `bkp.kmp.platform` / `.api` / `.impl` | API uses strict explicit API |
+| Storage | `bkp.kmp.storage` | Physical persistence assembly |
+| Testkit | `bkp.kmp.testkit` | Shared test primitives only |
 | Desktop app | `bkp.desktop.app` | Kotlin/JVM, not KMP |
 | Web app | `bkp.web.app` | KMP with a `wasmJs` browser target only |
 
@@ -68,9 +101,9 @@ that:
   appends rather than assigns; a module's own `proguard-rules.pro` is picked up when the file exists,
   and no module is obliged to carry an empty one.
 - **KMP primaries** declare no targets at all — the module picks them with
-  [`kotlin { bkpTargets { … } }`](#target-selection). `bkp.web.app` is the exception: it adds
-  `bkp.kmp.lib.compose` and then declares `web()` itself with `binaries.executable()`, because an
-  app module named for the web has nothing to choose.
+  [`kotlin { bkpTargets { … } }`](#target-selection). `bkp.web.app` is the exception: it layers the
+  Compose plugins onto `bkp.kmp.lib` itself and then declares `web()`, because an app module named
+  for the web has nothing to choose.
 - **The test baseline** — `kotlin-test`, `kotlinx-coroutines-test`, Turbine and power-assert
   diagrams on the `kotlin.test` assertions — is the same for `bkp.kmp.lib` (`commonTest`) and
   `bkp.android.lib` (`test`), so a module is never the odd one out for the platforms it targets.
@@ -106,6 +139,7 @@ convention did not.
 | Feature | Valid on |
 |---|---|
 | `demoProdFlavors()` | `bkp.android.app*` |
+| `compose()` | `bkp.kmp.foundation.api` |
 
 `demoProdFlavors()` registers `demo` and `prod` product flavors; without it the app stays on plain
 `debug`/`release`. It is read in AGP's `finalizeDsl`, which runs after the module's `bkpModule`
@@ -167,9 +201,9 @@ Repeat calls are idempotent — KGP's target factories are configure-or-create �
 followed by `android { }` refines the target rather than creating a second one.
 
 **Narrowing is a dependency-graph decision, not a local one.** A module's target set must still
-cover every platform its consumers need. `bkp.kmp.feature*` modules pull in four libraries via the
-[feature bundle](#featurebundle-used-by-bkpkmpfeature), and `:shared:app` feeds both `:androidApp`
-and `:desktopApp`, so narrowing works bottom-up through the dependency closure. Dropping a platform
+cover every platform its consumers need. `bkp.kmp.feature` modules pull in lifecycle ViewModel and
+Koin via the [role baseline](#role-dependency-baselines), and `:app:shared` feeds `:app:android`,
+`:app:desktop` and `:app:web`, so narrowing works bottom-up through the dependency closure. Dropping a platform
 from an upstream library while a downstream module still targets it fails at resolution, not at
 declaration.
 
@@ -191,11 +225,13 @@ it is indistinguishable from the declaration itself. Only the final set is obser
 
 ## Validation lifecycle
 
-Validation is split into two phases:
+Validation is split into two layers:
 
 1. Apply-time wiring: primary plugins wire baseline tooling/dependencies in `apply()`.
-2. Post-configuration checks: `bkp.validation.graph` validates the final DSL values and plugin
-   graph in the module's own `afterEvaluate`.
+2. Root graph checks: the root-applied `bkp.validation.graph` registers `checkModuleGraph` and
+   `checkHelixPolicySync`. Cross-project models are reduced to plain node/edge records after project
+   evaluation; task actions evaluate those records and scan declared source-file inputs without
+   retaining `Project` references.
 
 `afterEvaluate` is required, not incidental — the values being checked come from the `bkpModule`
 block in the module's build script, which runs after plugins apply. Validation is per project
@@ -203,17 +239,56 @@ rather than a walk over `rootProject.allprojects` from `gradle.projectsEvaluated
 isolation forbids reading another project's model; the per-project form also fails at the offending
 module instead of after the whole build has configured.
 
-The build fails when:
+Local configuration still fails when:
 
 - `demoProdFlavors()` is called outside a `bkp.android.app*` module
 - `bkp.android.app.firebase` is applied without a `bkp.android.app*` primary
 - a KMP module declares no targets
 - a KMP module has a target that was created outside `bkpTargets { }`
 
-Two further checks exist but cannot fire today — more than one primary plugin group, and `bkpModule`
-without a primary plugin. Both are guards against a future plugin breaking an assumption the current
-set happens to satisfy; see the notes in
-[`BkpValidationGraphPluginTest`](convention/src/test/kotlin/dev/mayankmkh/basekmpproject/convention/BkpValidationGraphPluginTest.kt).
+The root graph tasks enforce these stable rules:
+
+| Rule | Enforcement |
+|---|---|
+| `MOD-ROLE-MISSING`, `MOD-ROLE-MULTIPLE` | Exactly one recorded Helix role |
+| `MOD-PATH-ROLE-MISMATCH` | Role-to-path table from the adoption plan |
+| `DEP-ROLE-DENIED` | Default-deny matrix in `config/helix/dependency-policy.json` |
+| `DEP-FEATURE-FEATURE-PUBLIC-PRESENTATION-ONLY` | Feature imports from a peer stay below `.api` |
+| `FEATURE-PUBLIC-SURFACE-OUTSIDE-API` | Feature top-level public declarations live in `api/` |
+| `GRAPH-CYCLE-PHYSICAL`, `GRAPH-CYCLE-LOGICAL` | Project cycles before/after API/Impl family collapse |
+| `EXC-EXPIRED` | Time-bounded exception registry hygiene |
+| `POLICY-DRIFT` | Derived policy equals the marked master-source JSON |
+
+Findings use `[RULE-ID] subject — problem. Fix: remedy` and the graph task always writes
+`build/reports/helix/module-graph.json`. Every module with a build script is role-validated —
+grandfathering was removed in phase 4. Two carve-outs remain, both inside the role matrix rather than
+around it: `:testkit:*` may be consumed from any role, and an `app` → `app` edge is allowed because
+`:app:shared` and the target shells are one composition root spread across four modules
+(master source §8.2); `GRAPH-CYCLE-PHYSICAL` still holds those shells to a DAG. `:tooling:*` sits
+outside the runtime graph, and structural parents such as `:app` carry no build script, so neither
+reaches the role rules.
+
+The source-backed rules (`FEATURE-PUBLIC-SURFACE-OUTSIDE-API` and the peer-import rule) take the
+modules' `src` **directories** as task inputs and walk them while the task runs. Handing over a file
+tree resolved at configuration time instead would freeze the file list into the configuration-cache
+entry, and a public declaration added in a brand-new file would go unseen until something else forced
+reconfiguration.
+
+### Architecture exceptions
+
+`config/helix/exceptions.json` stores `rule`, exact `scope`, `owner`, `reason`, `created`, `expires`,
+and `removalCondition`. A matching current exception turns that finding into a warning. An expired
+entry always fails with `EXC-EXPIRED`; blanket suppression is intentionally unavailable.
+
+## Verification tiers
+
+- `./gradlew verifyFast` runs JVM/common compile and tests, `detektAll`, `spotlessCheck`,
+  `checkModuleGraph`, and `checkHelixPolicySync`. Included-build convention tests are excluded.
+- `./gradlew verifyFull` adds Android `assembleDebug`, both web development/production executable
+  distributions, and the shared app's debug iOS-simulator framework link.
+
+Each umbrella task prints the chosen tier when it starts. The target task lookup is lazy so it
+remains compatible with plugins that register tasks late and with the configuration cache.
 
 ## Tests
 
@@ -221,7 +296,9 @@ set happens to satisfy; see the notes in
 ./gradlew -p build-logic :convention:test
 ```
 
-The suite drives the plugins through Gradle TestKit against throwaway single-module projects. The
+The suite drives the plugins through Gradle TestKit against throwaway single- and multi-module
+projects. `TestProject.withModule` creates nested projects and source fixtures for dependency,
+cycle, exception, and path-rule tests. The
 plugins are injected with `withPluginClasspath()` rather than resolved from a repository, which is
 why `build.gradle.kts` lists AGP, KGP and friends a second time under `testPluginClasspath` — they
 are `compileOnly` for publishing, but a TestKit build has no consumer to bring them. The synthetic
@@ -236,21 +313,16 @@ Quality plugins are internal and auto-applied by primary plugins:
   but owns build scripts worth formatting; the plugin skips its detekt half there.
 - `bkp.quality.lint` (Android lint when an Android or KMP Android plugin is present)
 
-## Dependency bundles inventory
+## Role dependency baselines
 
 The convention core owns reusable bundles in
 [`DependencyBundles.kt`](convention/src/main/kotlin/dev/mayankmkh/basekmpproject/convention/core/DependencyBundles.kt).
 
-### FeatureBundle (used by `bkp.kmp.feature*`)
-
-- `:shared:libs:arch:core`
-- `:shared:libs:coroutines-x`
-- `:shared:libs:networking`
-- `:shared:libs:designsystem`
-- AndroidX ViewModel + Compose integration
-- Koin BOM + Koin core + Compose ViewModel integration
-
-This is the only difference between `bkp.kmp.lib` and `bkp.kmp.feature`.
+`bkp.kmp.feature` and `bkp.kmp.app` add lifecycle ViewModel/ViewModel Compose plus the Koin BOM,
+core, and Compose ViewModel integration. `bkp.kmp.capability.impl` adds only the Koin BOM and core.
+No role plugin adds project-to-project dependencies: since phase 3 every module names its own
+project dependencies, and the old `FeatureBundle` is gone along with `bkp.kmp.lib.compose` and
+`bkp.kmp.feature.compose`.
 
 ### Compose bundle
 
@@ -270,4 +342,10 @@ Kotlin/Android test dependencies are configured by primary plugin type.
   compilations once, so a module cannot call either again to refine its own test settings — it
   fails with an "already created" error. A per-module opt-out would go through `beforeVariants`.
 - There is no test coverage for any of the above.
-- There is no module generator; new modules are written by hand.
+- New modules are scaffolded by `tooling/helix-kmp/helix-kmp create`, which renders hand-written
+  templates and inserts the module into `settings.gradle.kts`. The templates live in
+  `tooling/helix-kmp/templates/` and were derived by hand from `:feature:posts` and
+  `:capability:posts-*`; nothing generates them from the plugins, so a change to a role plugin's
+  defaults can leave them stale. `tooling/helix-kmp/tests/run-tests.sh` is what catches that — it
+  scaffolds throwaway modules and runs `jvmTest`, `spotlessCheck`, `detektAll`, `checkModuleGraph`
+  and `checkHelixPolicySync` against them. It is deliberately not part of `verifyFast`.

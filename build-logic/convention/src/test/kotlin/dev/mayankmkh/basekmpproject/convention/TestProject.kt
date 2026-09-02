@@ -5,7 +5,7 @@ import org.gradle.testkit.runner.BuildResult
 import org.gradle.testkit.runner.GradleRunner
 
 /**
- * A throwaway single-module build for exercising the convention plugins.
+ * A throwaway build for exercising convention plugins and multi-module graph rules.
  *
  * The plugins come from `withPluginClasspath()` rather than a real included build, so nothing is
  * resolved from a repository to run a test. The version catalog is the project's own -- see the
@@ -13,6 +13,7 @@ import org.gradle.testkit.runner.GradleRunner
  * for a key the project does not actually have.
  */
 internal class TestProject(private val dir: File) {
+    private val modules = linkedSetOf<String>()
 
     fun withBuildScript(script: String): TestProject {
         val catalog =
@@ -21,6 +22,40 @@ internal class TestProject(private val dir: File) {
             }
         // `invariantSeparatorsPath`: the path is interpolated into Kotlin source, where a Windows
         // backslash would be an escape sequence.
+        writeSettings(catalog)
+        // TestKit's daemon otherwise runs on Gradle's 512M/384M defaults, which AGP plus KGP plus
+        // the Kotlin DSL compiler exhaust -- the daemon dies of metaspace part-way through the
+        // suite.
+        dir.resolve("gradle.properties")
+            .writeText("org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=1g\n")
+        dir.resolve("build.gradle.kts").writeText(script.trimIndent())
+        return this
+    }
+
+    /** Adds an included module and any source files owned by it. */
+    fun withModule(
+        path: String,
+        buildScript: String,
+        sources: Map<String, String> = emptyMap(),
+    ): TestProject {
+        require(path.startsWith(":") && path.length > 1) { "module path must look like :feature:x" }
+        modules += path
+        val moduleDir = dir.resolve(path.removePrefix(":").replace(':', File.separatorChar))
+        moduleDir.mkdirs()
+        moduleDir.resolve("build.gradle.kts").writeText(buildScript.trimIndent())
+        sources.forEach { (relativePath, content) ->
+            moduleDir.resolve(relativePath).apply {
+                parentFile.mkdirs()
+                writeText(content)
+            }
+        }
+        val catalog = requireNotNull(System.getProperty("bkp.test.versionCatalog"))
+        writeSettings(catalog)
+        return this
+    }
+
+    private fun writeSettings(catalog: String) {
+        val includes = modules.joinToString("\n") { module -> "include(\"$module\")" }
         dir.resolve("settings.gradle.kts")
             .writeText(
                 """
@@ -34,21 +69,18 @@ internal class TestProject(private val dir: File) {
                 }
             }
             rootProject.name = "bkp-test"
+            $includes
             """
                     .trimIndent()
             )
-        // TestKit's daemon otherwise runs on Gradle's 512M/384M defaults, which AGP plus KGP plus
-        // the
-        // Kotlin DSL compiler exhaust -- the daemon dies of metaspace part-way through the suite.
-        dir.resolve("gradle.properties")
-            .writeText("org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=1g\n")
-        dir.resolve("build.gradle.kts").writeText(script.trimIndent())
-        return this
     }
 
     /** Adds a file to the project, for conventions that key off one being there. */
     fun withFile(path: String, content: String): TestProject {
-        dir.resolve(path).writeText(content)
+        dir.resolve(path).apply {
+            parentFile.mkdirs()
+            writeText(content)
+        }
         return this
     }
 
@@ -57,6 +89,9 @@ internal class TestProject(private val dir: File) {
      * to configure, which is where the convention plugins and the validator do their work.
      */
     fun run(vararg tasks: String): BuildResult = runner(tasks).build()
+
+    /** Runs explicit tasks, expecting task execution (rather than configuration) to fail. */
+    fun runExpectingFailure(vararg tasks: String): BuildResult = runner(tasks).buildAndFail()
 
     /** Configures the project, expecting the validator to reject it. */
     fun configureAndFail(): BuildResult = runner(emptyArray()).buildAndFail()

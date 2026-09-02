@@ -2,6 +2,8 @@ package dev.mayankmkh.basekmpproject.convention.module
 
 import dev.mayankmkh.basekmpproject.configureKotlinJvm
 import dev.mayankmkh.basekmpproject.convention.dsl.bkpModuleExtension
+import dev.mayankmkh.basekmpproject.convention.helix.HelixRole
+import dev.mayankmkh.basekmpproject.convention.helix.recordHelixRole
 import dev.mayankmkh.basekmpproject.libs
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -22,6 +24,7 @@ class BkpDesktopAppPlugin : Plugin<Project> {
             apply(plugin = "bkp.validation.graph")
 
             bkpModuleExtension()
+            recordHelixRole(HelixRole.APP)
 
             configureKotlinJvm()
 

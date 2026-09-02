@@ -167,20 +167,63 @@ gradlePlugin {
             id = "bkp.kmp.lib"
             implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpKmpLibPlugin"
         }
-        register("bkpKmpLibCompose") {
-            id = "bkp.kmp.lib.compose"
-            implementationClass =
-                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpLibComposePlugin"
-        }
         register("bkpKmpFeature") {
             id = "bkp.kmp.feature"
             implementationClass =
                 "dev.mayankmkh.basekmpproject.convention.module.BkpKmpFeaturePlugin"
         }
-        register("bkpKmpFeatureCompose") {
-            id = "bkp.kmp.feature.compose"
+        register("bkpKmpApp") {
+            id = "bkp.kmp.app"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpKmpAppPlugin"
+        }
+        register("bkpKmpUi") {
+            id = "bkp.kmp.ui"
+            implementationClass = "dev.mayankmkh.basekmpproject.convention.module.BkpKmpUiPlugin"
+        }
+        register("bkpKmpCapabilityApi") {
+            id = "bkp.kmp.capability.api"
             implementationClass =
-                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpFeatureComposePlugin"
+                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpCapabilityApiPlugin"
+        }
+        register("bkpKmpCapabilityImpl") {
+            id = "bkp.kmp.capability.impl"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpCapabilityImplPlugin"
+        }
+        register("bkpKmpFoundationApi") {
+            id = "bkp.kmp.foundation.api"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpFoundationApiPlugin"
+        }
+        register("bkpKmpFoundationRuntime") {
+            id = "bkp.kmp.foundation.runtime"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpFoundationRuntimePlugin"
+        }
+        register("bkpKmpPlatform") {
+            id = "bkp.kmp.platform"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpPlatformPlugin"
+        }
+        register("bkpKmpPlatformApi") {
+            id = "bkp.kmp.platform.api"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpPlatformApiPlugin"
+        }
+        register("bkpKmpPlatformImpl") {
+            id = "bkp.kmp.platform.impl"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpPlatformImplPlugin"
+        }
+        register("bkpKmpStorage") {
+            id = "bkp.kmp.storage"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpStoragePlugin"
+        }
+        register("bkpKmpTestkit") {
+            id = "bkp.kmp.testkit"
+            implementationClass =
+                "dev.mayankmkh.basekmpproject.convention.module.BkpKmpTestkitPlugin"
         }
         register("bkpDesktopApp") {
             id = "bkp.desktop.app"

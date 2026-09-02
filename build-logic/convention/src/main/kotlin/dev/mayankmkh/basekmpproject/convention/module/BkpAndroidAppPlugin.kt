@@ -8,6 +8,8 @@ import dev.mayankmkh.basekmpproject.configureKotlinAndroid
 import dev.mayankmkh.basekmpproject.configurePrintApksTask
 import dev.mayankmkh.basekmpproject.convention.core.androidSdkConfig
 import dev.mayankmkh.basekmpproject.convention.dsl.bkpModuleExtension
+import dev.mayankmkh.basekmpproject.convention.helix.HelixRole
+import dev.mayankmkh.basekmpproject.convention.helix.recordHelixRole
 import dev.mayankmkh.basekmpproject.libs
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -26,6 +28,7 @@ class BkpAndroidAppPlugin : Plugin<Project> {
             apply(plugin = "bkp.validation.graph")
 
             val bkpModule = bkpModuleExtension()
+            recordHelixRole(HelixRole.APP)
             val sdk = androidSdkConfig()
 
             extensions.configure<ApplicationExtension> {

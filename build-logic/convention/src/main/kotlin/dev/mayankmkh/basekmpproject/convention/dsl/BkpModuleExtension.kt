@@ -27,11 +27,31 @@ abstract class Features {
     internal var demoProdFlavorsEnabled = false
         private set
 
+    internal var composeEnabled = false
+        private set
+
+    private val composeCallbacks = mutableListOf<() -> Unit>()
+
     /**
      * Registers `demo` and `prod` product flavors in place of plain `debug`/`release` variants.
      * Only valid on `bkp.android.app*` modules; the validator rejects it anywhere else.
      */
     fun demoProdFlavors() {
         demoProdFlavorsEnabled = true
+    }
+
+    /** Enables Compose for role plugins where it is an explicit, per-module choice. */
+    fun compose() {
+        if (composeEnabled) return
+        composeEnabled = true
+        composeCallbacks.forEach { it() }
+    }
+
+    /**
+     * Reacts while the module build script is still evaluating. Applying Compose from
+     * `afterEvaluate` is too late for other build-script blocks to configure its extensions.
+     */
+    internal fun whenComposeEnabled(action: () -> Unit) {
+        if (composeEnabled) action() else composeCallbacks += action
     }
 }

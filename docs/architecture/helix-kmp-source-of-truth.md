@@ -2745,8 +2745,8 @@ Cell returns
   -> same presentation state
 
 Cell removed from logical collection
-  -> owner cleared immediately
-  -> ViewModel cleared
+  -> owner clear requested immediately
+  -> ViewModel cleared when no composed item holds the owner
 ```
 
 ## 12.5 `StatefulLazyItem`
@@ -2763,6 +2763,11 @@ It may provide:
 - deterministic cleanup on logical removal;
 - diagnostic FeatureInstanceKey.
 
+When hosting Cells inside a lazy list, the host derives `activeKeys` from the viewport with
+`rememberViewportKeys`, including its bounded prefetch buffer. Refresh gating remains a ViewModel
+concern: use `stateIn(SharingStarted.WhileSubscribed(...))` with periodic refresh inside the shared
+flow so work stops when the item leaves composition and resumes when it returns.
+
 It should not grow into:
 
 - nested navigation runtime;
@@ -2771,7 +2776,9 @@ It should not grow into:
 - custom state keeper ecosystem;
 - general child runtime framework.
 
-Reconsider Decompose/first-party alternatives if the helper grows beyond roughly its intended narrow scope, recurring lifecycle bugs appear, or first-party keyed ownership becomes equivalent.
+The helper delegates keyed store ownership and ref-counted retirement to lifecycle 2.11.0
+`ViewModelStoreProvider`. Reconsider Decompose if it grows beyond this narrow scope or recurring
+lifecycle bugs show that a component runtime is warranted.
 
 ## 12.6 Required keyed-owner regression suite
 
@@ -2783,7 +2790,8 @@ At minimum:
 4. return to composition;
 5. verify state remains;
 6. remove item from logical dataset;
-7. verify owner/ViewModel clears immediately;
+7. verify owner/ViewModel clears immediately when uncomposed, or after disposal when removal races
+   an active composition reference;
 8. re-add as new logical instance;
 9. verify old state does not leak.
 
@@ -5647,9 +5655,11 @@ Android + iOS + Desktop + Web/Wasm
 
 Decision:
 
-- current qualified keyed owner remains baseline until that exact suite passes;
-- if first-party retain/store APIs satisfy the full contract with less owned code, delete or reduce `StatefulLazyItem`;
-- minimize private keyed-runtime coupling while this qualification remains open.
+- lifecycle 2.11.0 `ViewModelStoreProvider` satisfies the keyed store/ref-count contract and now
+  backs the reduced `StatefulLazyItem` helper;
+- Compose `retain` remains a separate candidate only if it can delete more infrastructure while
+  preserving the exact four-target suite;
+- minimize private keyed-runtime coupling around the first-party provider.
 
 ### SQLDelight
 
@@ -5675,7 +5685,7 @@ Do not transcribe upstream "current" versions here. Project support remains adap
 |---|---|---|
 | Navigation 3 | qualified | exact repository pin from version catalog; project runtime behavior qualified |
 | Nav3 CMP browser history | qualified-with-warning | exact repository pin + permanent Back/Forward/URL/direct/refresh/deep-link suite |
-| keyed `StatefulLazyItem` owner | qualified | offscreen retain/logical removal clear; minimize private coupling pending first-party comparison |
+| keyed `StatefulLazyItem` owner | qualified | backed by lifecycle 2.11.0 `ViewModelStoreProvider`; `rememberViewportKeys` supplies Decompose `ChildItems`-style destroy-beyond-buffer |
 | Compose `retain` / RetainedValuesStore replacement | under-evaluation | evaluate exact repository pin on four-target lazy/keyed/logical-removal suite |
 | SQLDelight | qualified | exact repository pin + required-target/Web Worker regression |
 | Store5 | accepted-experimental | exact repository pin; Snapshot/resource value with maturity risk |

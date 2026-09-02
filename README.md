@@ -70,6 +70,11 @@ adds it to `settings.gradle.kts`, and -- for a Cell -- registers its ViewModel i
 Koin module. What it does not do is load the new `<name>FeatureModule` or `<name>CapabilityModule`
 into the composition root in `:app:shared`; do that yourself.
 
+For Cells hosted inside a lazy list, derive `KeyedOwnerHost`'s active keys from the viewport with
+`rememberViewportKeys`, including its bounded prefetch buffer. Gate periodic refresh in the
+ViewModel with `stateIn(SharingStarted.WhileSubscribed(...))` and place the refresh inside the
+shared flow so it stops when the item leaves composition and resumes when it returns.
+
 The scaffolds come from hand-written templates in `tooling/helix-kmp/templates/`, derived from the
 `:feature:posts` / `:capability:posts-*` reference slice. They compile and pass `detektAll`,
 `spotlessCheck` and `checkModuleGraph` as written -- no reformatting pass required. If you change a

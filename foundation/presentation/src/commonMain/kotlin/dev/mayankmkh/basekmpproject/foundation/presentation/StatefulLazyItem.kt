@@ -8,97 +8,61 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelStore
-import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.ViewModelStoreProvider
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreOwner
 
 private const val DefaultHostKey = "default"
 private const val FallbackHostKey = "nearest-owner-fallback"
-private const val RegistryViewModelKeyPrefix =
-    "dev.mayankmkh.basekmpproject.foundation.presentation.KeyedOwnerRegistry"
-
-/**
- * Registry of presentation owners retained by a parent [ViewModelStoreOwner].
- *
- * Callers normally obtain this from [rememberKeyedOwnerRegistry] and let [KeyedOwnerHost] reconcile
- * logical keys. Its constructor and mutation operations stay internal so a Feature cannot
- * accidentally make ViewModel lifetime depend on composition recycling.
- */
-public class KeyedOwnerRegistry internal constructor() {
-    private val owners = mutableMapOf<String, ItemViewModelStoreOwner>()
-
-    internal fun ownerFor(key: FeatureInstanceKey): ViewModelStoreOwner =
-        owners.getOrPut(key.value) { ItemViewModelStoreOwner() }
-
-    internal fun retainOnly(activeKeys: Set<FeatureInstanceKey>): Set<String> {
-        val retainedValues = activeKeys.mapTo(mutableSetOf()) { it.value }
-        val removedValues = owners.keys.filterTo(mutableSetOf()) { it !in retainedValues }
-        removedValues.forEach { removed -> owners.remove(removed)?.viewModelStore?.clear() }
-        return removedValues
-    }
-
-    internal fun clear() {
-        owners.values.forEach { it.viewModelStore.clear() }
-        owners.clear()
-    }
-}
-
-private class ItemViewModelStoreOwner : ViewModelStoreOwner {
-    override val viewModelStore: ViewModelStore = ViewModelStore()
-}
-
-private class KeyedOwnerRegistryViewModel : ViewModel() {
-    val registry = KeyedOwnerRegistry()
-
-    override fun onCleared() {
-        registry.clear()
-    }
-}
+private const val ProviderKeyPrefix =
+    "dev.mayankmkh.basekmpproject.foundation.presentation.KeyedOwnerHost"
 
 private data class KeyedOwnerContext(
-    val registry: KeyedOwnerRegistry,
+    val provider: ViewModelStoreProvider,
     val saveableStateHolder: SaveableStateHolder,
 )
 
 // This local is the narrow owner hand-off the primitive exists to provide; making it an argument
-// to every nested item would let callers accidentally mix registries and saveable-state holders.
+// to every nested item would let callers accidentally mix providers and saveable-state holders.
 @Suppress("CompositionLocalAllowlist")
 private val LocalKeyedOwnerContext = staticCompositionLocalOf<KeyedOwnerContext?> { null }
 
 /**
- * Returns the registry stored in the nearest [LocalViewModelStoreOwner].
+ * Returns keyed presentation ownership retained by the nearest [LocalViewModelStoreOwner].
  *
- * The parent ViewModel is intentional: item ViewModels survive configuration changes with their
- * host. Distinct keyed-owner hosts under the same parent must pass distinct [hostKey] values.
+ * The provider keeps its per-key stores in a ViewModel inside the parent store, so item ViewModels
+ * survive configuration changes and are retired when the parent store clears. The provider is
+ * constructed directly rather than through `rememberViewModelStoreProvider`: that helper calls
+ * `clearAllKeys()` whenever its call site leaves composition while the lifecycle is still alive,
+ * which would wipe every hosted Cell when, for example, a Nav3 entry drops beneath the top of the
+ * back stack. Re-creating the provider object is harmless because it re-attaches to the same state
+ * holder under the same parent key. Distinct keyed-owner hosts under the same parent must pass
+ * distinct [hostKey] values.
  */
 @Composable
-@Suppress("ViewModelInjection")
-public fun rememberKeyedOwnerRegistry(hostKey: String = DefaultHostKey): KeyedOwnerRegistry {
+private fun rememberKeyedOwnerContext(hostKey: String): KeyedOwnerContext {
     require(hostKey.isNotBlank()) { "A keyed-owner host key cannot be blank" }
-    val parentOwner =
+    val parent =
         checkNotNull(LocalViewModelStoreOwner.current) {
             "Keyed presentation ownership requires a LocalViewModelStoreOwner"
         }
-    val holder =
-        viewModel<KeyedOwnerRegistryViewModel>(
-            viewModelStoreOwner = parentOwner,
-            key = "$RegistryViewModelKeyPrefix:$hostKey",
-        ) {
-            KeyedOwnerRegistryViewModel()
-        }
-    return holder.registry
+    val provider =
+        remember(parent, hostKey) { ViewModelStoreProvider(parent, "$ProviderKeyPrefix:$hostKey") }
+    val saveableStateHolder = rememberSaveableStateHolder()
+    return remember(provider, saveableStateHolder) {
+        KeyedOwnerContext(provider, saveableStateHolder)
+    }
 }
 
 /**
  * Installs keyed presentation ownership for a lazy host.
  *
- * [activeKeys] is the host's logical dataset, not merely its currently composed/visible items.
- * Moving an item offscreen therefore retains its ViewModel and saveable state; removing its key
- * from this set clears its [ViewModelStore] and saved state at the next successful composition.
- * Clearing the parent host's ViewModelStore clears every remaining child owner. The registry lives
- * in a parent ViewModel so a configuration-change disposal does not look like logical removal.
+ * [activeKeys] is the host's logical retention window. Moving an item outside that window requests
+ * that its ViewModelStore and saved state be removed at the next successful composition. The
+ * first-party provider clears immediately when the item is not composed and defers clearing until
+ * disposal when it still holds a composition reference. Clearing the parent host's ViewModelStore
+ * likewise retires every child store, while configuration-change disposal alone does not look like
+ * logical removal.
  */
 @Composable
 public fun KeyedOwnerHost(
@@ -106,13 +70,17 @@ public fun KeyedOwnerHost(
     hostKey: String = DefaultHostKey,
     content: @Composable () -> Unit,
 ) {
-    val registry = rememberKeyedOwnerRegistry(hostKey)
-    val saveableStateHolder = rememberSaveableStateHolder()
-    val context =
-        remember(registry, saveableStateHolder) { KeyedOwnerContext(registry, saveableStateHolder) }
+    val context = rememberKeyedOwnerContext(hostKey)
+    val knownKeys = remember(context) { mutableSetOf<String>() }
 
     SideEffect {
-        registry.retainOnly(activeKeys).forEach(saveableStateHolder::removeState)
+        val activeValues = activeKeys.mapTo(mutableSetOf()) { it.value }
+        (knownKeys - activeValues).forEach { removed ->
+            context.provider.clearKey(removed)
+            context.saveableStateHolder.removeState(removed)
+        }
+        knownKeys.retainAll(activeValues)
+        knownKeys += activeValues
     }
     CompositionLocalProvider(LocalKeyedOwnerContext provides context, content = content)
 }
@@ -122,35 +90,28 @@ public fun KeyedOwnerHost(
  *
  * Identity is [FeatureInstanceKey], independently of list index, business Resource identity, or
  * navigation Route identity. Use inside [KeyedOwnerHost] so logical removal is observable. When no
- * host is installed, this falls back to a registry retained by the nearest
+ * host is installed, this falls back to a provider retained by the nearest
  * [LocalViewModelStoreOwner]; that fallback retains state until the parent owner clears because it
- * has no logical dataset against which to detect removal. Composing the same key twice at once is
- * rejected by [SaveableStateHolder], catching duplicate active placement keys in tests/debug runs.
+ * has no logical retention window against which to detect removal. Composing the same key twice at
+ * once is rejected by [SaveableStateHolder], catching duplicate active placement keys in
+ * tests/debug runs.
  */
 @Composable
 public fun StatefulLazyItem(
     key: FeatureInstanceKey,
     content: @Composable () -> Unit,
 ) {
-    val installedContext = LocalKeyedOwnerContext.current
-    val fallbackRegistry =
-        if (installedContext == null) rememberKeyedOwnerRegistry(FallbackHostKey) else null
-    val fallbackStateHolder = if (installedContext == null) rememberSaveableStateHolder() else null
-    val context =
-        installedContext
-            ?: remember(fallbackRegistry, fallbackStateHolder) {
-                KeyedOwnerContext(
-                    registry = checkNotNull(fallbackRegistry),
-                    saveableStateHolder = checkNotNull(fallbackStateHolder),
-                )
-            }
+    val context = LocalKeyedOwnerContext.current ?: rememberKeyedOwnerContext(FallbackHostKey)
 
     key(key.value) {
         context.saveableStateHolder.SaveableStateProvider(key.value) {
-            CompositionLocalProvider(
-                LocalViewModelStoreOwner provides context.registry.ownerFor(key),
-                content = content,
-            )
+            val owner =
+                rememberViewModelStoreOwner(
+                    key = key.value,
+                    provider = context.provider,
+                    savedStateRegistryOwner = null,
+                )
+            CompositionLocalProvider(LocalViewModelStoreOwner provides owner, content = content)
         }
     }
 }

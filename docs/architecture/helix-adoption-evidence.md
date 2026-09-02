@@ -121,7 +121,13 @@ verification tier is `check` plus debug assembles).
   outside `.api`, config-cache regression), `BkpHelixRolePluginTest`.
 - `:foundation:resource` `ResourceObservationTest`; `:foundation:runtime`
   `ApplicationRuntimeScopeTest`; `:foundation:presentation`
-  `StatefulLazyItemRegressionTest` (keyed Cell owner regression, §12.6, 7 cases).
+  `StatefulLazyItemRegressionTest` (keyed Cell owner regression, §12.6, 9 cases) and
+  `ViewportKeysRegressionTest` (viewport-window retention/retirement, 3 cases; 12 total).
+- The keyed owner is now built on lifecycle 2.11.0 `ViewModelStoreProvider`; the repository-pinned
+  first-party comparison retained the narrow Helix host contract while deleting its custom store
+  registry. The host constructs the provider directly instead of using
+  `rememberViewModelStoreProvider`, which clears every key when its call site leaves composition
+  (a hidden host must keep its Cells; `hostLeavingCompositionWhileParentStoreLivesRetainsChildStores`).
 - `:capability:posts-impl` `PostsCapabilityImplTest` (Store5 → `ResourceObservation` mapping,
   reconnect refresh, per-post memoisation).
 - `:feature:posts` `PostViewModelTest` (common), `PostContentTest`, `PostDetailCellTest` (jvm).
@@ -161,7 +167,7 @@ module/file/type reverse-dependency slice; this narrative remains the adoption-t
   `ResourceProblem`, `ResourceProblemCategory`, `RefreshQos`, `RefreshPriority`,
   `NetworkPreference` (`:foundation:resource`); `ApplicationRuntimeScope`
   (`:foundation:runtime`); `FeatureInstanceKey`, `CellPlacementId`, `CellSpec`,
-  `StatefulLazyItem`, `KeyedOwnerHost`, `KeyedOwnerRegistry`, `rememberKeyedOwnerRegistry`
+  `StatefulLazyItem`, `KeyedOwnerHost`, `rememberViewportKeys`
   (`:foundation:presentation`); `PostId`, `Post`, `PostFeed`, `PostsQueries`, `PostsCommands`
   (`:capability:posts-api`); `postsCapabilityModule` (`:capability:posts-impl`);
   `PostFeedScreen`, `PostDetailScreen`, `PostDetailCell`, `PostFeedOutput`,
@@ -254,8 +260,8 @@ Recorded, not fixed (follow-ups, none blocks Feature development):
   days.
 - `PostsCapabilityImpl.postResources` never evicts; every post ever opened stays hot for the
   application lifetime (`stateIn(scope)` per post).
-- `StatefulLazyItem` rebuilds the active-key value set in `SideEffect`; changing that reconciliation
-  is behavior-sensitive and should wait for measured composition cost.
+- `KeyedOwnerHost` reconciles a set diff against remembered known keys in `SideEffect`; lifecycle's
+  provider defers a requested clear while an item remains composed and completes it on disposal.
 - `StoreResource` serialises overlapping refreshes behind a mutex rather than sharing the
   in-flight fetch.
 - `PUBLIC_TOP_LEVEL` matching in the graph task is line-based; a one-line

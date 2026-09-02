@@ -15,9 +15,9 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
-import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class StatefulLazyItemRegressionTest {
@@ -26,24 +26,24 @@ class StatefulLazyItemRegressionTest {
         val parent = TestOwner()
         val first = placementKey("first")
         val second = placementKey("second")
-        val owners = mutableListOf<ViewModelStoreOwner>()
+        val stores = mutableListOf<ViewModelStore>()
 
         setContent {
             CompositionLocalProvider(LocalViewModelStoreOwner provides parent) {
                 KeyedOwnerHost(setOf(first, second)) {
                     StatefulLazyItem(first) {
-                        owners += requireNotNull(LocalViewModelStoreOwner.current)
+                        stores += requireNotNull(LocalViewModelStoreOwner.current).viewModelStore
                     }
                     StatefulLazyItem(second) {
-                        owners += requireNotNull(LocalViewModelStoreOwner.current)
+                        stores += requireNotNull(LocalViewModelStoreOwner.current).viewModelStore
                     }
                 }
             }
         }
 
         runOnIdle {
-            assertEquals(2, owners.size)
-            assertNotSame(owners[0], owners[1])
+            assertEquals(2, stores.size)
+            assertNotSame(stores[0], stores[1])
         }
     }
 
@@ -52,7 +52,7 @@ class StatefulLazyItemRegressionTest {
         val parent = TestOwner()
         val itemKey = placementKey("retained")
         var visible by mutableStateOf(true)
-        val owners = mutableListOf<ViewModelStoreOwner>()
+        val stores = mutableListOf<ViewModelStore>()
         val models = mutableListOf<ProbeViewModel>()
         var incrementSaveableState: (() -> Unit)? = null
         var observedSaveableState = -1
@@ -62,7 +62,8 @@ class StatefulLazyItemRegressionTest {
                 KeyedOwnerHost(setOf(itemKey)) {
                     if (visible) {
                         StatefulLazyItem(itemKey) {
-                            owners += requireNotNull(LocalViewModelStoreOwner.current)
+                            stores +=
+                                requireNotNull(LocalViewModelStoreOwner.current).viewModelStore
                             val model = viewModel<ProbeViewModel> { ProbeViewModel() }
                             models += model
                             var localCount by rememberSaveable { mutableIntStateOf(0) }
@@ -81,7 +82,8 @@ class StatefulLazyItemRegressionTest {
         runOnIdle { visible = false }
         runOnIdle { visible = true }
         runOnIdle {
-            assertSame(owners.first(), owners.last())
+            // The provider may recreate its lightweight owner wrapper; the keyed store is identity.
+            assertSame(stores.first(), stores.last())
             assertSame(models.first(), models.last())
             assertEquals(7, models.last().count)
             assertEquals(1, observedSaveableState)
@@ -127,13 +129,70 @@ class StatefulLazyItemRegressionTest {
     }
 
     @Test
+    fun logicalRemovalWhileStillComposedDefersClearUntilDisposal() = runComposeUiTest {
+        val parent = TestOwner()
+        val itemKey = placementKey("deferred")
+        var activeKeys by mutableStateOf(setOf(itemKey))
+        var visible by mutableStateOf(true)
+        var clearCount = 0
+
+        setContent {
+            CompositionLocalProvider(LocalViewModelStoreOwner provides parent) {
+                KeyedOwnerHost(activeKeys) {
+                    if (visible) {
+                        StatefulLazyItem(itemKey) {
+                            viewModel { ProbeViewModel { clearCount += 1 } }
+                        }
+                    }
+                }
+            }
+        }
+
+        runOnIdle { activeKeys = emptySet() }
+        runOnIdle { assertEquals(0, clearCount) }
+        runOnIdle { visible = false }
+        runOnIdle { assertEquals(1, clearCount) }
+    }
+
+    @Test
+    fun hostLeavingCompositionWhileParentStoreLivesRetainsChildStores() = runComposeUiTest {
+        val parent = TestOwner()
+        val itemKey = placementKey("host-hidden")
+        var hostVisible by mutableStateOf(true)
+        var clearCount = 0
+        val models = mutableListOf<ProbeViewModel>()
+
+        setContent {
+            CompositionLocalProvider(LocalViewModelStoreOwner provides parent) {
+                if (hostVisible) {
+                    KeyedOwnerHost(setOf(itemKey)) {
+                        StatefulLazyItem(itemKey) {
+                            models += viewModel { ProbeViewModel { clearCount += 1 } }
+                        }
+                    }
+                }
+            }
+        }
+
+        // A Nav3 entry beneath the top of the back stack leaves composition while its
+        // ViewModelStore lives on; the Cells it hosts must come back with their state.
+        runOnIdle { hostVisible = false }
+        runOnIdle { hostVisible = true }
+        runOnIdle {
+            assertEquals(0, clearCount)
+            assertEquals(2, models.size)
+            assertSame(models.first(), models.last())
+        }
+    }
+
+    @Test
     fun reorderKeepsIdentityAttachedToKeys() = runComposeUiTest {
         val parent = TestOwner()
         val first = placementKey("one")
         val second = placementKey("two")
         var order by mutableStateOf(listOf(first, second))
-        val before = mutableMapOf<FeatureInstanceKey, ViewModelStoreOwner>()
-        val after = mutableMapOf<FeatureInstanceKey, ViewModelStoreOwner>()
+        val before = mutableMapOf<FeatureInstanceKey, ViewModelStore>()
+        val after = mutableMapOf<FeatureInstanceKey, ViewModelStore>()
         var reordered = false
 
         setContent {
@@ -141,8 +200,9 @@ class StatefulLazyItemRegressionTest {
                 KeyedOwnerHost(order.toSet()) {
                     order.forEach { itemKey ->
                         StatefulLazyItem(itemKey) {
-                            val owner = requireNotNull(LocalViewModelStoreOwner.current)
-                            if (reordered) after[itemKey] = owner else before[itemKey] = owner
+                            val store =
+                                requireNotNull(LocalViewModelStoreOwner.current).viewModelStore
+                            if (reordered) after[itemKey] = store else before[itemKey] = store
                         }
                     }
                 }
@@ -163,14 +223,17 @@ class StatefulLazyItemRegressionTest {
     fun clearingHostOwnerClearsEveryChildStore() = runComposeUiTest {
         val parent = TestOwner()
         val keys = setOf(placementKey("one"), placementKey("two"))
+        var visible by mutableStateOf(true)
         var clearCount = 0
 
         setContent {
             CompositionLocalProvider(LocalViewModelStoreOwner provides parent) {
                 KeyedOwnerHost(keys) {
-                    keys.forEach { itemKey ->
-                        StatefulLazyItem(itemKey) {
-                            viewModel { ProbeViewModel { clearCount += 1 } }
+                    if (visible) {
+                        keys.forEach { itemKey ->
+                            StatefulLazyItem(itemKey) {
+                                viewModel { ProbeViewModel { clearCount += 1 } }
+                            }
                         }
                     }
                 }
@@ -178,21 +241,24 @@ class StatefulLazyItemRegressionTest {
         }
 
         runOnIdle { parent.viewModelStore.clear() }
+        runOnIdle { assertEquals(0, clearCount) }
+        // The provider defers clearing stores that still have a composed owner reference.
+        runOnIdle { visible = false }
         runOnIdle { assertEquals(2, clearCount) }
     }
 
     @Test
-    fun fallbackRegistryUsesTheNearestOwner() = runComposeUiTest {
+    fun fallbackProviderUsesTheNearestOwner() = runComposeUiTest {
         val parent = TestOwner()
         val itemKey = placementKey("fallback")
         var visible by mutableStateOf(true)
-        val owners = mutableListOf<ViewModelStoreOwner>()
+        val stores = mutableListOf<ViewModelStore>()
 
         setContent {
             CompositionLocalProvider(LocalViewModelStoreOwner provides parent) {
                 if (visible) {
                     StatefulLazyItem(itemKey) {
-                        owners += requireNotNull(LocalViewModelStoreOwner.current)
+                        stores += requireNotNull(LocalViewModelStoreOwner.current).viewModelStore
                     }
                 }
             }
@@ -201,8 +267,8 @@ class StatefulLazyItemRegressionTest {
         runOnIdle { visible = false }
         runOnIdle { visible = true }
         runOnIdle {
-            assertEquals(2, owners.size)
-            assertSame(owners.first(), owners.last())
+            assertEquals(2, stores.size)
+            assertSame(stores.first(), stores.last())
         }
     }
 
@@ -218,7 +284,7 @@ class StatefulLazyItemRegressionTest {
             "cricket-details/match-123/live-score",
             FeatureInstanceKey.forScreen("cricket-details/match-123", "live-score").value,
         )
-        assertTrue(placement.value != "match-123")
+        assertNotEquals("match-123", placement.value)
     }
 
     private class TestOwner : ViewModelStoreOwner {

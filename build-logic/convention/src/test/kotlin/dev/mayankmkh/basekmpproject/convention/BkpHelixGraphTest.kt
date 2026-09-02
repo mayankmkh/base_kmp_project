@@ -63,6 +63,38 @@ class BkpHelixGraphTest {
     }
 
     @Test
+    fun `schema two report includes graph context metadata`() {
+        helixProject()
+            .withModule(
+                ":feature:consumer",
+                roleModule(
+                    "bkp.kmp.feature",
+                    "api(project(\":capability:public-api\"))",
+                ),
+                mapOf(
+                    "src/commonMain/kotlin/example/api/Consumer.kt" to
+                        "package example.api\n\npublic interface Consumer\n"
+                ),
+            )
+            .withModule(
+                ":capability:public-api",
+                roleModule("bkp.kmp.capability.api"),
+                mapOf(
+                    "src/commonMain/kotlin/example/PublicApi.kt" to
+                        "package example\n\npublic interface PublicApi\n"
+                ),
+            )
+            .run("checkModuleGraph")
+
+        val report = projectDir.resolve("build/reports/helix/module-graph.json").readText()
+        assertContains(report, "\"schema\": 2")
+        assertContains(report, "\"projectDir\": \"feature/consumer\"")
+        assertContains(report, "\"targets\"")
+        assertContains(report, "\"publicApiDirs\"")
+        assertContains(report, "\"configuration\": \"api\"")
+    }
+
+    @Test
     fun `active exception downgrades denied edge to warning`() {
         val result =
             deniedFeatureProject(

@@ -86,7 +86,31 @@ class BkpValidationGraphPlugin : Plugin<Project> {
                                 ?.orNull
                                 .orEmpty()
                                 .map { it.policyName }
-                        encodeNode(candidate.path, roles, candidate.projectDir.absolutePath)
+                        val targets =
+                            candidate.extensions
+                                .findByType<KotlinMultiplatformExtension>()
+                                ?.targets
+                                ?.filterNot { it.platformType == KotlinPlatformType.common }
+                                ?.map { it.name }
+                                ?.sorted()
+                                ?: when {
+                                    candidate.hasAnyPlugin(
+                                        BKP_ANDROID_APP,
+                                        BKP_ANDROID_APP_COMPOSE,
+                                    ) -> listOf("android")
+                                    candidate.pluginManager.hasPlugin(BKP_DESKTOP_APP) ->
+                                        listOf("jvm")
+                                    else -> emptyList()
+                                }
+                        encodeNode(
+                            candidate.path,
+                            roles,
+                            candidate.projectDir.absolutePath,
+                            candidate.projectDir
+                                .relativeTo(project.projectDir)
+                                .invariantSeparatorsPath,
+                            targets,
+                        )
                     }
                 )
                 edgeRecords.set(
@@ -98,7 +122,11 @@ class BkpValidationGraphPlugin : Plugin<Project> {
                                     configuration.dependencies
                                         .withType(ProjectDependency::class.java)
                                         .map { dependency ->
-                                            encodeEdge(candidate.path, dependency.path)
+                                            encodeEdge(
+                                                candidate.path,
+                                                dependency.path,
+                                                configuration.name.toGraphConfiguration(),
+                                            )
                                         }
                                 }
                         }
@@ -123,6 +151,13 @@ class BkpValidationGraphPlugin : Plugin<Project> {
             this == "implementation" ||
             ((endsWith("Api") || endsWith("Implementation")) && "main" in lower)
     }
+
+    private fun String.toGraphConfiguration(): String =
+        when {
+            this == "api" || endsWith("Api") -> "api"
+            this == "implementation" || endsWith("Implementation") -> "implementation"
+            else -> "other"
+        }
 
     private fun validateProject(project: Project) {
         val primaryPlugins = PRIMARY_PLUGIN_IDS.filter(project.pluginManager::hasPlugin)

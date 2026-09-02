@@ -21,18 +21,31 @@ import org.gradle.api.tasks.TaskAction
 
 private const val FIELD_SEPARATOR = "\u001f"
 
-internal fun encodeNode(path: String, roles: List<String>, projectDir: String): String =
-    listOf(path, roles.joinToString(","), projectDir).joinToString(FIELD_SEPARATOR)
+internal fun encodeNode(
+    path: String,
+    roles: List<String>,
+    projectDir: String,
+    relativeProjectDir: String,
+    targets: List<String>,
+): String =
+    listOf(path, roles.joinToString(","), projectDir, relativeProjectDir, targets.joinToString(","))
+        .joinToString(FIELD_SEPARATOR)
 
-internal fun encodeEdge(from: String, to: String): String =
-    listOf(from, to).joinToString(FIELD_SEPARATOR)
+internal fun encodeEdge(from: String, to: String, configuration: String): String =
+    listOf(from, to, configuration).joinToString(FIELD_SEPARATOR)
 
-private data class Node(val path: String, val roles: List<String>, val projectDir: File) {
+private data class Node(
+    val path: String,
+    val roles: List<String>,
+    val projectDir: File,
+    val relativeProjectDir: String,
+    val targets: List<String>,
+) {
     val role: String?
         get() = roles.singleOrNull()
 }
 
-private data class Edge(val from: String, val to: String)
+private data class Edge(val from: String, val to: String, val configuration: String)
 
 private data class Finding(
     val rule: String,
@@ -41,7 +54,7 @@ private data class Finding(
     val fix: String,
     val severity: String = "error",
 ) {
-    fun line(): String = "[$rule] $subject — $problem. Fix: $fix"
+    fun line(): String = "[$rule] $subject -- $problem. Fix: $fix"
 }
 
 private data class ArchitectureException(
@@ -95,13 +108,15 @@ abstract class CheckModuleGraphTask : DefaultTask() {
                     path = fields[0],
                     roles = fields[1].takeIf(String::isNotEmpty)?.split(',').orEmpty(),
                     projectDir = File(fields[2]),
+                    relativeProjectDir = fields[3],
+                    targets = fields[4].takeIf(String::isNotEmpty)?.split(',').orEmpty(),
                 )
             }
         val nodeByPath = nodes.associateBy(Node::path)
         val edges =
             edgeRecords.get().map { record ->
                 val fields = record.split(FIELD_SEPARATOR)
-                Edge(fields[0], fields[1])
+                Edge(fields[0], fields[1], fields[2])
             }
         val sources =
             sourceDirectories.files
@@ -311,7 +326,7 @@ abstract class CheckModuleGraphTask : DefaultTask() {
 
         val logicalEdges =
             edges
-                .map { Edge(logicalPath(it.from), logicalPath(it.to)) }
+                .map { Edge(logicalPath(it.from), logicalPath(it.to), it.configuration) }
                 .filter { it.from != it.to }
                 .distinct()
         val logicalNodes = paths.map(::logicalPath).toSet()
@@ -330,18 +345,25 @@ abstract class CheckModuleGraphTask : DefaultTask() {
     private fun writeReport(nodes: List<Node>, edges: List<Edge>, findings: List<Finding>) {
         val report =
             linkedMapOf(
-                "schema" to 1,
+                "schema" to 2,
                 "nodes" to
                     nodes.sortedBy(Node::path).map {
                         linkedMapOf(
                             "path" to it.path,
                             "role" to it.role,
                             "roles" to it.roles,
+                            "projectDir" to it.relativeProjectDir,
+                            "targets" to it.targets.sorted(),
+                            "publicApiDirs" to publicApiDirs(it),
                         )
                     },
                 "edges" to
-                    edges.sortedWith(compareBy(Edge::from, Edge::to)).map {
-                        linkedMapOf("from" to it.from, "to" to it.to)
+                    edges.sortedWith(compareBy(Edge::from, Edge::to, Edge::configuration)).map {
+                        linkedMapOf(
+                            "from" to it.from,
+                            "to" to it.to,
+                            "configuration" to it.configuration,
+                        )
                     },
                 "findings" to
                     findings.map {
@@ -357,6 +379,43 @@ abstract class CheckModuleGraphTask : DefaultTask() {
         val output = reportFile.get().asFile
         output.parentFile.mkdirs()
         output.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(report)) + "\n")
+    }
+
+    private fun publicApiDirs(node: Node): List<String> {
+        val sourceRoot = node.projectDir.resolve("src")
+        if (!sourceRoot.isDirectory) return emptyList()
+        val relativeDirs =
+            when (node.role) {
+                "feature" ->
+                    sourceRoot
+                        .walkTopDown()
+                        .filter(File::isDirectory)
+                        .filter { directory ->
+                            directory.name == "api" &&
+                                MAIN_SOURCE_DIRECTORY.containsMatchIn(
+                                    directory.relativeTo(node.projectDir).invariantSeparatorsPath
+                                )
+                        }
+                        .toList()
+                "capability_api",
+                "foundation_api",
+                "ui" ->
+                    sourceRoot.listFiles().orEmpty().filter(File::isDirectory).filter {
+                        it.name.endsWith("Main")
+                    }
+                else -> emptyList()
+            }
+        return relativeDirs
+            .map { directory ->
+                listOf(
+                        node.relativeProjectDir,
+                        directory.relativeTo(node.projectDir).invariantSeparatorsPath,
+                    )
+                    .filter(String::isNotEmpty)
+                    .joinToString("/")
+            }
+            .distinct()
+            .sorted()
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -428,6 +487,7 @@ abstract class CheckModuleGraphTask : DefaultTask() {
             Regex(
                 "^(?:(?:public|expect|actual|open|abstract|final|const|lateinit|inline|suspend|operator|infix|tailrec|external|value)\\s+)*(?:data\\s+class|enum\\s+class|sealed\\s+(?:class|interface)|class|interface|object|fun|val|var|typealias)\\b.*"
             )
+        private val MAIN_SOURCE_DIRECTORY = Regex("^src/[^/]*Main(?:/|$)")
 
         // Structural parents such as `:app` or `:capability` exist as Gradle projects without a
         // build script; they are containers rather than modules and are filtered out before the
@@ -540,7 +600,7 @@ abstract class CheckHelixPolicySyncTask : DefaultTask() {
         val inDocs = json?.let { runCatching { JsonSlurper().parseText(it) }.getOrNull() }
         if (inFile == null || inDocs == null || inFile != inDocs) {
             val line =
-                "[POLICY-DRIFT] config/helix/dependency-policy.json — policy differs from the normative Section 9.0 JSON. Fix: copy the marked JSON block from the Helix source of truth verbatim"
+                "[POLICY-DRIFT] config/helix/dependency-policy.json -- policy differs from the normative Section 9.0 JSON. Fix: copy the marked JSON block from the Helix source of truth verbatim"
             logger.error(line)
             throw GradleException("Helix policy synchronization failed with 1 finding(s).")
         }

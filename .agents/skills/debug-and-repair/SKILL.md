@@ -20,13 +20,14 @@ not obvious.
    If two things that should be separate share a key, or one thing that should be single has two,
    that is the bug.
 
-2. **Read the rule finding, if there is one.** Findings are formatted
+2. **Load the target context and explain any rule finding.** Findings are formatted
    `[RULE-ID] subject -- problem. Fix: remedy`. The rule IDs and what each means are listed in
-   `docs/architecture/helix-adoption-plan.md`. `./gradlew checkModuleGraph` writes the full report
-   to `build/reports/helix/module-graph.json`.
+   `docs/architecture/helix-adoption-plan.md`.
 
-   There is no `helix-kmp doctor` in this repository (P1, not built), so the JSON report and the
-   finding text are the diagnosis.
+   ```bash
+   tooling/helix-kmp/helix-kmp context <target>
+   tooling/helix-kmp/helix-kmp doctor [<scope>] --explain
+   ```
 
 3. **Trace the whole path, in order:** Action -> ViewModel -> Capability Queries/Commands ->
    resource -> HTTP/DB/socket -> emission -> State -> Content. Find the first hop where the value
@@ -41,6 +42,7 @@ not obvious.
 
    ```bash
    tooling/helix-kmp/helix-kmp verify --fast --affected
+   tooling/helix-kmp/helix-kmp impact <target>
    ```
 
 ## Never

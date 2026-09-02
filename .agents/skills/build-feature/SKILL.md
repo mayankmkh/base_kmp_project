@@ -14,12 +14,14 @@ Screen, Cell, UI component or Capability consumer.
    owned per placement -> a Cell. A navigable destination -> a Screen wrapping a Cell. Reusable
    business data -> a Capability. Pick the smallest one; do not create a Feature for a component.
 
-2. **Read the boundary you are about to touch.** There is no `helix-kmp context` here (P1, not
-   built), so do it by hand:
-   - the module's `build.gradle.kts` -- its role plugin and its dependencies;
-   - its `api` package -- everything public is the contract;
-   - `./gradlew checkModuleGraph` then `build/reports/helix/module-graph.json` for the current
-     edges.
+2. **Read the bounded boundary packet before editing.**
+
+   ```bash
+   tooling/helix-kmp/helix-kmp context <target>
+   ```
+
+   It includes target sources/tests, direct public dependency APIs, applicable rules, fixtures,
+   the graph slice, and exact verification commands without transitive implementation internals.
 
 3. **Scaffold with the CLI rather than by hand.** Preview first:
 
@@ -47,6 +49,7 @@ Screen, Cell, UI component or Capability consumer.
 
    ```bash
    tooling/helix-kmp/helix-kmp verify --fast --affected
+   tooling/helix-kmp/helix-kmp impact <target>
    ./gradlew <module>:spotlessApply   # if the formatter disagrees
    ```
 

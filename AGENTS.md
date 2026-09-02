@@ -3,10 +3,9 @@
 This repository follows **Helix KMP**. This file is the entry point for agents; it states the
 laws, the vocabulary, the prohibitions, and the commands that exist **today**.
 
-> **Adoption stage: control plane P0.** `helix-kmp create` and `helix-kmp verify` exist. The rest
-> of the command family described in the master source (Section 22) does **not** exist in this
-> repository yet -- see [What does not exist yet](#what-does-not-exist-yet). Do not invent it, do
-> not write instructions that assume it, and do not claim its output.
+<!-- helix:generated:stage BEGIN -->
+> **Adoption stage: control plane P1.** Available commands: `helix-kmp create`, `helix-kmp verify`, `helix-kmp graph`, `helix-kmp impact`, `helix-kmp doctor`, `helix-kmp context`, `helix-kmp gallery`.
+<!-- helix:generated:stage END -->
 
 ## One source per fact
 
@@ -57,33 +56,45 @@ One arch fact   -> one source of truth
 One module has exactly one role, declared by applying exactly one `bkp.kmp.*` role plugin. The
 path and the role must agree (`MOD-PATH-ROLE-MISMATCH`).
 
+<!-- helix:generated:module-roles BEGIN -->
 | Path | Role | What lives there |
 | --- | --- | --- |
 | `app/*` | `app` | Composition roots and platform entry points |
 | `feature/*` | `feature` | Screens, Cells, ViewModels, Outputs |
 | `ui/*` | `ui` | Stateless rendering only |
 | `capability/*-api` | `capability_api` | Queries, Commands, product models |
-| `capability/*-impl` | `capability_impl` | The implementation, all `internal` bar its Koin module |
-| `foundation/*` | `foundation_api` / `foundation_runtime` | Cross-cutting contracts and runtime |
-| `platform/*` | `platform` | Platform/OS seams |
-| `storage/*` | `storage` | Databases (product schema shared across Capabilities) |
+| `capability/*-impl` | `capability_impl` | Internal implementation; public Koin module only |
+| `foundation/*` | `foundation_api` | Cross-cutting contracts |
+| `foundation/*` | `foundation_runtime` | Cross-cutting runtime |
+| `platform/*` | `platform` | Platform and OS seams |
+| `platform/*-api` | `platform_api` | Platform seam contracts |
+| `platform/*-impl` | `platform_impl` | Platform seam implementations |
+| `storage/*` | `storage` | Shared product databases |
 | `testkit/*` | `testkit` | Test-only fakes and fixtures |
+<!-- helix:generated:module-roles END -->
 
 ## Required workflow
 
 Prefer the CLI and the workflow Skills in [`.agents/skills/`](.agents/skills/) over hand-created
 architecture wiring.
 
+<!-- helix:generated:workflow BEGIN -->
 ```bash
+tooling/helix-kmp/helix-kmp context <target>
 tooling/helix-kmp/helix-kmp create feature <name> [--capability <name>]
 tooling/helix-kmp/helix-kmp create capability <name>
 tooling/helix-kmp/helix-kmp create cell <feature> <CellName>
 tooling/helix-kmp/helix-kmp verify --fast --affected
-tooling/helix-kmp/helix-kmp verify --full
+tooling/helix-kmp/helix-kmp impact <target>
+tooling/helix-kmp/helix-kmp doctor [<scope>] --explain
+tooling/helix-kmp/helix-kmp graph [<module>]
+tooling/helix-kmp/helix-kmp gallery
 ```
+<!-- helix:generated:workflow END -->
 
-Add `--dry-run` to any of them to see what would happen without touching the tree. The equivalent
-Gradle entry points are `./gradlew verifyFast` and `./gradlew verifyFull`.
+Use `--dry-run` for create planning. Graph-backed commands refresh the report unless
+`--no-refresh` is explicitly supplied. The equivalent verification entry points are
+`./gradlew verifyFast` and `./gradlew verifyFull`.
 
 Skills, all under `.agents/skills/<name>/SKILL.md`:
 
@@ -101,10 +112,15 @@ locator.
 
 ## High-value prohibitions
 
+<!-- helix:generated:policy-prohibitions BEGIN -->
 - Feature -> Capability Impl: forbidden.
 - Capability Impl -> another business Capability Impl: forbidden.
-- UI -> ViewModel / Koin / navigation / Capability / repository: forbidden.
-- Capability API -> Compose / network / DB / Store5 / impl: forbidden.
+- UI -> Feature / Capability API / Capability Impl: forbidden.
+- Capability API -> UI / Capability Impl / Foundation Runtime / Storage: forbidden.
+<!-- helix:generated:policy-prohibitions END -->
+
+- UI contains no ViewModel, Koin, navigation, or repository code.
+- Capability API contains no Compose, network, DB, Store5, or implementation code.
 - Peer Cell implementation -> peer Cell implementation: forbidden.
 - A Feature's public surface lives in its `api` package only (`FEATURE-PUBLIC-SURFACE-OUTSIDE-API`).
 - A `UiCommand` must not carry correctness-bearing domain or resource state.
@@ -142,22 +158,11 @@ tooling/helix-kmp/tests/run-tests.sh
 
 ## What does not exist yet
 
-These commands are described by the master source and are **not implemented** here. They are the
-P1 and P2 stages of the control plane (master source Section 22.1.1). No part of them exists: no
-stub, no partial output, no JSON schema.
+Commands in later control-plane stages remain unavailable:
 
+<!-- helix:generated:future-commands BEGIN -->
 | Command | Stage | Status |
 | --- | --- | --- |
-| `helix-kmp graph` | P1 | Not built |
-| `helix-kmp impact <target>` | P1 | Not built |
-| `helix-kmp doctor <scope> --explain` | P1 | Not built |
-| `helix-kmp context <target>` | P1 | Not built |
-| `helix-kmp gallery` | P1 | Not built |
-| Generated / no-drift-checked agent instructions and Skills | P1 | Not built; this file and the Skills are written and maintained by hand |
 | `helix-kmp extract ...` | P2 | Not built |
 | `helix-kmp migrate ...` | P2 | Not built |
-
-Where a workflow in the master source calls for `context`, `impact` or `doctor`, do the equivalent
-by hand: read the module's `build.gradle.kts` and its `api` package, read
-`build/reports/helix/module-graph.json` after `./gradlew checkModuleGraph`, and grep for consumers
-of the type you are about to change.
+<!-- helix:generated:future-commands END -->

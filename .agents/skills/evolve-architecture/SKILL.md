@@ -10,18 +10,27 @@ is in the wrong place, and the change is to the architecture itself rather than 
 
 ## What this repository can and cannot do for you
 
-`helix-kmp graph`, `impact`, `doctor`, `extract` and `migrate` are P1/P2 stages of the control
-plane and **are not built** (see `AGENTS.md`). There is no deterministic recipe engine and no
-`--dry-run --explain` for a boundary move. Every step below is manual and reviewed by a person.
+The P1 graph, impact, doctor, and context commands provide deterministic evidence. P2 extraction
+and migration recipes are not built, so boundary edits remain manual and reviewed by a person.
 
 ## Steps
 
-1. **Establish the current graph.** Run `./gradlew checkModuleGraph` and read
-   `build/reports/helix/module-graph.json`. It is the authoritative edge list.
+1. **Establish the current graph and bounded context.**
 
-2. **Establish the blast radius by hand.** Find the consumers of every type you intend to move,
-   and note which modules would be recompiled. Record it: this is the "expected" half of the
-   before/after comparison you owe the reviewer.
+   ```bash
+   tooling/helix-kmp/helix-kmp graph [<module>]
+   tooling/helix-kmp/helix-kmp context <target>
+   ```
+
+2. **Establish the blast radius and pressure evidence.**
+
+   ```bash
+   tooling/helix-kmp/helix-kmp impact <target>
+   tooling/helix-kmp/helix-kmp doctor [<scope>] --explain
+   ```
+
+   Record the expected direct/transitive consumers before editing. Doctor recommendations are
+   evidence, not authorization or an automated recipe.
 
 3. **Check the ADRs.** `docs/architecture/adr/` records what was decided and what would justify
    revisiting it. A boundary move that contradicts an accepted ADR needs a new ADR, not a

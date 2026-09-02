@@ -10,9 +10,12 @@ verification.
 
 ## Steps
 
-1. **Establish the blast radius.** `helix-kmp impact` is P1 and not built, so read the diff: which
-   modules changed, and which modules depend on them according to
-   `build/reports/helix/module-graph.json` (written by `./gradlew checkModuleGraph`).
+1. **Establish the blast radius and graph slice.**
+
+   ```bash
+   tooling/helix-kmp/helix-kmp impact <target> --json
+   tooling/helix-kmp/helix-kmp graph [<module>] --json
+   ```
 
 2. **Run the tier that matches the radius.**
 

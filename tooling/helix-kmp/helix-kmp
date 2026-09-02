@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 #
-# helix-kmp -- the Helix KMP control plane for this repository (stage P0).
+# helix-kmp -- the Helix KMP control plane for this repository (stage P1).
 #
-# Implemented: `create` and `verify`. Everything else in the Section 22.2 command family
-# (graph, context, impact, doctor, gallery, extract, migrate) is P1/P2 and does not exist here.
-# See AGENTS.md.
+# The mutating P0 commands remain in bash 3.2. Thin read-only P1 commands are implemented with the
+# Python 3 standard library under lib/ and dispatched only through this stable public wrapper.
 #
 # Portability: bash 3.2 (the macOS system bash). No arrays-as-maps, no `mapfile`, no GNU-only
-# flags. External tools used: git, awk, sed, grep, find.
+# flags. External tools used: git, awk, sed, grep, find, python3.
 
 set -euo pipefail
 
@@ -463,7 +462,7 @@ is_global_change() {
 }
 
 cmd_verify() {
-    local tier="" affected=0 base="" dry_run=0
+    local tier="" affected=0 base="" dry_run=0 agents=0 apply=0
     while [ $# -gt 0 ]; do
         case "$1" in
             --fast) tier="fast" ;;
@@ -472,10 +471,24 @@ cmd_verify() {
             --base) shift; base="${1:-}"; [ -n "$base" ] || die "--base needs a git ref" ;;
             --base=*) base="${1#*=}" ;;
             --dry-run) dry_run=1 ;;
+            --agents) agents=1 ;;
+            --apply) apply=1 ;;
             *) die "unknown flag for 'verify': $1" ;;
         esac
         shift
     done
+
+    if [ "$agents" = "1" ]; then
+        [ "$affected" = "0" ] || die "--affected does not apply to --agents"
+        [ -z "$tier" ] || die "--fast/--full do not apply to --agents"
+        if [ "$apply" = "1" ]; then
+            run_python agents --apply
+        else
+            run_python agents
+        fi
+        return $?
+    fi
+    [ "$apply" = "0" ] || die "--apply applies only to --agents"
 
     if [ -z "$tier" ]; then
         tier="fast"
@@ -488,6 +501,8 @@ cmd_verify() {
         run_gradle "$dry_run" verifyFull
         return $?
     fi
+
+    run_python agents || return $?
 
     if [ "$affected" = "0" ]; then
         info "Helix verification tier: FAST (repository-wide)"
@@ -505,18 +520,20 @@ cmd_verify() {
         return 0
     fi
 
-    for file in $files; do
+    while IFS= read -r file; do
         if is_global_change "$file"; then
             info "  $file affects every module -- falling back to the repository-wide fast tier."
             global=1
             break
         fi
-    done
+    done <<EOF
+$files
+EOF
 
     if [ "$global" = "0" ]; then
         for path in $(module_paths); do
             dir="$(module_dir_for_path "$path")"
-            for file in $files; do
+            while IFS= read -r file; do
                 case "$file" in
                     "$dir"/*)
                         case " $modules " in
@@ -525,7 +542,9 @@ cmd_verify() {
                         esac
                         ;;
                 esac
-            done
+            done <<EOF
+$files
+EOF
         done
     fi
 
@@ -557,13 +576,17 @@ run_gradle() {
     ( cd "$REPO_ROOT" && "$GRADLEW" "$@" )
 }
 
+run_python() {
+    HELIX_KMP_REPO_ROOT="$REPO_ROOT" python3 "$SCRIPT_DIR/lib/helix_cli.py" "$@"
+}
+
 # ---------------------------------------------------------------------------
 # help / version
 # ---------------------------------------------------------------------------
 
 cmd_help() {
     cat <<'USAGE'
-helix-kmp -- Helix KMP control plane (stage P0)
+helix-kmp -- Helix KMP control plane (stage P1)
 
 Usage:
   helix-kmp create feature <name> [--capability <name>] [--dry-run]
@@ -583,6 +606,7 @@ Usage:
 
   helix-kmp verify --fast [--affected] [--base <ref>] [--dry-run]
   helix-kmp verify --full [--dry-run]
+  helix-kmp verify --agents [--apply]
       --fast            ./gradlew verifyFast
       --fast --affected module-scoped jvmTest/detektAll/spotlessCheck for the modules touched
                         since <ref> (default origin/main) plus the working tree, followed by
@@ -590,12 +614,35 @@ Usage:
                         tier when build-logic, settings, the catalog or config/ changed.
       --full            ./gradlew verifyFull
       --dry-run         print the Gradle command instead of running it.
+      --agents          check generated AGENTS.md sections and Skill command availability.
+      --agents --apply  regenerate only the marked AGENTS.md sections.
+
+  helix-kmp graph [<module>] [--json] [--no-refresh]
+      Shows schema-2 nodes, targets, public API directories, forward/reverse edges, and cycles.
+      A module argument limits output to its direct neighbourhood.
+
+  helix-kmp impact <target> [--json] [--no-refresh]
+      Resolves a module path, repo-relative file, or Kotlin type and reports reverse dependents,
+      tests, owners, public consumers, qualification suites, and expected/surprising impact.
+
+  helix-kmp doctor [<scope>] [--explain] [--json] [--no-refresh]
+      Diagnoses report findings and cheap architecture pressure signals. --explain includes the
+      rule and approved repair shape. Doctor never edits files and exits 1 when findings exist.
+
+  helix-kmp context <target> [--json] [--no-refresh] [--files-only]
+      Produces the bounded eight-section context packet. --files-only lists source paths and sizes
+      instead of embedding source contents.
+
+  helix-kmp gallery [--json] [--no-refresh]
+      Produces the fixture review index and Cell x state matrix. It does not launch or render an app.
+
+  P1 graph-backed commands refresh build/reports/helix/module-graph.json with
+  './gradlew checkModuleGraph -q' first. --no-refresh reuses the existing schema-2 report.
 
   helix-kmp help
   helix-kmp --version
 
-Not implemented here: graph, context, impact, doctor, gallery, extract, migrate. Those are the
-P1/P2 stages of the control plane (master source Section 22.1.1) and no part of them exists yet.
+Not implemented here: extract and migrate (control-plane stage P2).
 USAGE
 }
 
@@ -615,6 +662,7 @@ main() {
     case "$command" in
         create) cmd_create "$@" ;;
         verify) cmd_verify "$@" ;;
+        graph | impact | doctor | context | gallery) run_python "$command" "$@" ;;
         help | --help | -h) cmd_help ;;
         --version | version) cmd_version ;;
         *) die "unknown command '$command'. Run 'helix-kmp help'." ;;

@@ -1,0 +1,624 @@
+#!/usr/bin/env bash
+#
+# helix-kmp -- the Helix KMP control plane for this repository (stage P0).
+#
+# Implemented: `create` and `verify`. Everything else in the Section 22.2 command family
+# (graph, context, impact, doctor, gallery, extract, migrate) is P1/P2 and does not exist here.
+# See AGENTS.md.
+#
+# Portability: bash 3.2 (the macOS system bash). No arrays-as-maps, no `mapfile`, no GNU-only
+# flags. External tools used: git, awk, sed, grep, find.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+TEMPLATE_ROOT="$SCRIPT_DIR/templates"
+SETTINGS_FILE="$REPO_ROOT/settings.gradle.kts"
+GRADLEW="$REPO_ROOT/gradlew"
+
+PACKAGE_ROOT="dev.mayankmkh.basekmpproject"
+
+# ---------------------------------------------------------------------------
+# output helpers
+# ---------------------------------------------------------------------------
+
+die() {
+    echo "helix-kmp: $*" >&2
+    exit 2
+}
+
+info() { echo "$*"; }
+
+# ---------------------------------------------------------------------------
+# name helpers
+# ---------------------------------------------------------------------------
+
+# `sample-thing` -> `SampleThing`
+to_pascal() {
+    echo "$1" | awk -F'-' '{
+        out = ""
+        for (i = 1; i <= NF; i++) {
+            out = out toupper(substr($i, 1, 1)) substr($i, 2)
+        }
+        print out
+    }'
+}
+
+# `sample-thing` -> `sampleThing`
+to_camel() {
+    local pascal
+    pascal="$(to_pascal "$1")"
+    echo "$(echo "$pascal" | cut -c1 | tr '[:upper:]' '[:lower:]')$(echo "$pascal" | cut -c2-)"
+}
+
+# `sample-thing` -> `samplething` (a legal single package segment)
+to_package_segment() {
+    echo "$1" | tr -d '-'
+}
+
+require_module_name() {
+    local name="$1"
+    case "$name" in
+        [a-z]*) ;;
+        *) die "module name '$name' must start with a lowercase letter" ;;
+    esac
+    if echo "$name" | grep -qv '^[a-z][a-z0-9-]*$'; then
+        die "module name '$name' must match [a-z][a-z0-9-]* (lowercase, digits, hyphens)"
+    fi
+}
+
+require_type_name() {
+    local name="$1"
+    if echo "$name" | grep -qv '^[A-Z][A-Za-z0-9]*$'; then
+        die "type name '$name' must be PascalCase, matching [A-Z][A-Za-z0-9]*"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# settings.gradle.kts
+# ---------------------------------------------------------------------------
+
+# Module includes live in a single sorted `include(...)` vararg call. Insert into it in place
+# rather than appending a second statement: ktfmt puts a blank line between consecutive top-level
+# calls, which would turn the module list into a page of scrolling.
+add_include() {
+    local module_path="$1"
+    if grep -q "^    \"$module_path\",\$" "$SETTINGS_FILE"; then
+        info "  settings.gradle.kts already includes $module_path"
+        return 0
+    fi
+    local tmp
+    tmp="$(mktemp "${TMPDIR:-/tmp}/helix-settings.XXXXXX")"
+    awk -v new="$module_path" '
+        {
+            lines[NR] = $0
+            if ($0 ~ /^    ":[^"]+",$/) {
+                last = NR
+                if (!found) {
+                    entry = $0
+                    sub(/^    "/, "", entry)
+                    sub(/",$/, "", entry)
+                    if (entry > new) { pos = NR; found = 1 }
+                }
+            }
+        }
+        END {
+            if (!found) pos = last + 1
+            for (i = 1; i <= NR; i++) {
+                if (i == pos) printf "    \"%s\",\n", new
+                print lines[i]
+            }
+            if (pos == NR + 1) printf "    \"%s\",\n", new
+        }
+    ' "$SETTINGS_FILE" > "$tmp"
+    mv "$tmp" "$SETTINGS_FILE"
+    info "  settings.gradle.kts += $module_path"
+}
+
+# ---------------------------------------------------------------------------
+# template rendering
+# ---------------------------------------------------------------------------
+
+# Placeholder pairs are passed as `KEY=VALUE` arguments and applied with sed. Values are plain
+# identifiers and dotted/slashed paths, so `|` is always a safe sed delimiter.
+render_tree() {
+    local template_dir="$1"
+    local target_dir="$2"
+    shift 2
+
+    [ -d "$template_dir" ] || die "missing template directory $template_dir"
+
+    local sed_script=""
+    local pair key value
+    for pair in "$@"; do
+        key="${pair%%=*}"
+        value="${pair#*=}"
+        sed_script="${sed_script}s|__${key}__|${value}|g;"
+    done
+
+    local source_file relative rendered
+    # `find | while read` rather than a bash array: bash 3.2 has no `mapfile`, and template paths
+    # never contain spaces.
+    find "$template_dir" -type f | sort | while IFS= read -r source_file; do
+        relative="${source_file#"$template_dir"/}"
+        rendered="$(echo "$relative" | sed "$sed_script")"
+        if [ "$DRY_RUN" = "1" ]; then
+            echo "  would write ${target_dir#"$REPO_ROOT"/}/$rendered"
+        else
+            mkdir -p "$target_dir/$(dirname "$rendered")"
+            sed "$sed_script" "$source_file" > "$target_dir/$rendered"
+            echo "  wrote ${target_dir#"$REPO_ROOT"/}/$rendered"
+        fi
+    done
+}
+
+# ---------------------------------------------------------------------------
+# create
+# ---------------------------------------------------------------------------
+
+create_feature() {
+    local name="${1:-}"
+    shift || true
+    [ -n "$name" ] || die "usage: helix-kmp create feature <name> [--capability <name>] [--dry-run]"
+    require_module_name "$name"
+
+    local capability=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --capability)
+                shift
+                capability="${1:-}"
+                [ -n "$capability" ] || die "--capability needs a capability name"
+                require_module_name "$capability"
+                ;;
+            --capability=*) capability="${1#*=}"; require_module_name "$capability" ;;
+            --dry-run) DRY_RUN=1 ;;
+            *) die "unknown flag for 'create feature': $1" ;;
+        esac
+        shift
+    done
+
+    local module_dir="$REPO_ROOT/feature/$name"
+    [ -e "$module_dir" ] && die "feature/$name already exists"
+
+    local pascal camel segment package package_dir
+    pascal="$(to_pascal "$name")"
+    camel="$(to_camel "$name")"
+    segment="$(to_package_segment "$name")"
+    package="$PACKAGE_ROOT.feature.$segment"
+    package_dir="$(echo "$package" | tr '.' '/')"
+
+    info "create feature :feature:$name"
+    render_tree "$TEMPLATE_ROOT/feature" "$module_dir" \
+        "NAME=$pascal" "name=$camel" "PACKAGE=$package" "PACKAGE_DIR=$package_dir"
+
+    if [ -n "$capability" ]; then
+        local cap_pascal cap_camel cap_segment cap_package cap_accessor
+        cap_pascal="$(to_pascal "$capability")"
+        cap_camel="$(to_camel "$capability")"
+        cap_segment="$(to_package_segment "$capability")"
+        cap_package="$PACKAGE_ROOT.capability.$cap_segment.api"
+        cap_accessor="$(to_camel "$capability-api")"
+        if [ ! -d "$REPO_ROOT/capability/$capability-api" ]; then
+            info "  note: :capability:$capability-api does not exist yet -- run 'helix-kmp create capability $capability'"
+        fi
+        info "  overlay: capability-backed ViewModel (:capability:$capability-api)"
+        render_tree "$TEMPLATE_ROOT/feature-capability" "$module_dir" \
+            "NAME=$pascal" "name=$camel" "PACKAGE=$package" "PACKAGE_DIR=$package_dir" \
+            "CAP_NAME=$cap_pascal" "cap_name=$cap_camel" "CAP_PACKAGE=$cap_package" \
+            "CAP_ACCESSOR=$cap_accessor"
+    fi
+
+    if [ "$DRY_RUN" = "1" ]; then
+        info "  would add \":feature:$name\" to settings.gradle.kts"
+    else
+        add_include ":feature:$name"
+    fi
+    next_steps ":feature:$name"
+}
+
+create_capability() {
+    local name="${1:-}"
+    shift || true
+    [ -n "$name" ] || die "usage: helix-kmp create capability <name> [--dry-run]"
+    require_module_name "$name"
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --dry-run) DRY_RUN=1 ;;
+            *) die "unknown flag for 'create capability': $1" ;;
+        esac
+        shift
+    done
+
+    local api_dir="$REPO_ROOT/capability/$name-api"
+    local impl_dir="$REPO_ROOT/capability/$name-impl"
+    [ -e "$api_dir" ] && die "capability/$name-api already exists"
+    [ -e "$impl_dir" ] && die "capability/$name-impl already exists"
+
+    local pascal camel segment api_package impl_package api_accessor
+    pascal="$(to_pascal "$name")"
+    camel="$(to_camel "$name")"
+    segment="$(to_package_segment "$name")"
+    api_package="$PACKAGE_ROOT.capability.$segment.api"
+    impl_package="$PACKAGE_ROOT.capability.$segment.impl"
+    api_accessor="$(to_camel "$name-api")"
+
+    info "create capability :capability:$name-api and :capability:$name-impl"
+    render_tree "$TEMPLATE_ROOT/capability-api" "$api_dir" \
+        "NAME=$pascal" "name=$camel" "PACKAGE=$api_package" \
+        "PACKAGE_DIR=$(echo "$api_package" | tr '.' '/')"
+    render_tree "$TEMPLATE_ROOT/capability-impl" "$impl_dir" \
+        "NAME=$pascal" "name=$camel" "PACKAGE=$impl_package" \
+        "PACKAGE_DIR=$(echo "$impl_package" | tr '.' '/')" \
+        "API_PACKAGE=$api_package" "API_ACCESSOR=$api_accessor"
+
+    if [ "$DRY_RUN" = "1" ]; then
+        info "  would add \":capability:$name-api\" and \":capability:$name-impl\" to settings.gradle.kts"
+    else
+        add_include ":capability:$name-api"
+        add_include ":capability:$name-impl"
+    fi
+    info ""
+    info "Next: register ${camel}CapabilityModule in the :app:shared Koin startup."
+    next_steps ":capability:$name-impl"
+}
+
+create_cell() {
+    local feature="${1:-}"
+    local cell="${2:-}"
+    [ -n "$feature" ] && [ -n "$cell" ] ||
+        die "usage: helix-kmp create cell <feature> <CellName> [--dry-run]"
+    shift 2
+    require_module_name "$feature"
+    require_type_name "$cell"
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --dry-run) DRY_RUN=1 ;;
+            *) die "unknown flag for 'create cell': $1" ;;
+        esac
+        shift
+    done
+
+    local module_dir="$REPO_ROOT/feature/$feature"
+    [ -d "$module_dir" ] || die "feature/$feature does not exist -- create the feature first"
+
+    local segment package package_dir cell_camel
+    segment="$(to_package_segment "$feature")"
+    package="$PACKAGE_ROOT.feature.$segment"
+    package_dir="$(echo "$package" | tr '.' '/')"
+    cell_camel="$(echo "$cell" | cut -c1 | tr '[:upper:]' '[:lower:]')$(echo "$cell" | cut -c2-)"
+
+    local cell_file="$module_dir/src/commonMain/kotlin/$package_dir/api/${cell}Cell.kt"
+    [ -e "$cell_file" ] && die "${cell}Cell already exists in feature/$feature"
+
+    info "create cell $cell in :feature:$feature"
+    render_tree "$TEMPLATE_ROOT/cell" "$module_dir" \
+        "CELL=$cell" "cell=$cell_camel" "PACKAGE=$package" "PACKAGE_DIR=$package_dir"
+
+    register_cell_view_model "$module_dir" "$package_dir" "$feature" "$cell"
+    next_steps ":feature:$feature"
+}
+
+# Inserts an import into the file's existing sorted import block, keeping it sorted. ktfmt sorts
+# imports lexicographically, so an out-of-order insertion would fail spotlessCheck.
+add_import() {
+    local file="$1" import_line="$2"
+    grep -q "^${import_line}\$" "$file" && return 0
+    local tmp
+    tmp="$(mktemp "${TMPDIR:-/tmp}/helix-import.XXXXXX")"
+    awk -v new="$import_line" '
+        BEGIN { done = 0 }
+        {
+            if (!done && $0 ~ /^import /) {
+                if ($0 > new) { print new; done = 1 }
+            } else if (!done && seen && $0 !~ /^import /) {
+                print new
+                done = 1
+            }
+            if ($0 ~ /^import /) seen = 1
+            print
+        }
+        END { if (!done) print new }
+    ' "$file" > "$tmp"
+    mv "$tmp" "$file"
+}
+
+# Appends the Cell's keyed `viewModel { }` factory to the Feature's Koin module. The module file is
+# generated with a single trailing `}`; if a hand-edit has changed that shape the registration is
+# printed instead of guessed at.
+register_cell_view_model() {
+    local module_dir="$1" package_dir="$2" feature="$3" cell="$4"
+    local feature_camel module_file
+    feature_camel="$(to_camel "$feature")"
+    module_file="$module_dir/src/commonMain/kotlin/$package_dir/api/${feature_camel}FeatureModule.kt"
+
+    local snippet
+    snippet="    viewModel { parameters ->
+        ${cell}ViewModel(id = parameters.get(), instanceKey = parameters.get())
+    }"
+
+    if [ ! -f "$module_file" ] || [ "$(tail -n 1 "$module_file")" != "}" ]; then
+        info ""
+        info "Could not find a generated ${feature_camel}FeatureModule to extend. Register the Cell's"
+        info "ViewModel yourself, in the Feature's Koin module:"
+        info ""
+        info "$snippet"
+        return 0
+    fi
+
+    if [ "$DRY_RUN" = "1" ]; then
+        info "  would register ${cell}ViewModel in ${feature_camel}FeatureModule"
+        return 0
+    fi
+
+    # Split around the final `}` with head/tail: `awk -v` cannot carry a multi-line value on the
+    # BSD awk that ships with macOS.
+    local tmp line_count
+    tmp="$(mktemp "${TMPDIR:-/tmp}/helix-koin.XXXXXX")"
+    line_count="$(wc -l < "$module_file" | tr -d ' ')"
+    head -n "$((line_count - 1))" "$module_file" > "$tmp"
+    printf '\n%s\n}\n' "$snippet" >> "$tmp"
+    mv "$tmp" "$module_file"
+
+    add_import "$module_file" \
+        "import $(echo "$package_dir" | tr '/' '.').${cell}ViewModel"
+    info "  registered ${cell}ViewModel in ${feature_camel}FeatureModule"
+}
+
+next_steps() {
+    info ""
+    info "Verify with:"
+    info "  tooling/helix-kmp/helix-kmp verify --fast --affected"
+    info "  ./gradlew ${1}:spotlessApply"
+}
+
+cmd_create() {
+    local kind="${1:-}"
+    shift || true
+    case "$kind" in
+        feature) create_feature "$@" ;;
+        capability) create_capability "$@" ;;
+        cell) create_cell "$@" ;;
+        "") die "usage: helix-kmp create <feature|capability|cell> ..." ;;
+        *) die "unknown unit '$kind'. Available: feature, capability, cell" ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+# verify
+# ---------------------------------------------------------------------------
+
+# Every module path from the single `include(...)` vararg in settings.gradle.kts, one per line.
+module_paths() {
+    sed -n 's/^    "\(:[^"]*\)",$/\1/p' "$SETTINGS_FILE"
+}
+
+module_dir_for_path() {
+    echo "$1" | sed 's/^://; s/:/\//g'
+}
+
+# The fast tier's per-module tasks. `detektAll` and `spotlessCheck` exist in every module that
+# applies a bkp primary plugin; the test task name depends on the module's target selection, so it
+# is read off the build script rather than assumed.
+#
+# The selection mirrors `verifyFast` in the root build script, which depends on whichever of
+# `jvmTest` and `test` a project actually registers and on nothing else. So a module with no JVM
+# target contributes no test task here either -- `bkp.web.app` declares `wasmJs` alone, and asking
+# for `:app:web:test` would fail the whole invocation on an unknown task.
+tasks_for_module() {
+    local path="$1"
+    local dir
+    dir="$REPO_ROOT/$(module_dir_for_path "$path")"
+    local build_file="$dir/build.gradle.kts"
+    [ -f "$build_file" ] || return 0
+
+    echo "$path:spotlessCheck"
+    echo "$path:detektAll"
+    if grep -q 'bkpTargets' "$build_file"; then
+        if grep -qE 'default\(\)|jvm\(\)' "$build_file"; then
+            echo "$path:jvmTest"
+        fi
+    elif grep -q 'libs.plugins.bkp.web.app' "$build_file"; then
+        : # wasmJs only -- no `test` and no `jvmTest`, exactly as `verifyFast` sees it.
+    else
+        echo "$path:test"
+    fi
+}
+
+# Changed files vs. the base ref plus everything uncommitted, relative to the repo root.
+changed_files() {
+    local base="$1"
+    {
+        if [ -n "$base" ]; then
+            git -C "$REPO_ROOT" diff --name-only "$base...HEAD" 2>/dev/null || true
+        fi
+        git -C "$REPO_ROOT" status --porcelain 2>/dev/null |
+            sed 's/^.\{3\}//; s/^.* -> //'
+    } | sed '/^$/d' | sort -u
+}
+
+default_base_ref() {
+    local candidate
+    for candidate in origin/main origin/master main master; do
+        if git -C "$REPO_ROOT" rev-parse --verify --quiet "$candidate" > /dev/null 2>&1; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    echo ""
+}
+
+# A change to the build logic, the module list, the catalog or the Helix policy can affect any
+# module, so the affected set is not trustworthy and the whole fast tier runs instead.
+is_global_change() {
+    case "$1" in
+        build-logic/* | settings.gradle.kts | build.gradle.kts | gradle.properties) return 0 ;;
+        gradle/* | config/helix/* | config/detekt/*) return 0 ;;
+        tooling/helix-kmp/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+cmd_verify() {
+    local tier="" affected=0 base="" dry_run=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --fast) tier="fast" ;;
+            --full) tier="full" ;;
+            --affected) affected=1 ;;
+            --base) shift; base="${1:-}"; [ -n "$base" ] || die "--base needs a git ref" ;;
+            --base=*) base="${1#*=}" ;;
+            --dry-run) dry_run=1 ;;
+            *) die "unknown flag for 'verify': $1" ;;
+        esac
+        shift
+    done
+
+    if [ -z "$tier" ]; then
+        tier="fast"
+        info "No tier supplied; defaulting to --fast."
+    fi
+
+    if [ "$tier" = "full" ]; then
+        [ "$affected" = "0" ] || die "--affected applies to the fast tier only"
+        info "Helix verification tier: FULL"
+        run_gradle "$dry_run" verifyFull
+        return $?
+    fi
+
+    if [ "$affected" = "0" ]; then
+        info "Helix verification tier: FAST (repository-wide)"
+        run_gradle "$dry_run" verifyFast
+        return $?
+    fi
+
+    [ -n "$base" ] || base="$(default_base_ref)"
+    info "Helix verification tier: FAST (affected, base: ${base:-<none, working tree only>})"
+
+    local files file global=0 modules="" path dir
+    files="$(changed_files "$base")"
+    if [ -z "$files" ]; then
+        info "No changed files; nothing to verify."
+        return 0
+    fi
+
+    for file in $files; do
+        if is_global_change "$file"; then
+            info "  $file affects every module -- falling back to the repository-wide fast tier."
+            global=1
+            break
+        fi
+    done
+
+    if [ "$global" = "0" ]; then
+        for path in $(module_paths); do
+            dir="$(module_dir_for_path "$path")"
+            for file in $files; do
+                case "$file" in
+                    "$dir"/*)
+                        case " $modules " in
+                            *" $path "*) ;;
+                            *) modules="$modules $path" ;;
+                        esac
+                        ;;
+                esac
+            done
+        done
+    fi
+
+    if [ "$global" = "1" ] || [ -z "$modules" ]; then
+        [ "$global" = "1" ] || info "  no changed file maps to a module -- running the repository-wide fast tier."
+        run_gradle "$dry_run" verifyFast
+        return $?
+    fi
+
+    info "  affected modules:$modules"
+    local gradle_args="" module task
+    for module in $modules; do
+        for task in $(tasks_for_module "$module"); do
+            gradle_args="$gradle_args $task"
+        done
+    done
+    gradle_args="$gradle_args checkModuleGraph checkHelixPolicySync"
+    # shellcheck disable=SC2086
+    run_gradle "$dry_run" $gradle_args
+}
+
+run_gradle() {
+    local dry_run="$1"
+    shift
+    if [ "$dry_run" = "1" ]; then
+        echo "./gradlew $*"
+        return 0
+    fi
+    ( cd "$REPO_ROOT" && "$GRADLEW" "$@" )
+}
+
+# ---------------------------------------------------------------------------
+# help / version
+# ---------------------------------------------------------------------------
+
+cmd_help() {
+    cat <<'USAGE'
+helix-kmp -- Helix KMP control plane (stage P0)
+
+Usage:
+  helix-kmp create feature <name> [--capability <name>] [--dry-run]
+      Scaffolds feature/<name> (role plugin bkp.kmp.feature): a public api/ package with
+      <Name>Screen, <Name>Cell, <Name>Output and <name>FeatureModule, an internal ViewModel
+      (State/Action/UiCommand), stateless Content, fixtures and tests. Without --capability the
+      Feature is self-contained; with it the ViewModel observes that Capability's Queries/Commands.
+
+  helix-kmp create capability <name> [--dry-run]
+      Scaffolds capability/<name>-api (<Name>Queries, <Name>Commands, models) and
+      capability/<name>-impl (internal implementation, Koin module, test).
+
+  helix-kmp create cell <feature> <CellName> [--dry-run]
+      Adds a Cell -- (id, instanceKey: FeatureInstanceKey, onOutput) -- with its keyed ViewModel,
+      stateless Content, Output and tests to an existing Feature, and registers the ViewModel in
+      that Feature's Koin module.
+
+  helix-kmp verify --fast [--affected] [--base <ref>] [--dry-run]
+  helix-kmp verify --full [--dry-run]
+      --fast            ./gradlew verifyFast
+      --fast --affected module-scoped jvmTest/detektAll/spotlessCheck for the modules touched
+                        since <ref> (default origin/main) plus the working tree, followed by
+                        checkModuleGraph and checkHelixPolicySync. Falls back to the whole fast
+                        tier when build-logic, settings, the catalog or config/ changed.
+      --full            ./gradlew verifyFull
+      --dry-run         print the Gradle command instead of running it.
+
+  helix-kmp help
+  helix-kmp --version
+
+Not implemented here: graph, context, impact, doctor, gallery, extract, migrate. Those are the
+P1/P2 stages of the control plane (master source Section 22.1.1) and no part of them exists yet.
+USAGE
+}
+
+cmd_version() {
+    cat "$SCRIPT_DIR/VERSION"
+}
+
+# ---------------------------------------------------------------------------
+# entry point
+# ---------------------------------------------------------------------------
+
+DRY_RUN=0
+
+main() {
+    local command="${1:-help}"
+    shift || true
+    case "$command" in
+        create) cmd_create "$@" ;;
+        verify) cmd_verify "$@" ;;
+        help | --help | -h) cmd_help ;;
+        --version | version) cmd_version ;;
+        *) die "unknown command '$command'. Run 'helix-kmp help'." ;;
+    esac
+}
+
+main "$@"

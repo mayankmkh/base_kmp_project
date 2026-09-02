@@ -1,0 +1,95 @@
+package __PACKAGE__
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import __CAP_PACKAGE__.__CAP_NAME__Commands
+import __CAP_PACKAGE__.__CAP_NAME__Id
+import __CAP_PACKAGE__.__CAP_NAME__Queries
+import __PACKAGE__.api.__NAME__Output
+import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
+
+/** Everything the Content needs to draw, and nothing else. */
+internal data class __NAME__State(
+    val id: String = "",
+    val isBusy: Boolean = false,
+    val label: String = "",
+)
+
+/** What the user did. Actions travel down; they are never navigation. */
+internal sealed interface __NAME__Action {
+    data object Refresh : __NAME__Action
+
+    data object Select : __NAME__Action
+
+    data object Back : __NAME__Action
+}
+
+/** One-shot presentation effects. A UiCommand never carries correctness-bearing state. */
+internal sealed interface __NAME__UiCommand {
+    data class ShowMessage(val message: String) : __NAME__UiCommand
+}
+
+// Reads through the Capability's grouped `Queries` and asks for synchronization through its intent
+// `Commands`. The Capability owns the data; this ViewModel owns only the presentation of it.
+//
+// Next step: once the Capability reports freshness, replace the raw `Flow` collection with
+// `ResourceObservation` from `:foundation:resource` -- `:feature:posts` (`PostDetailViewModel`) is
+// the reference.
+/** Owns this Cell instance's state for as long as the instance lives. */
+internal class __NAME__ViewModel(
+    private val id: String,
+    instanceKey: FeatureInstanceKey,
+    private val queries: __CAP_NAME__Queries,
+    private val commands: __CAP_NAME__Commands,
+) : ViewModel() {
+    private val mutableState = MutableStateFlow(__NAME__State(id = id))
+    private val uiCommandChannel = Channel<__NAME__UiCommand>(Channel.BUFFERED)
+    private val outputChannel = Channel<__NAME__Output>(Channel.BUFFERED)
+
+    val state: StateFlow<__NAME__State> = mutableState.asStateFlow()
+    val uiCommands: Flow<__NAME__UiCommand> = uiCommandChannel.receiveAsFlow()
+    val outputs: Flow<__NAME__Output> = outputChannel.receiveAsFlow()
+
+    init {
+        require(instanceKey.value.isNotBlank())
+        viewModelScope.launch {
+            queries.observe(__CAP_NAME__Id(id)).collect { record ->
+                mutableState.value = mutableState.value.copy(label = record?.label.orEmpty())
+            }
+        }
+    }
+
+    // Each branch delegates to a short private function so that the formatting of this file does
+    // not depend on how long the Feature's name happens to be.
+    fun onAction(action: __NAME__Action) {
+        when (action) {
+            __NAME__Action.Refresh -> refresh()
+            __NAME__Action.Select -> select()
+            __NAME__Action.Back -> back()
+        }
+    }
+
+    private fun select() {
+        viewModelScope.launch { outputChannel.send(__NAME__Output.Selected(id)) }
+    }
+
+    private fun back() {
+        viewModelScope.launch { outputChannel.send(__NAME__Output.Back) }
+    }
+
+    private fun refresh() {
+        viewModelScope.launch {
+            mutableState.value = mutableState.value.copy(isBusy = true)
+            commands.refresh()
+            mutableState.value = mutableState.value.copy(isBusy = false)
+            uiCommandChannel.send(__NAME__UiCommand.ShowMessage("Refreshed"))
+        }
+    }
+}

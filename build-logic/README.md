@@ -310,7 +310,9 @@ entry always fails with `EXC-EXPIRED`; blanket suppression is intentionally unav
 - `./gradlew verifyFast` runs JVM/common compile and tests, `detektAll`, `spotlessCheck`,
   `checkModuleGraph`, and `checkHelixPolicySync`. Included-build convention tests are excluded.
 - `./gradlew verifyFull` adds Android `assembleDebug`, both web development/production executable
-  distributions, and the shared app's debug iOS-simulator framework link.
+  distributions, and the shared app's debug iOS-simulator framework link. The web convention orders
+  every production `wasmJs*` task after the development ones, because both variants sync into one
+  `kotlin` directory and would otherwise trip Gradle's implicit-dependency check in a shared graph.
 
 Every primary convention registers a live `verifyFastModule` lifecycle; the Android, web, and iOS
 target-owning conventions attach `verifyFullModule` where relevant. The root umbrellas aggregate

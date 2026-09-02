@@ -25,11 +25,8 @@ class BkpWebAppPlugin : Plugin<Project> {
         with(target) {
             applyRoleBase(HelixRole.APP)
             applyCompose()
-            registerVerifyFullModule { name ->
-                name.startsWith("wasmJsBrowser") &&
-                    ("Development" in name || "Production" in name) &&
-                    (name.endsWith("Webpack") || name.endsWith("ExecutableDistribution"))
-            }
+            registerVerifyFullModule { name -> name in FULL_TIER_TASK_NAMES }
+            serializeExecutableVariants()
 
             val kotlin = extensions.getByType<KotlinMultiplatformExtension>()
             (kotlin as ExtensionAware).extensions.getByType<BkpTargets>().web {
@@ -38,7 +35,41 @@ class BkpWebAppPlugin : Plugin<Project> {
         }
     }
 
+    /**
+     * The Kotlin plugin syncs the development and the production executable into the same
+     * `build/wasm/packages/<module>/kotlin` directory, and each variant's webpack task reads from
+     * there. With both variants in one task graph -- which `verifyFull` asks for -- Gradle rejects
+     * the undeclared cross-variant dependency, and without an order the development bundle could be
+     * built from production output. Running every production task after every development task
+     * keeps each variant's sync and bundle adjacent.
+     */
+    private fun Project.serializeExecutableVariants() {
+        val development = tasks.matching { it.name.isWasmJsVariant("Development") }
+        tasks
+            .matching {
+                it.name.isWasmJsVariant("Production") || it.name == PRODUCTION_DISTRIBUTION
+            }
+            .configureEach {
+                mustRunAfter(development)
+            }
+    }
+
+    private fun String.isWasmJsVariant(variant: String) = startsWith("wasmJs") && variant in this
+
     private companion object {
+        /**
+         * The production distribution carries no variant in its name, unlike its development twin,
+         * so the four full-tier tasks are listed rather than pattern-matched.
+         */
+        const val PRODUCTION_DISTRIBUTION = "wasmJsBrowserDistribution"
+        val FULL_TIER_TASK_NAMES =
+            setOf(
+                "wasmJsBrowserDevelopmentWebpack",
+                "wasmJsBrowserDevelopmentExecutableDistribution",
+                "wasmJsBrowserProductionWebpack",
+                PRODUCTION_DISTRIBUTION,
+            )
+
         /**
          * Webpack otherwise names the bundle after the Gradle project, so `:app:web` would emit
          * `web.js` and a rename of the module would silently break `index.html`. Pinning the name

@@ -27,17 +27,7 @@ public fun PostDetailCell(
     instanceKey: FeatureInstanceKey,
     onOutput: (PostDetailOutput) -> Unit,
     modifier: Modifier = Modifier,
-) {
-    PostDetailCell(postId, instanceKey, onOutput, PaddingValues(), modifier)
-}
-
-@Composable
-internal fun PostDetailCell(
-    postId: PostId,
-    instanceKey: FeatureInstanceKey,
-    onOutput: (PostDetailOutput) -> Unit,
-    contentPadding: PaddingValues,
-    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(),
 ) {
     val viewModel: PostDetailViewModel =
         koinViewModel(

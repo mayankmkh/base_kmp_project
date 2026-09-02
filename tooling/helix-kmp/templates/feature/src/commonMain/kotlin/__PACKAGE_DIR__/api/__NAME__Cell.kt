@@ -30,17 +30,7 @@ public fun __NAME__Cell(
     instanceKey: FeatureInstanceKey,
     onOutput: (__NAME__Output) -> Unit,
     modifier: Modifier = Modifier,
-) {
-    __NAME__Cell(id, instanceKey, onOutput, PaddingValues(), modifier)
-}
-
-@Composable
-internal fun __NAME__Cell(
-    id: String,
-    instanceKey: FeatureInstanceKey,
-    onOutput: (__NAME__Output) -> Unit,
-    contentPadding: PaddingValues,
-    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(),
 ) {
     val viewModel: __NAME__ViewModel =
         koinViewModel(key = instanceKey.value, parameters = { parametersOf(id, instanceKey) })

@@ -18,6 +18,7 @@ import org.koin.core.parameter.parametersOf
 // The Helix Cell signature is `(id, instanceKey, onOutput)`: `id` says *what* is shown,
 // `instanceKey` says *which instance* owns the state, and `onOutput` is the only way out of the
 // Feature. Two hosts may show this Cell at once as long as they pass different instance keys.
+// `contentPadding` lets a host pass its own insets, so the Cell never assumes it owns the surface.
 /** Independently hostable stateful presentation unit. */
 @Composable
 public fun __CELL__Cell(
@@ -25,17 +26,7 @@ public fun __CELL__Cell(
     instanceKey: FeatureInstanceKey,
     onOutput: (__CELL__Output) -> Unit,
     modifier: Modifier = Modifier,
-) {
-    __CELL__Cell(id, instanceKey, onOutput, PaddingValues(), modifier)
-}
-
-@Composable
-internal fun __CELL__Cell(
-    id: String,
-    instanceKey: FeatureInstanceKey,
-    onOutput: (__CELL__Output) -> Unit,
-    contentPadding: PaddingValues,
-    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(),
 ) {
     val viewModel: __CELL__ViewModel =
         koinViewModel(key = instanceKey.value, parameters = { parametersOf(id, instanceKey) })

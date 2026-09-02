@@ -2,8 +2,8 @@
 
 Evidence contract: master source §22.13. Completion checklist: §29.7. Plan and per-phase
 decisions: [helix-adoption-plan.md](helix-adoption-plan.md) §5–§6. Date: 2026-09-02.
-Nothing in this report is committed; the whole adoption is a single uncommitted working tree
-on `main` (191 tracked files changed, +1029/−2751, plus new untracked modules and tooling).
+The adoption was committed on 2026-09-02 as seven commits on `main`; those commits remain
+unpushed. This report now also records the subsequent P1 control-plane working-tree change.
 
 ## Target/owner changed
 
@@ -51,7 +51,7 @@ All runs on 2026-09-02, macOS, JDK per `gradle/libs.versions.toml`, configuratio
 
 | Command | Result |
 |---|---|
-| `./gradlew -p build-logic :convention:test` | BUILD SUCCESSFUL (Helix graph 10 cases, role plugins, validation) |
+| `./gradlew -p build-logic :convention:test` | BUILD SUCCESSFUL (Helix graph 11 cases, including schema-2 metadata, plus role plugins and validation) |
 | `./gradlew help --configuration-cache` ×2 | entry stored, then reused |
 | `./gradlew checkModuleGraph checkHelixPolicySync` | BUILD SUCCESSFUL, 0 findings, 0 exceptions, 18 modules; report `build/reports/helix/module-graph.json` |
 | `./gradlew spotlessCheck detektAll` | BUILD SUCCESSFUL |
@@ -62,6 +62,9 @@ All runs on 2026-09-02, macOS, JDK per `gradle/libs.versions.toml`, configuratio
 | iOS Simulator smoke test (iPhone 17, iOS 26.2): fresh install of the `xcodebuild` output, feed → detail → back | PASS after the `StoreResource` fix below. The first run on a fresh database logged `Uncaught application-runtime failure` (`IllegalArgumentException: An observation without a value must be refreshing or failed`) and left the feed and detail screens on a spinner; see Review findings. |
 | `tooling/helix-kmp/tests/run-tests.sh` | PASS (scaffold, verify, remove, working tree byte-identical) |
 | `tooling/helix-kmp/helix-kmp verify --fast` | BUILD SUCCESSFUL |
+| `./gradlew verifyFast --continue` (P1 final loop) | BUILD SUCCESSFUL; schema-2 graph has 18 nodes and zero findings |
+| `tooling/helix-kmp/helix-kmp verify --agents` | PASS; generated sections and Skill command mentions synchronized |
+| P1 command smoke matrix with `--no-refresh` | PASS: graph JSON, three impact target forms, clean/negative doctor, eight-section context, gallery index |
 | `shellcheck` on the CLI | not run: shellcheck is not installed on this machine |
 
 `./gradlew build` was deliberately not run (known OOM without capped workers; the routine
@@ -83,7 +86,8 @@ verification tier is `check` plus debug assembles).
   `CredentialStoreTest` / `IdentityCapabilityImplTest` in `:capability:identity-impl`.
 - Deleted with their modules: list/details ViewModel, repository and content tests,
   `UiStateTest`, `PostsApiTest`.
-- Tooling: `tooling/helix-kmp/tests/run-tests.sh`; scaffold templates ship their own tests.
+- Tooling: `tooling/helix-kmp/tests/run-tests.sh`; schema-2/P1 fast command checks, agent drift
+  positive/negative checks, and denied-edge doctor diagnosis now run alongside the scaffold tests.
 
 ## Fixture/golden evidence
 
@@ -103,8 +107,8 @@ reset is what keeps `WhileSubscribed` teardown off an absent JVM `Main` dispatch
 Everything downstream of `:shared:*` was affected: all four app shells, the iOS Xcode build
 phase, the Koin composition root (`app/shared/.../di/KoinApp.kt`), the Nav3 route set. No
 external consumer exists. The `MIGRATION_REPORT.md` from 2026-08-14 is kept as history with
-a header stating its paths are stale. The `helix-kmp impact` command that would automate this
-report is not built (P1).
+a header stating its paths are stale. The P1 `helix-kmp impact` command now automates the
+module/file/type reverse-dependency slice; this narrative remains the adoption-time impact record.
 
 ## Public API/ABI changes
 
@@ -140,17 +144,16 @@ iOS simulator framework link.
 - `config/helix/exceptions.json` is empty. The single policy deviation lives in code, not in
   an exception: the validator allows `app → app` edges so the target shells can depend on
   `:app:shared` (plan §6 phase 4 and ADR 0001 explain why).
-- **§29.7 items not met, so adoption is not declared complete**: P1 control-plane gates
-  (`graph`, `impact`, `doctor`, `context`, `gallery`), the no-drift check for agent
-  instructions (they are hand-maintained), and Resource Inspector hooks. `AGENTS.md`,
-  `README.md` and the Skills state these as not built; nothing claims to be generated.
+- **§29.7 P1 control-plane gate is met**: thin `graph`, `impact`, `doctor`, `context`, and
+  gallery-index commands are implemented, and `verify --agents` regenerates/checks marked
+  `AGENTS.md` sections plus Skill command availability. Resource Inspector hooks remain unmet.
 - No Live Resource exists in the slice, so "one Live Resource shares correctly" is satisfied
   only by the `stateIn`/`WhileSubscribed` sharing in the Feature, not by a Capability-level
   live stream.
 - `RefreshQos` is recorded at the command boundary but every priority executes immediately;
   there is no refresh scheduler.
-- The deletions of `BkpKmpLibComposePlugin.kt` and `BkpKmpFeatureComposePlugin.kt` are
-  unstaged, and every new directory is untracked; `git add -A` is needed before any commit.
+- The seven adoption commits are local to `main` and remain unpushed; this P1 work is intentionally
+  left as working-tree changes for review.
 - The iOS link against the static `SharedApp` framework had been broken since the SQLDelight
   native driver landed on 2026-09-01 (undefined `sqlite3_*` symbols); the Xcode project was last
   touched on 2026-08-15 and never gained `-lsqlite3`. Found while verifying the `app/ios/` move

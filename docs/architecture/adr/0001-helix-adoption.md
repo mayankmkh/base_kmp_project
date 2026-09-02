@@ -41,7 +41,7 @@ Concretely:
    [`../helix-adoption-plan.md`](../helix-adoption-plan.md).
 2. **The dependency matrix is data, not prose.** [`config/helix/dependency-policy.json`](../../config/helix/dependency-policy.json)
    is the single source; `./gradlew checkModuleGraph` enforces it and `checkHelixPolicySync` keeps
-   the plugin's own view of it honest. Findings are formatted `[RULE-ID] subject — problem. Fix: remedy`.
+   the plugin's own view of it honest. Findings are formatted `[RULE-ID] subject -- problem. Fix: remedy`.
 3. **Presentation is Cells, not screens.** A Cell is `(id, instanceKey: FeatureInstanceKey, onOutput)`.
    Instance identity is explicit, so two placements of the same Cell never share state by accident,
    and a Feature's only way out is an Output the host interprets.
@@ -52,9 +52,9 @@ Concretely:
 6. **Verification is tiered and named:** `verifyFast` for the inner loop, `verifyFull` for
    platform seams and releases.
 7. **The control plane is staged.** Stage P0 -- `helix-kmp create` and `helix-kmp verify` -- is
-   built and lives in `tooling/helix-kmp/`. P1 (`graph`, `impact`, `doctor`, `context`, `gallery`,
-   and generated no-drift agent instructions) and P2 (`extract`, `migrate`) are deliberately not
-   built yet, and nothing in the repository pretends otherwise.
+   built and lives in `tooling/helix-kmp/`. Stage P1 adds thin `graph`, `impact`, `doctor`,
+   `context`, and gallery-index commands plus generated/no-drift agent instructions. P2
+   (`extract`, `migrate`) remains deliberately unbuilt.
 
 ## Alternatives considered
 
@@ -106,14 +106,12 @@ and it makes blast radius global by construction (Section 5.11).
   registration even when it shows one string.
 - The rules can be wrong. When they are, the answer is an ADR and a boundary change, which is
   slower than editing the policy file -- deliberately.
-- The control plane is a bash script with hand-written templates. Templates drift from the code
-  they were derived from unless `tooling/helix-kmp/tests/run-tests.sh` is run when either changes.
-- P1 is missing, so `context`, `impact` and `doctor` workflows are manual today. The Skills say so
-  rather than pretending.
+- The stable control-plane wrapper is Bash 3.2, with thin Python 3 P1 readers and hand-written
+  scaffolding templates. The tooling self-test covers both surfaces.
+- Sophisticated doctor scoring, advanced context ranking, and refactoring recipes remain P2.
 
 ## Revisit when
 
 - Exception pressure concentrates on one rule -- that is evidence about the rule, not the code.
 - Configuration time becomes the dominant cost of the inner loop.
-- P1 lands, at which point `AGENTS.md` and the Skills must become generated and no-drift checked
-  rather than hand-maintained.
+- Product history justifies P2 ranking or deterministic extraction/migration recipes.

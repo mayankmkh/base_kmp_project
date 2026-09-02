@@ -37,7 +37,7 @@ Plus, outside the runtime graph:
 | Path | What it is |
 | --- | --- |
 | `build-logic/` | The `bkp.*` convention plugins and the architecture rules -- see [`build-logic/README.md`](build-logic/README.md) |
-| `tooling/helix-kmp/` | The Helix control plane (stage P0): the CLI, its templates and its tests |
+| `tooling/helix-kmp/` | The Helix control plane (stage P1): the CLI, its templates and its tests |
 | `config/helix/` | The dependency policy and the exception registry |
 | `docs/architecture/` | The master source, the adoption plan, the ADRs |
 
@@ -75,8 +75,25 @@ The scaffolds come from hand-written templates in `tooling/helix-kmp/templates/`
 `spotlessCheck` and `checkModuleGraph` as written -- no reformatting pass required. If you change a
 template, run `tooling/helix-kmp/tests/run-tests.sh`.
 
-Then run `tooling/helix-kmp/helix-kmp help` for the full surface, including which commands
-deliberately do not exist yet.
+## Control plane
+
+Stage **P1** is implemented through the stable Bash 3.2 wrapper. The graph-backed commands use
+Python 3's standard library and refresh `build/reports/helix/module-graph.json` unless
+`--no-refresh` is supplied.
+
+| Command | Purpose |
+| --- | --- |
+| `helix-kmp create ...` | Scaffold a Feature, Capability, or Cell |
+| `helix-kmp verify ...` | Run fast/full gates or the agent-instruction no-drift check |
+| `helix-kmp graph [<module>]` | Show schema-2 nodes, edges, reverse edges, and cycles |
+| `helix-kmp impact <target>` | Resolve module/file/type blast radius, tests, owners, and consumers |
+| `helix-kmp doctor [<scope>]` | Explain findings and cheap architecture-pressure evidence |
+| `helix-kmp context <target>` | Emit the bounded eight-section task packet |
+| `helix-kmp gallery` | Index Feature Screens, Cells, and fixture states; no launcher or rendering |
+
+The schema-2 report stores `nodes[{path,role,roles,projectDir,targets,publicApiDirs}]`,
+`edges[{from,to,configuration}]`, and `findings[]`. `graph --json` adds `reverseEdges` without
+changing the Gradle-owned report. Run `tooling/helix-kmp/helix-kmp help` for all flags.
 
 ## Running it
 
@@ -105,7 +122,6 @@ simulator framework.
 
 ## Status
 
-The control plane is at stage **P0**: `create` and `verify` exist. `graph`, `impact`, `doctor`,
-`context`, `gallery`, `extract` and `migrate` are described by the master source and are **not
-built** here -- no stub, no partial output. `AGENTS.md` lists them explicitly so that neither a
-person nor an agent assumes otherwise.
+The control plane is at stage **P1**. Only the evidence-earned P2 extraction and migration
+codemods remain unbuilt; Resource Inspector hooks and a Live Resource reference slice are also
+future work rather than part of this thin command layer.

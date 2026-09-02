@@ -38,7 +38,7 @@ currently empty, and that is the preferred state.
 | `removalCondition` | no | Recorded for humans; the task ignores it. Write it anyway -- an entry with no stated exit is a permanent rule change in disguise |
 
 `rule` and `scope` must match the finding *exactly*. A finding is printed as
-`[RULE-ID] subject — problem. Fix: remedy`; `rule` is the bracketed ID and `scope` is the subject.
+`[RULE-ID] subject -- problem. Fix: remedy`; `rule` is the bracketed ID and `scope` is the subject.
 A mismatch does not error, it simply fails to suppress anything.
 
 ## What an active exception does

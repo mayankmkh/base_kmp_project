@@ -259,14 +259,33 @@ The root graph tasks enforce these stable rules:
 | `EXC-EXPIRED` | Time-bounded exception registry hygiene |
 | `POLICY-DRIFT` | Derived policy equals the marked master-source JSON |
 
-Findings use `[RULE-ID] subject — problem. Fix: remedy` and the graph task always writes
-`build/reports/helix/module-graph.json`. Every module with a build script is role-validated —
+Findings use `[RULE-ID] subject -- problem. Fix: remedy` and the graph task always writes the
+schema-2 `build/reports/helix/module-graph.json`. Nodes contain `path`, `role`, `roles`,
+repo-relative `projectDir`, declared `targets`, and repo-relative `publicApiDirs`; edges contain
+`from`, `to`, and normalized `configuration` (`api`, `implementation`, or `other`); findings keep
+their stable rule fields. Every module with a build script is role-validated —
 grandfathering was removed in phase 4. Two carve-outs remain, both inside the role matrix rather than
 around it: `:testkit:*` may be consumed from any role, and an `app` → `app` edge is allowed because
 `:app:shared` and the target shells are one composition root spread across four modules
 (master source §8.2); `GRAPH-CYCLE-PHYSICAL` still holds those shells to a DAG. `:tooling:*` sits
 outside the runtime graph, and structural parents such as `:app` carry no build script, so neither
 reaches the role rules.
+
+## Control-plane stage P1
+
+The public CLI remains `tooling/helix-kmp/helix-kmp`; internal Python filenames are replaceable.
+Graph-backed commands refresh the report first unless `--no-refresh` is requested.
+
+| Command | Reads or runs |
+| --- | --- |
+| `graph` | Schema-2 report; adds reverse edges for presentation |
+| `impact` | Report, source imports/types, optional CODEOWNERS |
+| `doctor` | Findings, report metrics, exceptions, and up to 200 Git commits |
+| `context` | Target sources/tests and direct dependency public APIs only |
+| `gallery` | Feature public Composables and fixture declarations only |
+| `verify --agents` | Canonical stage block, policy, rule IDs, CLI help, Skills, generated AGENTS sections |
+
+`extract` and `migrate` are P2 and are not implemented.
 
 The source-backed rules (`FEATURE-PUBLIC-SURFACE-OUTSIDE-API` and the peer-import rule) take the
 modules' `src` **directories** as task inputs and walk them while the task runs. Handing over a file

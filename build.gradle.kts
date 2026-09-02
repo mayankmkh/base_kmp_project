@@ -44,74 +44,42 @@ plugins {
     alias(libs.plugins.bkp.validation.graph)
 }
 
-val announceVerifyFast =
-    tasks.register("announceVerifyFast") {
-        group = "verification"
-        description = "Prints the selected Helix verification tier."
-        doLast { logger.lifecycle("Helix verification tier: FAST") }
-    }
+val verifyFastModules = subprojects.map { candidate ->
+    candidate.tasks.matching { it.name == "verifyFastModule" }
+}
 
 val verifyFast =
     tasks.register("verifyFast") {
         group = "verification"
         description = "Runs the Helix JVM/common inner-loop verification tier."
-        dependsOn(announceVerifyFast, "checkModuleGraph", "checkHelixPolicySync")
+        dependsOn(
+            verifyFastModules,
+            "spotlessCheck",
+            "checkModuleGraph",
+            "checkHelixPolicySync",
+        )
     }
 
-val announceVerifyFull =
-    tasks.register("announceVerifyFull") {
-        group = "verification"
-        description = "Prints the selected Helix verification tier."
-        doLast { logger.lifecycle("Helix verification tier: FULL") }
-    }
+val verifyFullModules = subprojects.map { candidate ->
+    candidate.tasks.matching { it.name == "verifyFullModule" }
+}
 
 val verifyFull =
     tasks.register("verifyFull") {
         group = "verification"
         description = "Runs the Helix full supported-target verification tier."
-        dependsOn(announceVerifyFull, "checkModuleGraph", "checkHelixPolicySync")
+        dependsOn(
+            verifyFastModules,
+            verifyFullModules,
+            "spotlessCheck",
+            "checkModuleGraph",
+            "checkHelixPolicySync",
+        )
     }
 
-// AGP/KMP register some tasks late, so task names are captured after every project is evaluated and
-// wired through lazy providers. Included build-logic tests are outside `allprojects`, so the fast
-// tier never recurses into convention TestKit tests.
-gradle.projectsEvaluated {
-    allprojects.forEach { candidate ->
-        val candidatePath = candidate.path
-        candidate.tasks.configureEach {
-            if (name != "announceVerifyFast" && name != "announceVerifyFull") {
-                mustRunAfter(announceVerifyFast, announceVerifyFull)
-            }
-        }
-        val fastTaskNames =
-            candidate.tasks.names.filter { name ->
-                name == "jvmTest" ||
-                    name == "test" ||
-                    name == "compileCommonMainKotlinMetadata" ||
-                    name == "compileKotlinMetadata" ||
-                    name == "detektAll" ||
-                    name == "spotlessCheck"
-            }
-        verifyFast.configure {
-            dependsOn(fastTaskNames.map(candidate.tasks::named))
-        }
-        verifyFull.configure {
-            dependsOn(fastTaskNames.map(candidate.tasks::named))
-        }
-        val fullTaskNames =
-            candidate.tasks.names.filter { name ->
-                val isAndroidDebug = candidatePath == ":app:android" && name == "assembleDebug"
-                val isWebExecutable =
-                    candidatePath == ":app:web" &&
-                        name.startsWith("wasmJsBrowser") &&
-                        ("Development" in name || "Production" in name) &&
-                        (name.endsWith("Webpack") || name.endsWith("ExecutableDistribution"))
-                val isIosSimulatorFramework =
-                    candidatePath == ":app:shared" && name == "linkDebugFrameworkIosSimulatorArm64"
-                isAndroidDebug || isWebExecutable || isIosSimulatorFramework
-            }
-        verifyFull.configure {
-            dependsOn(fullTaskNames.map(candidate.tasks::named))
-        }
+gradle.taskGraph.whenReady {
+    when {
+        hasTask(verifyFull.get()) -> logger.lifecycle("Helix verification tier: FULL")
+        hasTask(verifyFast.get()) -> logger.lifecycle("Helix verification tier: FAST")
     }
 }

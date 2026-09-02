@@ -6,20 +6,44 @@ import org.gradle.api.provider.ListProperty
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.findByType
 
-/** Stable role names shared by role plugins, dependency policy, reports, and Helix tooling. */
-enum class HelixRole(val policyName: String) {
-    APP("app"),
-    FEATURE("feature"),
-    UI("ui"),
-    CAPABILITY_API("capability_api"),
-    CAPABILITY_IMPL("capability_impl"),
-    FOUNDATION_API("foundation_api"),
-    FOUNDATION_RUNTIME("foundation_runtime"),
-    PLATFORM("platform"),
-    PLATFORM_API("platform_api"),
-    PLATFORM_IMPL("platform_impl"),
-    STORAGE("storage"),
-    TESTKIT("testkit"),
+/** Stable role facts shared by role plugins, dependency policy, reports, and Helix tooling. */
+enum class HelixRole(
+    val policyName: String,
+    val pluginId: String,
+    val pathPattern: Regex,
+) {
+    APP("app", "bkp.kmp.app", Regex("^:app:[^:]+$")),
+    FEATURE("feature", "bkp.kmp.feature", Regex("^:feature:[^:]+$")),
+    UI("ui", "bkp.kmp.ui", Regex("^:ui:[^:]+$")),
+    CAPABILITY_API(
+        "capability_api",
+        "bkp.kmp.capability.api",
+        Regex("^:capability:[^:]+-api$"),
+    ),
+    CAPABILITY_IMPL(
+        "capability_impl",
+        "bkp.kmp.capability.impl",
+        Regex("^:capability:[^:]+-impl$"),
+    ),
+    FOUNDATION_API(
+        "foundation_api",
+        "bkp.kmp.foundation.api",
+        Regex("^:foundation:[^:]+$"),
+    ),
+    FOUNDATION_RUNTIME(
+        "foundation_runtime",
+        "bkp.kmp.foundation.runtime",
+        Regex("^:foundation:[^:]+$"),
+    ),
+    PLATFORM(
+        "platform",
+        "bkp.kmp.platform",
+        Regex("^:platform:(?!.*-(?:api|impl)$)[^:]+$"),
+    ),
+    PLATFORM_API("platform_api", "bkp.kmp.platform.api", Regex("^:platform:[^:]+-api$")),
+    PLATFORM_IMPL("platform_impl", "bkp.kmp.platform.impl", Regex("^:platform:[^:]+-impl$")),
+    STORAGE("storage", "bkp.kmp.storage", Regex("^:storage:[^:]+$")),
+    TESTKIT("testkit", "bkp.kmp.testkit", Regex("^:testkit:[^:]+$")),
 }
 
 /**

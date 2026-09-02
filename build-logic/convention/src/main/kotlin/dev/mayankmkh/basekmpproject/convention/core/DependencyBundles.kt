@@ -12,10 +12,6 @@ internal fun Project.addFeatureRoleDependencies() {
     addKoinDependencies(includeComposeViewModel = true)
 }
 
-internal fun Project.addAppRoleDependencies() {
-    addFeatureRoleDependencies()
-}
-
 internal fun Project.addCapabilityImplRoleDependencies() {
     addKoinDependencies(includeComposeViewModel = false)
 }

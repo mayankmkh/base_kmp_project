@@ -2,6 +2,7 @@ package dev.mayankmkh.basekmpproject.convention.dsl
 
 import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import dev.mayankmkh.basekmpproject.configureKotlinMultiplatformAndroidLibrary
+import dev.mayankmkh.basekmpproject.convention.core.registerVerifyFullModule
 import dev.mayankmkh.basekmpproject.wasmJsBrowser
 import javax.inject.Inject
 import org.gradle.api.Action
@@ -34,6 +35,7 @@ constructor(
     private val declaredPlatforms = linkedSetOf<BkpPlatform>()
     private var exceptionReason: String? = null
     private var androidDeclared = false
+    private var iosDeclared = false
 
     internal val declaredTargetNames: Set<String>
         get() = names
@@ -126,6 +128,10 @@ constructor(
 
     fun ios(action: Action<KotlinNativeTarget>) {
         declaredPlatforms += BkpPlatform.IOS
+        if (!iosDeclared) {
+            iosDeclared = true
+            project.registerVerifyFullModule { it == "linkDebugFrameworkIosSimulatorArm64" }
+        }
         record {
             action.execute(kotlin.iosArm64())
             action.execute(kotlin.iosSimulatorArm64())

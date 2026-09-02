@@ -7,6 +7,7 @@ import dev.mayankmkh.basekmpproject.configureFlavors
 import dev.mayankmkh.basekmpproject.configureKotlinAndroid
 import dev.mayankmkh.basekmpproject.configurePrintApksTask
 import dev.mayankmkh.basekmpproject.convention.core.androidSdkConfig
+import dev.mayankmkh.basekmpproject.convention.core.registerVerifyFullModule
 import dev.mayankmkh.basekmpproject.convention.dsl.bkpModuleExtension
 import dev.mayankmkh.basekmpproject.convention.helix.HelixRole
 import dev.mayankmkh.basekmpproject.convention.helix.recordHelixRole
@@ -26,6 +27,7 @@ class BkpAndroidAppPlugin : Plugin<Project> {
             apply(plugin = "bkp.quality.style")
             apply(plugin = "bkp.quality.lint")
             apply(plugin = "bkp.validation.graph")
+            registerVerifyFullModule { it == "assembleDebug" }
 
             val bkpModule = bkpModuleExtension()
             recordHelixRole(HelixRole.APP)

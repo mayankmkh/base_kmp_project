@@ -306,8 +306,11 @@ entry always fails with `EXC-EXPIRED`; blanket suppression is intentionally unav
 - `./gradlew verifyFull` adds Android `assembleDebug`, both web development/production executable
   distributions, and the shared app's debug iOS-simulator framework link.
 
-Each umbrella task prints the chosen tier when it starts. The target task lookup is lazy so it
-remains compatible with plugins that register tasks late and with the configuration cache.
+Every primary convention registers a live `verifyFastModule` lifecycle; the Android, web, and iOS
+target-owning conventions attach `verifyFullModule` where relevant. The root umbrellas aggregate
+those module lifecycles, and `verify --fast --affected` selects the same lifecycle instead of
+re-parsing module build scripts. The task graph prints the chosen tier once. Live task collections
+keep tasks registered late by AGP and KMP in the selected tier and remain configuration-cache safe.
 
 ## Tests
 

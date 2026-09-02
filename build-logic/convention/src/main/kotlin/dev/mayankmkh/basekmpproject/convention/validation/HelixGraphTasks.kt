@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.convention.validation
 
+import dev.mayankmkh.basekmpproject.convention.helix.HelixRole
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import java.io.File
@@ -224,6 +225,20 @@ abstract class CheckModuleGraphTask : DefaultTask() {
         findings: MutableList<Finding>,
     ) {
         val policyRoles = policy["roles"] as? Map<String, Any?> ?: emptyMap()
+        val conditionalAllows =
+            (policy["conditionalAllows"] as? List<*>).orEmpty().mapNotNull {
+                it as? Map<String, Any?>
+            }
+        conditionalAllows.forEach { conditionalAllow ->
+            val id = conditionalAllow["id"] as? String ?: "<missing id>"
+            val predicate = conditionalAllow["predicate"] as? Map<String, Any?>
+            val type = predicate?.get("type") as? String
+            if (type != "target_public_api_and_source_import") {
+                throw GradleException(
+                    "Unknown Helix conditional allow predicate type '$type' for $id"
+                )
+            }
+        }
         edges.forEach { edge ->
             val from = nodeByPath[edge.from] ?: return@forEach
             val to = nodeByPath[edge.to] ?: return@forEach
@@ -242,25 +257,34 @@ abstract class CheckModuleGraphTask : DefaultTask() {
             // rather than denied by it; `GRAPH-CYCLE-PHYSICAL` still holds the shells to a DAG.
             if (fromRole == "app" && toRole == "app") return@forEach
 
-            if (fromRole == "feature" && toRole == "feature") {
+            val conditionalAllow = conditionalAllows.firstOrNull {
+                it["from"] == fromRole && it["to"] == toRole
+            }
+            if (conditionalAllow != null) {
+                // Predicate types were validated above; today's only type checks that the source
+                // imports nothing from the target outside the target's public package.
+                val predicate = conditionalAllow.getValue("predicate") as Map<String, Any?>
+                val importSuffix =
+                    predicate.getValue("sourceMayImportOnlyTargetPackageSuffix") as String
                 val targetRoot = targetPackageRoot(sourcesByModule.getValue(to.path))
                 val offendingImports =
                     if (targetRoot == null) {
                         listOf("target package root could not be determined")
                     } else {
+                        val allowedPackage = "$targetRoot$importSuffix"
                         importsFromTarget(sourcesByModule.getValue(from.path), targetRoot)
                             .filterNot { imported ->
-                                imported == "$targetRoot.api" ||
-                                    imported.startsWith("$targetRoot.api.")
+                                imported == allowedPackage ||
+                                    imported.startsWith("$allowedPackage.")
                             }
                     }
                 if (offendingImports.isNotEmpty()) {
                     findings +=
                         Finding(
-                            "DEP-FEATURE-FEATURE-PUBLIC-PRESENTATION-ONLY",
+                            conditionalAllow.getValue("id") as String,
                             subject,
                             "feature dependency imports target internals: ${offendingImports.joinToString()}",
-                            "expose presentation contracts below the target .api package and import only that package",
+                            "expose presentation contracts below the target $importSuffix package and import only that package",
                         )
                 }
                 return@forEach
@@ -313,16 +337,14 @@ abstract class CheckModuleGraphTask : DefaultTask() {
         paths: List<String>,
         findings: MutableList<Finding>,
     ) {
-        stronglyConnected(paths.toSet(), edges).forEach { cycle ->
-            val subject = cycle.sorted().let { it.joinToString(" -> ") + " -> " + it.first() }
-            findings +=
-                Finding(
-                    "GRAPH-CYCLE-PHYSICAL",
-                    subject,
-                    "main-source project dependencies form a physical cycle",
-                    "reverse or remove an edge so dependencies remain acyclic",
-                )
-        }
+        findings +=
+            cycleFindings(
+                paths.toSet(),
+                edges,
+                "GRAPH-CYCLE-PHYSICAL",
+                "main-source project dependencies form a physical cycle",
+                "reverse or remove an edge so dependencies remain acyclic",
+            )
 
         val logicalEdges =
             edges
@@ -330,17 +352,27 @@ abstract class CheckModuleGraphTask : DefaultTask() {
                 .filter { it.from != it.to }
                 .distinct()
         val logicalNodes = paths.map(::logicalPath).toSet()
-        stronglyConnected(logicalNodes, logicalEdges).forEach { cycle ->
-            val subject = cycle.sorted().let { it.joinToString(" -> ") + " -> " + it.first() }
-            findings +=
-                Finding(
-                    "GRAPH-CYCLE-LOGICAL",
-                    subject,
-                    "dependencies cycle after api/impl family modules are collapsed",
-                    "remove the cross-family back edge or introduce a lower stable contract",
-                )
-        }
+        findings +=
+            cycleFindings(
+                logicalNodes,
+                logicalEdges,
+                "GRAPH-CYCLE-LOGICAL",
+                "dependencies cycle after api/impl family modules are collapsed",
+                "remove the cross-family back edge or introduce a lower stable contract",
+            )
     }
+
+    private fun cycleFindings(
+        nodes: Set<String>,
+        edges: List<Edge>,
+        rule: String,
+        problem: String,
+        fix: String,
+    ): List<Finding> =
+        stronglyConnected(nodes, edges).map { cycle ->
+            val subject = cycle.sorted().let { it.joinToString(" -> ") + " -> " + it.first() }
+            Finding(rule, subject, problem, fix)
+        }
 
     private fun writeReport(nodes: List<Node>, edges: List<Edge>, findings: List<Finding>) {
         val report =
@@ -495,33 +527,8 @@ abstract class CheckModuleGraphTask : DefaultTask() {
         private fun ignoredForRoleValidation(path: String): Boolean = path.startsWith(":tooling:")
 
         private fun roleMatchesPath(role: String, path: String): Boolean =
-            when (role) {
-                "app" -> APP_PATH.matches(path)
-                "feature" -> FEATURE_PATH.matches(path)
-                "ui" -> UI_PATH.matches(path)
-                "capability_api" -> CAPABILITY_API_PATH.matches(path)
-                "capability_impl" -> CAPABILITY_IMPL_PATH.matches(path)
-                "foundation_api",
-                "foundation_runtime" -> FOUNDATION_PATH.matches(path)
-                "platform" -> PLATFORM_PATH.matches(path)
-                "platform_api" -> PLATFORM_API_PATH.matches(path)
-                "platform_impl" -> PLATFORM_IMPL_PATH.matches(path)
-                "storage" -> STORAGE_PATH.matches(path)
-                "testkit" -> TESTKIT_PATH.matches(path)
-                else -> false
-            }
-
-        private val APP_PATH = Regex("^:app:[^:]+$")
-        private val FEATURE_PATH = Regex("^:feature:[^:]+$")
-        private val UI_PATH = Regex("^:ui:[^:]+$")
-        private val CAPABILITY_API_PATH = Regex("^:capability:[^:]+-api$")
-        private val CAPABILITY_IMPL_PATH = Regex("^:capability:[^:]+-impl$")
-        private val FOUNDATION_PATH = Regex("^:foundation:[^:]+$")
-        private val PLATFORM_PATH = Regex("^:platform:(?!.*-(?:api|impl)$)[^:]+$")
-        private val PLATFORM_API_PATH = Regex("^:platform:[^:]+-api$")
-        private val PLATFORM_IMPL_PATH = Regex("^:platform:[^:]+-impl$")
-        private val STORAGE_PATH = Regex("^:storage:[^:]+$")
-        private val TESTKIT_PATH = Regex("^:testkit:[^:]+$")
+            HelixRole.entries.firstOrNull { it.policyName == role }?.pathPattern?.matches(path) ==
+                true
 
         private fun logicalPath(path: String): String =
             if (path.startsWith(":capability:") || path.startsWith(":platform:")) {

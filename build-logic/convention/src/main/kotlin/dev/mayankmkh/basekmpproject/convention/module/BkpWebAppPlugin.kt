@@ -1,13 +1,11 @@
 package dev.mayankmkh.basekmpproject.convention.module
 
-import dev.mayankmkh.basekmpproject.configureKMPCompose
+import dev.mayankmkh.basekmpproject.convention.core.registerVerifyFullModule
 import dev.mayankmkh.basekmpproject.convention.dsl.BkpTargets
 import dev.mayankmkh.basekmpproject.convention.helix.HelixRole
-import dev.mayankmkh.basekmpproject.convention.helix.recordHelixRole
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.plugins.ExtensionAware
-import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.getByType
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
@@ -25,11 +23,13 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 class BkpWebAppPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
-            apply(plugin = "bkp.kmp.lib")
-            apply(plugin = "org.jetbrains.compose")
-            apply(plugin = "org.jetbrains.kotlin.plugin.compose")
-            configureKMPCompose()
-            recordHelixRole(HelixRole.APP)
+            applyRoleBase(HelixRole.APP)
+            applyCompose()
+            registerVerifyFullModule { name ->
+                name.startsWith("wasmJsBrowser") &&
+                    ("Development" in name || "Production" in name) &&
+                    (name.endsWith("Webpack") || name.endsWith("ExecutableDistribution"))
+            }
 
             val kotlin = extensions.getByType<KotlinMultiplatformExtension>()
             (kotlin as ExtensionAware).extensions.getByType<BkpTargets>().web {

@@ -1,9 +1,11 @@
 package dev.mayankmkh.basekmpproject.convention.validation
 
+import dev.mayankmkh.basekmpproject.convention.core.registerVerifyFastModule
 import dev.mayankmkh.basekmpproject.convention.dsl.BKP_DEFAULT_PLATFORMS
 import dev.mayankmkh.basekmpproject.convention.dsl.BkpModuleExtension
 import dev.mayankmkh.basekmpproject.convention.dsl.BkpTargets
 import dev.mayankmkh.basekmpproject.convention.helix.HelixModuleExtension
+import dev.mayankmkh.basekmpproject.convention.helix.HelixRole
 import java.time.LocalDate
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
@@ -18,7 +20,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 class BkpValidationGraphPlugin : Plugin<Project> {
     override fun apply(target: Project) {
-        if (target.path == ":") registerRootTasks(target)
+        if (target.path == ":") registerRootTasks(target) else target.registerVerifyFastModule()
         // Each project validates only itself. Walking `rootProject.allprojects` from
         // `gradle.projectsEvaluated` -- and the extraProperties flag that made that walk happen
         // once
@@ -165,16 +167,12 @@ class BkpValidationGraphPlugin : Plugin<Project> {
         val hasAndroidAppFirebase = project.pluginManager.hasPlugin(BKP_ANDROID_APP_FIREBASE)
         val hasAndroidLib = project.pluginManager.hasPlugin(BKP_ANDROID_LIB)
         val hasAndroidTest = project.pluginManager.hasPlugin(BKP_ANDROID_TEST)
-        val hasKmpFeature = project.pluginManager.hasPlugin(BKP_KMP_FEATURE)
         val hasHelixKmpRole = HELIX_KMP_ROLE_PLUGIN_IDS.any(project.pluginManager::hasPlugin)
         val hasWebApp = project.pluginManager.hasPlugin(BKP_WEB_APP)
         // `bkp.kmp.feature*` and `bkp.web.app` are both built on `bkp.kmp.lib*`, so the lib group
         // is only the module's own primary when neither of them claimed it first.
         val hasKmpLibOnly =
-            !hasHelixKmpRole &&
-                !hasKmpFeature &&
-                !hasWebApp &&
-                project.pluginManager.hasPlugin(BKP_KMP_LIB)
+            !hasHelixKmpRole && !hasWebApp && project.pluginManager.hasPlugin(BKP_KMP_LIB)
         val hasDesktopApp = project.pluginManager.hasPlugin(BKP_DESKTOP_APP)
 
         val activeGroups =
@@ -183,7 +181,6 @@ class BkpValidationGraphPlugin : Plugin<Project> {
                 "androidLib".takeIf { hasAndroidLib },
                 "androidTest".takeIf { hasAndroidTest },
                 "helixKmpRole".takeIf { hasHelixKmpRole },
-                "kmpFeature".takeIf { hasKmpFeature && !hasHelixKmpRole },
                 "kmpLib".takeIf { hasKmpLibOnly },
                 "desktopApp".takeIf { hasDesktopApp },
                 "webApp".takeIf { hasWebApp },
@@ -212,7 +209,7 @@ class BkpValidationGraphPlugin : Plugin<Project> {
 
         val primary = primaryPlugins.first()
         val isAndroidApp = primary.startsWith(BKP_ANDROID_APP)
-        val isKmpPrimary = hasHelixKmpRole || primary.startsWith("bkp.kmp")
+        val isKmpPrimary = primary.startsWith("bkp.kmp")
 
         if (!isAndroidApp && extension.features.demoProdFlavorsEnabled) {
             throw GradleException(
@@ -339,20 +336,7 @@ class BkpValidationGraphPlugin : Plugin<Project> {
         private const val BKP_KMP_TESTKIT = "bkp.kmp.testkit"
 
         private val HELIX_KMP_ROLE_PLUGIN_IDS =
-            setOf(
-                BKP_KMP_APP,
-                BKP_KMP_FEATURE,
-                BKP_KMP_UI,
-                BKP_KMP_CAPABILITY_API,
-                BKP_KMP_CAPABILITY_IMPL,
-                BKP_KMP_FOUNDATION_API,
-                BKP_KMP_FOUNDATION_RUNTIME,
-                BKP_KMP_PLATFORM,
-                BKP_KMP_PLATFORM_API,
-                BKP_KMP_PLATFORM_IMPL,
-                BKP_KMP_STORAGE,
-                BKP_KMP_TESTKIT,
-            )
+            HelixRole.entries.mapTo(mutableSetOf()) { it.pluginId }
 
         private val PRIMARY_PLUGIN_IDS =
             setOf(

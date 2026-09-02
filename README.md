@@ -44,8 +44,8 @@ Plus, outside the runtime graph:
 ## Verifying
 
 ```bash
-tooling/helix-kmp/helix-kmp verify --fast --affected   # only the modules you touched
-./gradlew verifyFast                                   # every module: JVM tests, detekt, spotless, module graph
+tooling/helix-kmp/helix-kmp verify --fast --affected   # touched modules' verifyFastModule lifecycles
+./gradlew verifyFast                                   # every module lifecycle, plus root style and graph checks
 ./gradlew verifyFull                                   # the above, plus Android debug, web bundles, iOS simulator framework
 ```
 

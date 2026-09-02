@@ -1,8 +1,8 @@
 package dev.mayankmkh.basekmpproject.convention.module
 
 import dev.mayankmkh.basekmpproject.configureKMPCompose
-import dev.mayankmkh.basekmpproject.convention.core.addAppRoleDependencies
 import dev.mayankmkh.basekmpproject.convention.core.addCapabilityImplRoleDependencies
+import dev.mayankmkh.basekmpproject.convention.core.addFeatureRoleDependencies
 import dev.mayankmkh.basekmpproject.convention.dsl.BkpModuleExtension
 import dev.mayankmkh.basekmpproject.convention.helix.HelixRole
 import dev.mayankmkh.basekmpproject.convention.helix.recordHelixRole
@@ -12,12 +12,12 @@ import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.getByType
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
-private fun Project.applyRoleBase(role: HelixRole) {
+internal fun Project.applyRoleBase(role: HelixRole) {
     apply(plugin = "bkp.kmp.lib")
     recordHelixRole(role)
 }
 
-private fun Project.applyCompose() {
+internal fun Project.applyCompose() {
     apply(plugin = "org.jetbrains.compose")
     apply(plugin = "org.jetbrains.kotlin.plugin.compose")
     configureKMPCompose()
@@ -32,7 +32,7 @@ class BkpKmpAppPlugin : Plugin<Project> {
         with(target) {
             applyRoleBase(HelixRole.APP)
             applyCompose()
-            addAppRoleDependencies()
+            addFeatureRoleDependencies()
         }
 }
 

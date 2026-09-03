@@ -16,6 +16,7 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.client.statement.request
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.takeFrom
 import io.ktor.serialization.kotlinx.json.json
@@ -97,6 +98,8 @@ internal fun HttpClientConfig<*>.installNetworking(
     install(Logging) {
         logger = clientLogger
         level = logLevel
+        // HEADERS level would otherwise write the bearer token into whatever the app logs to.
+        sanitizeHeader { header -> header == HttpHeaders.Authorization }
     }
     expectSuccess = true
     defaultRequest {

@@ -4,6 +4,7 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.respondOk
 import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.request.get
 import io.ktor.http.HttpHeaders
@@ -11,8 +12,10 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
 import io.ktor.http.headersOf
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -79,6 +82,30 @@ class ClientTest {
             "Bearer first",
             engine.requestHistory.single().headers[HttpHeaders.Authorization],
         )
+    }
+
+    @Test
+    fun `never writes the bearer token to the log`() = runTest {
+        val engine = MockEngine { respondOk() }
+        val log = StringBuilder()
+        val logger =
+            object : Logger {
+                override fun log(message: String) {
+                    log.appendLine(message)
+                }
+            }
+
+        createHttpClient(
+                engine,
+                config,
+                FakeCredentialProvider(),
+                logger,
+                logLevel = LogLevel.HEADERS,
+            )
+            .get("/thing")
+
+        assertContains(log.toString(), HttpHeaders.Authorization)
+        assertFalse("first" in log.toString(), "token leaked into the log:\n$log")
     }
 
     @Test

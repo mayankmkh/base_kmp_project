@@ -15,7 +15,7 @@ Principle (29.2): inspect first, keep compatible setup, reshape ownership, repla
 | Ktor client stack (`createHttpClient`, auth, logging) | KEEP/MOVE | `:foundation:network` (foundation_runtime) |
 | SQLDelight posts schema, local store, assembly, drivers | KEEP/MOVE | schema + local store in `:capability:posts-impl`; assembly + drivers in `:storage:database` |
 | Store5 repositories (list + details) | RESHAPE | internal to `:capability:posts-impl`; expose `Flow<ResourceObservation<T>>` |
-| `PostsApi` + `PostDto` | RESHAPE/HIDE | internal to `:capability:posts-impl` (13.3, 29.4) |
+| `PostsApi` (now `PostsRemoteSource`) + `PostDto` | RESHAPE/HIDE | internal to `:capability:posts-impl` (13.3, 29.4) |
 | `:shared:features:list`, `:shared:features:details` | RESHAPE | `:feature:posts` (Screens `PostFeedScreen`, `PostDetailScreen`; Cell `PostDetailCell`) |
 | `:shared:libs:designsystem` | MOVE | `:ui:design-system` |
 | `:shared:libs:connectivity` | MOVE | `:platform:connectivity` (cohesive platform module) |

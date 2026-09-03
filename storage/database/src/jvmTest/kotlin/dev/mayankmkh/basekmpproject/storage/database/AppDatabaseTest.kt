@@ -22,7 +22,7 @@ class AppDatabaseTest {
 
             val tables = driver.sqliteMasterNames("table")
             assertTrue("post" in tables)
-            assertTrue("post_feed_state" in tables)
+            assertTrue("postFeedState" in tables)
             assertTrue("author_id" in driver.tableColumns("post"))
         } finally {
             driver.close()

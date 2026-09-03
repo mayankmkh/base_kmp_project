@@ -1,0 +1,1 @@
+ALTER TABLE post_feed_state RENAME TO postFeedState;

@@ -11,7 +11,7 @@ import kotlinx.coroutines.sync.withLock
  * An interface rather than the concrete provider so a test can supply an in-memory database without
  * a `DatabaseContext` and without touching the user's home directory.
  */
-fun interface AppDatabaseSource {
+fun interface AppDatabaseProvider {
     suspend fun database(): AppDatabase
 }
 
@@ -22,7 +22,7 @@ fun interface AppDatabaseSource {
  * would put disk I/O on the path that builds the object graph. So the singleton is this provider,
  * and the database it hands out is created on whichever coroutine asks for it first.
  */
-class AppDatabaseProvider(private val context: DatabaseContext) : AppDatabaseSource {
+class DefaultAppDatabaseProvider(private val context: DatabaseContext) : AppDatabaseProvider {
     private val mutex = Mutex()
 
     // `@Volatile` so the fast path below is a safe publication rather than a data race: without it

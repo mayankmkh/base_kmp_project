@@ -32,7 +32,7 @@ class PostsCapabilityImplTest {
     @Test
     fun `cached feed stays stale until refresh completes fresh`() =
         runTest(dispatcher) {
-            val local = createInMemoryPostsLocalStore()
+            val local = createInMemoryPostsLocalSource()
             local.replaceAll(listOf(PostEntity("7", "Cached", "Cached body", authorId = 70)))
             val engine = MockEngine { respondJson(FEED_JSON) }
             val capability = capability(engine, local)
@@ -59,7 +59,7 @@ class PostsCapabilityImplTest {
     @Test
     fun `offline refresh keeps cached value stale and exposes retryable failure`() =
         runTest(dispatcher) {
-            val local = createInMemoryPostsLocalStore()
+            val local = createInMemoryPostsLocalSource()
             local.replaceAll(listOf(PostEntity("7", "Cached", "Cached body", authorId = 70)))
             val engine = MockEngine { throw IOException("offline") }
             val capability = capability(engine, local)
@@ -87,7 +87,7 @@ class PostsCapabilityImplTest {
     @Test
     fun `reconnect refreshes the feed in the capability child scope`() =
         runTest(dispatcher) {
-            val local = createInMemoryPostsLocalStore()
+            val local = createInMemoryPostsLocalSource()
             local.replaceAll(listOf(PostEntity("7", "Cached", "Cached body", authorId = 70)))
             val online = MutableStateFlow(false)
             val engine = MockEngine { respondJson(FEED_JSON) }
@@ -119,7 +119,7 @@ class PostsCapabilityImplTest {
     @Test
     fun `cancelling the calling coroutine still settles the refresh`() =
         runTest(dispatcher) {
-            val local = createInMemoryPostsLocalStore()
+            val local = createInMemoryPostsLocalSource()
             local.replaceAll(listOf(PostEntity("7", "Cached", "Cached body", authorId = 70)))
             val released = CompletableDeferred<Unit>()
             val engine = MockEngine {
@@ -154,7 +154,7 @@ class PostsCapabilityImplTest {
 
     private fun capability(
         engine: MockEngine,
-        local: PostsLocalStore,
+        local: PostsLocalSource,
         connectivity: ConnectivityMonitor = ConnectivityMonitor { MutableStateFlow(true) },
     ): PostsCapabilityImpl {
         val runtime =
@@ -163,8 +163,8 @@ class PostsCapabilityImplTest {
                 CoroutineExceptionHandler { _, throwable -> throw throwable },
             )
         return PostsCapabilityImpl(
-            postsApi = PostsApi(createHttpClient(engine, CONFIG)),
-            postsLocalStore = local,
+            remoteSource = PostsRemoteSource(createHttpClient(engine, CONFIG)),
+            localSource = local,
             applicationRuntimeScope = runtime,
             connectivityMonitor = connectivity,
         )

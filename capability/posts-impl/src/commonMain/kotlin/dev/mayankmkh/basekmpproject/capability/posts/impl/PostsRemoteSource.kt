@@ -18,7 +18,7 @@ internal data class PostDto(
     val body: String,
 )
 
-internal class PostsApi(private val client: HttpClient) {
+internal class PostsRemoteSource(private val client: HttpClient) {
     suspend fun getPosts(limit: Int = DEFAULT_LIMIT): Result<List<PostDto>, ApiError> =
         client.tryCatching {
             get(POSTS_PATH) {

@@ -13,43 +13,43 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 
 /**
- * The posts table, in terms this project's data layer can use.
+ * The posts table in capability-owned terms.
  *
- * Exists so features depend on `PostEntity` rather than on SQLDelight's generated types, the same
- * way `:foundation:preferences` keeps DataStore out of its callers. It also absorbs the two things
- * that are awkward about the asynchronous query API: `asFlow()` emits the *query*, not its rows, so
- * every observation needs an explicit `awaitAsList`, and a multi-row write has to go through a
- * suspending transaction to land as one table notification instead of N.
+ * Keeps SQLDelight's generated types inside this local source so the rest of the capability works
+ * with `PostEntity`. It also absorbs the two things that are awkward about the asynchronous query
+ * API: `asFlow()` emits the *query*, not its rows, so every observation needs an explicit
+ * `awaitAsList`, and a multi-row write has to go through a suspending transaction to land as one
+ * table notification instead of N.
  */
-internal class PostsLocalStore(private val provider: PostsDatabaseSource) {
+internal class PostsLocalSource(private val provider: PostsDatabaseProvider) {
 
     /**
-     * Emits the cached feed, then again after every write to `post`.
+     * Emits the durable feed, then again after every write to `post`.
      *
      * `flatMapLatest` over a one-shot `flow { emit(database()) }` is what defers opening the
      * database until somebody collects -- building the flow itself stays non-suspending, which is
      * what Store5's `SourceOfTruth.reader` contract requires.
      */
     fun observeAll(): Flow<List<PostEntity>> = withDatabase { database ->
-        database.postQueries.selectAll().asFlow().map { query ->
+        database.postsSchemaQueries.selectAll().asFlow().map { query ->
             query.awaitAsList().map { it.toEntity() }
         }
     }
 
     fun observeById(id: String): Flow<PostEntity?> = withDatabase { database ->
-        database.postQueries.selectById(id).asFlow().map { query ->
+        database.postsSchemaQueries.selectById(id).asFlow().map { query ->
             query.awaitAsOneOrNull()?.toEntity()
         }
     }
 
     /** Whether the feed endpoint has completed successfully at least once. */
     fun observeFeedInitialized(): Flow<Boolean> = withDatabase { database ->
-        database.postQueries.feedInitializationCount().asFlow().map { query ->
+        database.postsSchemaQueries.feedInitializationCount().asFlow().map { query ->
             query.awaitAsOne() > 0L
         }
     }
 
-    suspend fun count(): Long = provider.database().postQueries.countAll().awaitAsOne()
+    suspend fun count(): Long = provider.database().postsSchemaQueries.countAll().awaitAsOne()
 
     /**
      * Replaces the whole feed in one transaction.
@@ -61,9 +61,9 @@ internal class PostsLocalStore(private val provider: PostsDatabaseSource) {
     suspend fun replaceAll(posts: List<PostEntity>) {
         val database = provider.database()
         database.transaction {
-            database.postQueries.deleteAll()
+            database.postsSchemaQueries.deleteAll()
             posts.forEachIndexed { index, post ->
-                database.postQueries.upsert(
+                database.postsSchemaQueries.upsert(
                     id = post.id,
                     author_id = post.authorId,
                     title = post.title,
@@ -71,7 +71,7 @@ internal class PostsLocalStore(private val provider: PostsDatabaseSource) {
                     position = index.toLong(),
                 )
             }
-            database.postQueries.markFeedInitialized()
+            database.postsSchemaQueries.markFeedInitialized()
         }
     }
 
@@ -84,9 +84,9 @@ internal class PostsLocalStore(private val provider: PostsDatabaseSource) {
     suspend fun upsert(post: PostEntity) {
         val database = provider.database()
         database.transaction {
-            val existing = database.postQueries.selectById(post.id).awaitAsOneOrNull()
-            val position = existing?.position ?: database.postQueries.countAll().awaitAsOne()
-            database.postQueries.upsert(
+            val existing = database.postsSchemaQueries.selectById(post.id).awaitAsOneOrNull()
+            val position = existing?.position ?: database.postsSchemaQueries.countAll().awaitAsOne()
+            database.postsSchemaQueries.upsert(
                 id = post.id,
                 author_id = post.authorId,
                 title = post.title,
@@ -106,7 +106,7 @@ internal class PostsLocalStore(private val provider: PostsDatabaseSource) {
         PostEntity(id = id, title = title, body = body, authorId = author_id)
 }
 
-/** A cached post, free of both the wire format and SQLDelight's generated row type. */
+/** A durable post, free of both the wire format and SQLDelight's generated row type. */
 internal data class PostEntity(
     val id: String,
     val title: String,

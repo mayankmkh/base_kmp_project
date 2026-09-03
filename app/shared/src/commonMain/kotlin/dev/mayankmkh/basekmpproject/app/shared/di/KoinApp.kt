@@ -5,7 +5,7 @@ import co.touchlab.kermit.StaticConfig
 import co.touchlab.kermit.platformLogWriter
 import dev.mayankmkh.basekmpproject.app.shared.config.KermitKtorLogger
 import dev.mayankmkh.basekmpproject.capability.identity.impl.identityCapabilityModule
-import dev.mayankmkh.basekmpproject.capability.posts.impl.PostsDatabaseSource
+import dev.mayankmkh.basekmpproject.capability.posts.impl.PostsDatabaseProvider
 import dev.mayankmkh.basekmpproject.capability.posts.impl.postsCapabilityModule
 import dev.mayankmkh.basekmpproject.feature.posts.api.postsFeatureModule
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
@@ -18,8 +18,8 @@ import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityContext
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.createConnectivityMonitor
 import dev.mayankmkh.basekmpproject.storage.database.AppDatabaseProvider
-import dev.mayankmkh.basekmpproject.storage.database.AppDatabaseSource
 import dev.mayankmkh.basekmpproject.storage.database.DatabaseContext
+import dev.mayankmkh.basekmpproject.storage.database.DefaultAppDatabaseProvider
 import io.ktor.client.plugins.logging.Logger as KtorLogger
 import io.ktor.http.Url
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -113,17 +113,17 @@ private val connectivityModule = module {
 }
 
 /**
- * The cache the repositories treat as their source of truth.
+ * The database is the source of truth the capabilities observe.
  *
  * The provider is a `single` because it memoises the open database; a second instance would open a
  * second connection to the same file and the two would not see each other's writes.
  */
 private val databaseModule = module {
     factory { createDatabaseContext() }
-    singleOf(::AppDatabaseProvider) bind AppDatabaseSource::class
-    single<PostsDatabaseSource> {
-        val appDatabaseSource = get<AppDatabaseSource>()
-        PostsDatabaseSource { appDatabaseSource.database() }
+    singleOf(::DefaultAppDatabaseProvider) bind AppDatabaseProvider::class
+    single<PostsDatabaseProvider> {
+        val appDatabaseProvider = get<AppDatabaseProvider>()
+        PostsDatabaseProvider { appDatabaseProvider.database() }
     }
 }
 

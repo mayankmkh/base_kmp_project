@@ -1464,6 +1464,19 @@ Owns hidden product/data behavior:
 - batching/hydration;
 - outbox/retry/idempotency where required.
 
+Capability-internal source naming:
+
+- inside `<Name>CapabilityImpl`, raw backends are `<Name>RemoteSource` (one per transport and the
+  only class touching the HTTP client) and `<Name>LocalSource` (one per durable store and the only
+  class touching SQLDelight); a `<Name>DatabaseProvider` fun interface hands the local source its
+  database handle;
+- `<Name>CapabilityImpl` is the only class combining sources and owns DTO/row-to-model mappers;
+- names are role-based and platform-neutral: avoid `Store` (Store5 type, Redux/TCA state
+  container), `Service` (Android component, microservice), `Storage` (web `localStorage`), `Cache`
+  (the table is the source of truth), and Android's `DataSource` formula;
+- Android Guide to app architecture mapping: `RemoteDataSource` -> `RemoteSource`,
+  `LocalDataSource` -> `LocalSource`, `Repository` -> `Capability` (Queries + Commands).
+
 ## 7.9 Query
 
 A **Query** reads/observes product resource state without expressing a business mutation.
@@ -1543,6 +1556,8 @@ Typical current implementation:
 ```text
 Query -> Store5 -> Fetcher/REST + SourceOfTruth/SQLDelight
 ```
+
+Capability-internal source names follow §7.8.
 
 ## 7.14 Live Resource
 
@@ -3491,6 +3506,15 @@ Rules:
 - assembly-owned `.sq` may express cross-capability joins/projections;
 - migration versions are unique across every schema-contributing module;
 - presentation never depends on SQLDelight.
+
+### 17.1.1 File and table naming
+
+- one `<Name>Schema.sq` per Capability under its `db/` package; the generated accessor is
+  `<name>SchemaQueries`, which cannot collide with the Capability's `<Name>Queries` API;
+- table names are camelCase (SQLDelight's own example idiom), so generated row classes are
+  PascalCase;
+- generated row/query types stay inside the local source class; the `.sq` file name has no schema
+  effect, while a table rename is a `.sqm` migration.
 
 ## 17.2 One physical database is a default, not a law
 

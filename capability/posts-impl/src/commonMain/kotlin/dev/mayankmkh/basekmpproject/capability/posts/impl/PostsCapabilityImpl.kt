@@ -29,8 +29,8 @@ import org.mobilenativefoundation.store.store5.StoreBuilder
 import org.mobilenativefoundation.store.store5.Validator
 
 internal class PostsCapabilityImpl(
-    postsApi: PostsApi,
-    postsLocalStore: PostsLocalStore,
+    remoteSource: PostsRemoteSource,
+    localSource: PostsLocalSource,
     applicationRuntimeScope: ApplicationRuntimeScope,
     connectivityMonitor: ConnectivityMonitor,
 ) : PostsQueries, PostsCommands, AutoCloseable {
@@ -40,7 +40,7 @@ internal class PostsCapabilityImpl(
         StoreBuilder.from(
                 fetcher =
                     Fetcher.ofResult { _: Unit ->
-                        postsApi
+                        remoteSource
                             .getPosts()
                             .fold(
                                 success = { posts -> FetcherResult.Data(posts) },
@@ -51,8 +51,8 @@ internal class PostsCapabilityImpl(
                     SourceOfTruth.of<Unit, List<PostEntity>, FeedSnapshot>(
                         reader = {
                             combine(
-                                postsLocalStore.observeAll(),
-                                postsLocalStore.observeFeedInitialized(),
+                                localSource.observeAll(),
+                                localSource.observeFeedInitialized(),
                             ) { posts, initialized ->
                                 FeedSnapshot(
                                     feed = PostFeed(posts.map(PostEntity::toPost)),
@@ -60,7 +60,7 @@ internal class PostsCapabilityImpl(
                                 )
                             }
                         },
-                        writer = { _, posts -> postsLocalStore.replaceAll(posts) },
+                        writer = { _, posts -> localSource.replaceAll(posts) },
                     ),
                 converter =
                     Converter.Builder<List<PostDto>, List<PostEntity>, FeedSnapshot>()
@@ -83,7 +83,7 @@ internal class PostsCapabilityImpl(
         StoreBuilder.from(
                 fetcher =
                     Fetcher.ofResult { id: PostId ->
-                        postsApi
+                        remoteSource
                             .getPost(id.value)
                             .fold(
                                 success = { post -> FetcherResult.Data(post) },
@@ -93,11 +93,11 @@ internal class PostsCapabilityImpl(
                 sourceOfTruth =
                     SourceOfTruth.of<PostId, PostEntity, Post>(
                         reader = { id ->
-                            postsLocalStore.observeById(id.value.toString()).map { entity ->
+                            localSource.observeById(id.value.toString()).map { entity ->
                                 entity?.toPost()
                             }
                         },
-                        writer = { _, post -> postsLocalStore.upsert(post) },
+                        writer = { _, post -> localSource.upsert(post) },
                     ),
                 converter =
                     Converter.Builder<PostDto, PostEntity, Post>()

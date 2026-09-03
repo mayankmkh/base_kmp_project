@@ -12,11 +12,11 @@ import kotlinx.coroutines.flow.map
 // The whole implementation is `internal`: only the Koin module is visible outside this module, so
 // no consumer can reach past the API.
 //
-// Next step: this scaffold holds its records in memory. When it owns a real resource, follow
-// `:capability:posts-impl`: a Store5 `Store` over `:foundation:network`, capability-owned
-// SQLDelight sources under its `db/` package composed by `:storage:database`, a scope taken from
-// `ApplicationRuntimeScope.childScope(...)`, and `ResourceObservation` from `:foundation:resource`
-// in place of a bare `Flow`.
+// Next step: this scaffold holds its records in memory. When it owns a real resource, create
+// `__NAME__RemoteSource`, `__NAME__LocalSource`, and `__NAME__DatabaseProvider`; add
+// `__NAME__Schema.sq` with camelCase tables under its `db/` package; and follow
+// `:capability:posts-impl` for the worked example. Keep the Store5 `Store`, capability child scope,
+// and `ResourceObservation` inside the implementation.
 /** In-memory implementation of the __name__ Capability. */
 internal class __NAME__CapabilityImpl : __NAME__Queries, __NAME__Commands {
     private val records = MutableStateFlow(emptyList<__NAME__Record>())

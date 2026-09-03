@@ -1,5 +1,5 @@
--- The local cache of the posts feed. This table is the single source of truth the UI observes:
--- the network writes into it and never reaches the presentation layer directly, so cached rows
+-- The durable source of truth for the posts feed that the UI observes:
+-- the network writes into it and never reaches the presentation layer directly, so persisted rows
 -- render offline and a refresh shows up as a table change rather than as a separate result.
 CREATE TABLE post (
     id TEXT NOT NULL PRIMARY KEY,
@@ -18,7 +18,7 @@ CREATE INDEX post_position ON post(position);
 -- A row exists once the feed endpoint has returned successfully, including when it returned an
 -- empty list. Keeping this beside the rows makes "not fetched yet" distinguishable from "fetched
 -- and empty" without preferences that could drift away from the database.
-CREATE TABLE post_feed_state (
+CREATE TABLE postFeedState (
     singleton INTEGER NOT NULL PRIMARY KEY CHECK (singleton = 0)
 );
 
@@ -45,8 +45,8 @@ FROM post;
 
 feedInitializationCount:
 SELECT count(*)
-FROM post_feed_state;
+FROM postFeedState;
 
 markFeedInitialized:
-INSERT OR IGNORE INTO post_feed_state(singleton)
+INSERT OR IGNORE INTO postFeedState(singleton)
 VALUES (0);

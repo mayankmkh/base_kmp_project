@@ -22,7 +22,7 @@ The path and the role must agree; `./gradlew checkModuleGraph` enforces both.
 | `:capability:posts-api` | capability_api | `PostsQueries`, `PostsCommands`, and the `Post` / `PostFeed` product models |
 | `:capability:posts-impl` | capability_impl | Store5/network implementation and the posts-owned SQLDelight schema; `internal` but for its Koin module |
 | `:feature:posts` | feature | The posts Screens, Cells, ViewModels and Outputs |
-| `:foundation:network` | foundation_runtime | Ktor client setup, credentials, request IDs, status-first `ApiError` mapping |
+| `:foundation:network` | foundation_runtime | Ktor client setup, opt-in auth/retry, request IDs and `NetworkFailure` mapping |
 | `:foundation:preferences` | foundation_runtime | DataStore-backed key-value preference stores |
 | `:foundation:presentation` | foundation_api | `FeatureInstanceKey`, `CellPlacementId`, `CellSpec` |
 | `:foundation:resource` | foundation_api | `ResourceObservation`, freshness, refresh QoS, problem taxonomy |

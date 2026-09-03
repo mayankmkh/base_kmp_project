@@ -1,13 +1,13 @@
 package dev.mayankmkh.basekmpproject.capability.posts.impl
 
 import com.github.michaelbull.result.Result
-import dev.mayankmkh.basekmpproject.foundation.network.ApiError
-import dev.mayankmkh.basekmpproject.foundation.network.disableAuthentication
+import dev.mayankmkh.basekmpproject.foundation.network.NetworkFailure
 import dev.mayankmkh.basekmpproject.foundation.network.tryCatching
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.http.appendPathSegments
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -19,17 +19,17 @@ internal data class PostDto(
 )
 
 internal class PostsRemoteSource(private val client: HttpClient) {
-    suspend fun getPosts(limit: Int = DEFAULT_LIMIT): Result<List<PostDto>, ApiError> =
+    suspend fun getPosts(limit: Int = DEFAULT_LIMIT): Result<List<PostDto>, NetworkFailure> =
         client.tryCatching {
-            get(POSTS_PATH) {
-                    disableAuthentication()
+            get {
+                    url { appendPathSegments(POSTS_PATH) }
                     parameter("_limit", limit)
                 }
                 .body()
         }
 
-    suspend fun getPost(id: Long): Result<PostDto, ApiError> = client.tryCatching {
-        get("$POSTS_PATH/$id") { disableAuthentication() }.body()
+    suspend fun getPost(id: Long): Result<PostDto, NetworkFailure> = client.tryCatching {
+        get { url { appendPathSegments(POSTS_PATH, id.toString()) } }.body()
     }
 
     private companion object {

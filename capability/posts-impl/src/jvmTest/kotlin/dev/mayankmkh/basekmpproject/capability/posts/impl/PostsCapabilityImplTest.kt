@@ -18,6 +18,7 @@ import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +29,19 @@ import kotlinx.coroutines.test.runTest
 
 class PostsCapabilityImplTest {
     private val dispatcher = UnconfinedTestDispatcher()
+
+    @Test
+    fun `post paths merge with the configured base url`() = runTest {
+        val engine = MockEngine { respondJson(POST_JSON) }
+
+        val post = PostsRemoteSource(createHttpClient(engine, CONFIG)).getPost(1).component1()
+
+        assertNotNull(post)
+        assertEquals(
+            "https://jsonplaceholder.typicode.com/posts/1",
+            engine.requestHistory.single().url.toString(),
+        )
+    }
 
     @Test
     fun `cached feed stays stale until refresh completes fresh`() =
@@ -171,11 +185,9 @@ class PostsCapabilityImplTest {
     }
 
     private companion object {
-        val CONFIG =
-            NetworkConfig(
-                baseUrl = Url("https://jsonplaceholder.typicode.com"),
-                defaultHeaders = emptyMap(),
-            )
+        val CONFIG = NetworkConfig(baseUrl = Url("https://jsonplaceholder.typicode.com"))
+
+        const val POST_JSON = """{"userId":1,"id":1,"title":"First","body":"First body"}"""
 
         val FEED_JSON =
             """

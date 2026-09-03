@@ -32,7 +32,7 @@ module that stops at the base — rather than applying a role plugin on top — 
 | Module | Role plugin | Purpose |
 |---|---|---|
 | `:foundation:runtime` | `bkp.kmp.foundation.runtime` | dispatchers and application runtime scope |
-| `:foundation:network` | `bkp.kmp.foundation.runtime` | Ktor client construction and transport errors |
+| `:foundation:network` | `bkp.kmp.foundation.runtime` | Ktor client construction, auth/retry mechanics and failures |
 | `:foundation:preferences` | `bkp.kmp.foundation.runtime` | DataStore-backed key-value preference stores |
 | `:foundation:resource` | `bkp.kmp.foundation.api` | resource observation and refresh QoS contracts |
 | `:foundation:resource-store5` | `bkp.kmp.foundation.runtime` | shared Store5-to-resource adapter |

@@ -56,7 +56,12 @@ class RootContentTest {
             modules(
                 module {
                     single<HttpClient> {
-                        createHttpClient(MockEngine { respondFeed() }, config = get())
+                        createHttpClient(
+                            MockEngine { respondFeed() },
+                            config = get(),
+                            headers = get(),
+                            json = get(),
+                        )
                     }
                 }
             )

@@ -3725,6 +3725,9 @@ Ownership split:
   -> serialization configuration
   -> timeouts
   -> common request IDs/interceptors
+  -> auth mechanics (per-request opt-in)
+  -> retry policy (per-request opt-in)
+  -> failure model
   -> generic connectivity/telemetry hooks
 
 Capability Impl
@@ -3757,12 +3760,12 @@ Foundation network may define a neutral inversion such as:
 
 ```kotlin
 interface CredentialProvider {
-    suspend fun currentBearerToken(): String?
-    suspend fun refreshBearerToken(): CredentialRefreshResult
+    suspend fun currentCredential(): String?
+    suspend fun refreshCredential(rejected: String?): CredentialRefreshResult
 }
 
 sealed interface CredentialRefreshResult {
-    data class Refreshed(val bearerToken: String) : CredentialRefreshResult
+    data class Refreshed(val credential: String) : CredentialRefreshResult
 
     /** The credentials are invalid; the provider has already applied its session semantics. */
     data object Rejected : CredentialRefreshResult
@@ -3774,6 +3777,8 @@ sealed interface CredentialRefreshResult {
 
 Identity implementation supplies it through App composition.
 
+[`network.md`](network.md) owns the HTTP client assembly and plugin mechanics.
+
 Refresh returning `Rejected` or `Unavailable` surfaces the original 401 to the caller; the client
 never retries with a credential it knows to be invalid.
 
@@ -3783,7 +3788,7 @@ The authenticated Ktor client may:
 2. inject it generically;
 3. on eligible `401`, invoke single-flight refresh;
 4. retry the original request according to policy;
-5. avoid recursive refresh by using a raw/unauthenticated auth transport for refresh.
+5. send refresh requests through the same client without `authenticated()`.
 
 Product endpoints, DTO mapping, and business semantics remain in owning Capability implementations.
 

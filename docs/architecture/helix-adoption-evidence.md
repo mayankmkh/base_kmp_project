@@ -262,10 +262,23 @@ Network module review follow-up (2026-09-04):
 
 - The credential contract is aligned to §18.6.1, with host-scoped bearer injection and no-auth
   requests never refreshed or retried with a token known to be invalid.
-- `ApiError.Http` is status-first and leaves Capability-owned error body decoding optional.
+- `NetworkFailure.Http` is status-first and leaves Capability-owned error body decoding optional.
 - Every request carries an `X-Request-Id`, `NetworkConfig` owns all three client timeouts, app code
   owns its environment base URL after `BaseUrls` was deleted, and `:foundation:network` now enables
   explicit API mode.
+
+Network ground-up redesign (2026-09-04):
+
+- One client now serves public and protected endpoints through per-request `authenticated()` and
+  `retryable()` opt-ins.
+- Bearer auth uses the Identity-owned in-memory snapshot with `cacheTokens = false`, so sign-out
+  and account switches cannot leave a second token cache behind.
+- Android and desktop name OkHttp, iOS names Darwin, and wasmJs names Js directly rather than
+  resolving an engine from the classpath.
+- `NetworkFailure` is a value model with copied status, headers and body bytes; Capability
+  implementations decide whether and how to decode product error bodies.
+- The app and client share strict JSON semantics: unknown keys are ignored, lenient parsing and
+  explicit nulls/defaults are disabled, and input values are coerced.
 
 Recorded, not fixed (follow-ups, none blocks Feature development):
 

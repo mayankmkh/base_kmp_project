@@ -51,9 +51,9 @@ class IdentityCapabilityImplTest {
 
         capability.observeSession().test {
             assertEquals(SessionState.SignedIn, awaitItem())
-            assertEquals(CredentialRefreshResult.Rejected, capability.refreshBearerToken())
+            assertEquals(CredentialRefreshResult.Rejected, capability.refreshCredential("access"))
             assertEquals(SessionState.Anonymous, awaitItem())
-            assertNull(capability.currentBearerToken())
+            assertNull(capability.currentCredential())
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -62,9 +62,9 @@ class IdentityCapabilityImplTest {
     fun `credential provider reflects the credential store`() = runTest {
         val capability = capability()
 
-        assertNull(capability.currentBearerToken())
+        assertNull(capability.currentCredential())
         capability.signIn(AuthToken("access"))
-        assertEquals("access", capability.currentBearerToken())
+        assertEquals("access", capability.currentCredential())
     }
 
     private fun capability() = IdentityCapabilityImpl(CredentialStore(inMemoryPreferenceStore()))

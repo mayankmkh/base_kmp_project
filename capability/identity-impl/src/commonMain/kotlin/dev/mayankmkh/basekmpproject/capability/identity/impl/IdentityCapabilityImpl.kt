@@ -29,11 +29,11 @@ internal class IdentityCapabilityImpl(private val credentials: CredentialStore) 
         credentials.removeAuthToken()
     }
 
-    override suspend fun currentBearerToken(): String? = credentials.getAuthToken()
+    override suspend fun currentCredential(): String? = credentials.getAuthToken()
 
-    override suspend fun refreshBearerToken(): CredentialRefreshResult {
-        // A real app first calls its refresh endpoint through an unauthenticated client created by
-        // `createHttpClient(engine?, config)` with `AnonymousCredentialProvider` before deciding.
+    override suspend fun refreshCredential(rejected: String?): CredentialRefreshResult {
+        // A real refresh would call the token endpoint through the same client without marking the
+        // request `authenticated()`, so it never enters the credential refresh loop.
         signOut()
         return CredentialRefreshResult.Rejected
     }

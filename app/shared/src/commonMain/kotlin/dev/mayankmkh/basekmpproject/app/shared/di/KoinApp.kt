@@ -9,6 +9,7 @@ import dev.mayankmkh.basekmpproject.capability.identity.impl.identityCapabilityM
 import dev.mayankmkh.basekmpproject.capability.posts.impl.PostsDatabaseProvider
 import dev.mayankmkh.basekmpproject.capability.posts.impl.postsCapabilityModule
 import dev.mayankmkh.basekmpproject.feature.posts.api.postsFeatureModule
+import dev.mayankmkh.basekmpproject.foundation.network.DynamicHeaders
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
 import dev.mayankmkh.basekmpproject.foundation.preferences.PrefContext
@@ -46,8 +47,11 @@ fun initKoin(config: KoinAppDeclaration? = null) {
 private val jsonModule = module {
     single {
         Json {
-            isLenient = true
             ignoreUnknownKeys = true
+            isLenient = false
+            explicitNulls = false
+            encodeDefaults = false
+            coerceInputValues = true
         }
     }
 }
@@ -87,11 +91,15 @@ private val preferencesModule = module {
  */
 private val networkModule = module {
     single { NetworkConfig(baseUrl = apiBaseUrl) }
+    // Locale comes from the app language owner and app version from platform build metadata once
+    // either is required by the backend; the sample API needs no changing headers today.
+    single<DynamicHeaders> { DynamicHeaders.None }
     singleOf(::KermitKtorLogger) bind KtorLogger::class
     single {
         createHttpClient(
             config = get(),
             credentialProvider = get(),
+            headers = get(),
             clientLogger = get(),
             json = get(),
         )

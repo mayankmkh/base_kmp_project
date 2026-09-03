@@ -1,20 +1,22 @@
 package dev.mayankmkh.basekmpproject.foundation.resource.store5
 
-import dev.mayankmkh.basekmpproject.foundation.network.ApiError
-import dev.mayankmkh.basekmpproject.foundation.network.NetworkFailureKind
+import dev.mayankmkh.basekmpproject.foundation.network.NetworkFailure
+import dev.mayankmkh.basekmpproject.foundation.network.TransportFailureKind
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 
-public fun ApiError.toResourceProblem(): ResourceProblem =
+public fun NetworkFailure.toResourceProblem(): ResourceProblem =
     when (this) {
-        is ApiError.Network ->
+        is NetworkFailure.Transport ->
             when (kind) {
-                NetworkFailureKind.OFFLINE ->
+                TransportFailureKind.OFFLINE ->
                     ResourceProblem(category = ResourceProblemCategory.OFFLINE, retryable = true)
-                NetworkFailureKind.TIMEOUT ->
+                TransportFailureKind.TIMEOUT ->
                     ResourceProblem(category = ResourceProblemCategory.TEMPORARY, retryable = true)
             }
-        is ApiError.Http ->
+        is NetworkFailure.Decoding ->
+            ResourceProblem(category = ResourceProblemCategory.PERMANENT, retryable = false)
+        is NetworkFailure.Http ->
             when {
                 status == io.ktor.http.HttpStatusCode.Unauthorized ||
                     status == io.ktor.http.HttpStatusCode.Forbidden ->
@@ -28,7 +30,7 @@ public fun ApiError.toResourceProblem(): ResourceProblem =
                     ResourceProblem(ResourceProblemCategory.PERMANENT, retryable = false)
                 else -> ResourceProblem(ResourceProblemCategory.UNKNOWN, retryable = false)
             }
-        is ApiError.Unknown ->
+        is NetworkFailure.Unexpected ->
             ResourceProblem(category = ResourceProblemCategory.UNKNOWN, retryable = false)
     }
 

@@ -1,7 +1,7 @@
 package dev.mayankmkh.basekmpproject.foundation.resource.store5
 
-import dev.mayankmkh.basekmpproject.foundation.network.ApiError
-import dev.mayankmkh.basekmpproject.foundation.network.toApiError
+import dev.mayankmkh.basekmpproject.foundation.network.NetworkFailure
+import dev.mayankmkh.basekmpproject.foundation.network.toNetworkFailure
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceFreshness
@@ -108,7 +108,7 @@ public class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
         }
     }
 
-    private fun accept(response: StoreReadResponse<StoreValue>): ResourceProblem? {
+    private suspend fun accept(response: StoreReadResponse<StoreValue>): ResourceProblem? {
         return when (response) {
             is StoreReadResponse.Data -> {
                 state.value =
@@ -157,11 +157,11 @@ public class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
     }
 }
 
-private fun StoreReadResponse.Error.toResourceProblem(): ResourceProblem {
-    val custom = (this as? StoreReadResponse.Error.Custom<*>)?.error as? ApiError
+private suspend fun StoreReadResponse.Error.toResourceProblem(): ResourceProblem {
+    val custom = (this as? StoreReadResponse.Error.Custom<*>)?.error as? NetworkFailure
     return custom?.toResourceProblem()
         ?: when (this) {
-            is StoreReadResponse.Error.Exception -> error.toApiError().toResourceProblem()
+            is StoreReadResponse.Error.Exception -> error.toNetworkFailure().toResourceProblem()
             is StoreReadResponse.Error.Message,
             is StoreReadResponse.Error.Custom<*> ->
                 ResourceProblem(ResourceProblemCategory.UNKNOWN, retryable = false)

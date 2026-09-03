@@ -41,7 +41,6 @@ class KoinGraphTest {
                 // `NetworkConfig`'s own fields, filled in by the app environment rather than Koin.
                 Url::class,
                 Duration::class,
-                Map::class,
                 // `HttpClient`'s constructor: the engine is resolved off the classpath by
                 // `HttpClient { }` and the config block is the lambda itself.
                 HttpClientEngine::class,

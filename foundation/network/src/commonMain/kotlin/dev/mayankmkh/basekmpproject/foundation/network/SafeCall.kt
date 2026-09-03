@@ -4,54 +4,59 @@ import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.mapError
 import com.github.michaelbull.result.runCatching
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
+import io.ktor.client.call.NoTransformationFoundException
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
+import io.ktor.client.statement.bodyAsBytes
+import io.ktor.client.statement.request
+import io.ktor.client.utils.unwrapCancellationException
+import io.ktor.serialization.JsonConvertException
 import io.ktor.util.network.UnresolvedAddressException
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.IOException
+import kotlinx.serialization.json.Json
 
-/** Refer [io.ktor.client.plugins.addDefaultResponseValidation] */
 public suspend inline fun <reified T> HttpClient.tryCatching(
     block: suspend HttpClient.() -> T
-): Result<T, ApiError> {
-    return runCatching { block() }
-        .mapError {
-            when (it) {
-                is ResponseException -> ApiError.Http(it.response.status, it.response, it)
-                else -> it.toApiError()
-            }
-        }
-}
+): Result<T, NetworkFailure> = runCatching { block() }.mapError { it.toNetworkFailure() }
 
-/**
- * Decodes the error body as [T] with the client's serializer, or null when it is not that shape.
- */
-public suspend inline fun <reified T> ApiError.Http.bodyOrNull(): T? =
+public inline fun <reified T> NetworkFailure.Http.bodyOrNull(json: Json): T? =
     try {
-        response.body<T>()
-    } catch (exception: CancellationException) {
-        throw exception
-    } catch (@Suppress("SwallowedException", "TooGenericExceptionCaught") exception: Exception) {
-        // Error payloads are optional and may not match the Capability-owned DTO.
-        null
+        json.decodeFromString<T>(body.decodeToString())
+    } catch (@Suppress("SwallowedException", "TooGenericExceptionCaught") exception: Throwable) {
+        if (exception.unwrapCancellationException() is CancellationException) throw exception
+        else null
     }
 
-public fun Throwable.toApiError(): ApiError {
-    if (this is CancellationException) throw this
+public suspend fun Throwable.toNetworkFailure(): NetworkFailure {
+    val unwrapped = unwrapCancellationException()
+    if (unwrapped is CancellationException) throw unwrapped
 
-    val kind =
-        when (this) {
-            is HttpRequestTimeoutException,
-            is SocketTimeoutException,
-            is ConnectTimeoutException -> NetworkFailureKind.TIMEOUT
-            is UnresolvedAddressException,
-            is IOException -> NetworkFailureKind.OFFLINE
-            else -> platformNetworkFailureKind()
+    return when (unwrapped) {
+        is ResponseException ->
+            NetworkFailure.Http(
+                status = unwrapped.response.status,
+                headers = unwrapped.response.headers,
+                body = unwrapped.response.bodyAsBytes(),
+                requestId = unwrapped.response.request.headers[RequestIdHeader],
+                cause = unwrapped,
+            )
+        is JsonConvertException,
+        is NoTransformationFoundException -> NetworkFailure.Decoding(unwrapped)
+        is HttpRequestTimeoutException,
+        is SocketTimeoutException,
+        is ConnectTimeoutException ->
+            NetworkFailure.Transport(TransportFailureKind.TIMEOUT, unwrapped)
+        is UnresolvedAddressException,
+        is IOException -> NetworkFailure.Transport(TransportFailureKind.OFFLINE, unwrapped)
+        else -> {
+            val kind = unwrapped.platformTransportFailureKind()
+            if (kind == null) NetworkFailure.Unexpected(unwrapped)
+            else NetworkFailure.Transport(kind, unwrapped)
         }
-    return if (kind == null) ApiError.Unknown(this) else ApiError.Network(kind, this)
+    }
 }
 
-internal expect fun Throwable.platformNetworkFailureKind(): NetworkFailureKind?
+internal expect fun Throwable.platformTransportFailureKind(): TransportFailureKind?

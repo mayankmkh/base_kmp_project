@@ -3,7 +3,14 @@ package dev.mayankmkh.basekmpproject.foundation.network
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
+import io.ktor.client.engine.HttpClientEngineFactory
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import io.ktor.client.network.sockets.SocketTimeoutException
+import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.api.SendingRequest
+import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.providers.BearerTokens
 import io.ktor.client.plugins.auth.providers.bearer
@@ -16,7 +23,9 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.client.statement.request
+import io.ktor.client.utils.unwrapCancellationException
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.takeFrom
 import io.ktor.serialization.kotlinx.json.json
@@ -26,114 +35,139 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 
+internal expect val platformEngineFactory: HttpClientEngineFactory<*>
+
 internal fun createJson(): Json = Json {
-    isLenient = true
     ignoreUnknownKeys = true
+    isLenient = false
+    explicitNulls = false
+    encodeDefaults = false
+    coerceInputValues = true
 }
 
 @Suppress("LongParameterList")
 public fun createHttpClient(
     config: NetworkConfig,
-    credentialProvider: CredentialProvider,
-    clientLogger: Logger,
+    credentialProvider: CredentialProvider = AnonymousCredentialProvider,
+    headers: DynamicHeaders = DynamicHeaders.None,
+    clientLogger: Logger = Logger.EMPTY,
+    logLevel: LogLevel = LogLevel.NONE,
     json: Json = createJson(),
-    logLevel: LogLevel = LogLevel.HEADERS,
-): HttpClient = HttpClient {
-    installNetworking(
-        config,
-        credentialProvider,
-        json,
-        ktorPlatformLogger(clientLogger),
-        logLevel,
-    )
-}
+): HttpClient =
+    HttpClient(platformEngineFactory) {
+        installNetworking(config, credentialProvider, headers, clientLogger, logLevel, json)
+    }
 
 /**
- * The same client, on an engine the caller names.
- *
- * The no-engine overload above resolves one off the classpath, which is right for the app and
- * useless for a test: there is no seam to answer a request without a network. Handing in a
- * `MockEngine` here gets the real plugin stack -- content negotiation, auth, `expectSuccess` --
- * over canned responses. Kept in `main` for the same reason `createInMemoryDriver` is: a KMP test
- * source set is not visible outside its own module.
+ * The same client on an engine the caller names; tests pass `MockEngine` and get the real plugin
+ * stack over canned responses. Kept in `main` because a KMP test source set is not visible outside
+ * its own module.
  */
 @Suppress("LongParameterList")
 public fun createHttpClient(
     engine: HttpClientEngine,
     config: NetworkConfig,
     credentialProvider: CredentialProvider = AnonymousCredentialProvider,
+    headers: DynamicHeaders = DynamicHeaders.None,
     clientLogger: Logger = Logger.EMPTY,
-    json: Json = createJson(),
     logLevel: LogLevel = LogLevel.NONE,
+    json: Json = createJson(),
 ): HttpClient =
     HttpClient(engine) {
-        installNetworking(
-            config,
-            credentialProvider,
-            json,
-            ktorPlatformLogger(clientLogger),
-            logLevel,
-        )
+        installNetworking(config, credentialProvider, headers, clientLogger, logLevel, json)
     }
 
-/**
- * Split out of [createHttpClient] so the engine stays the caller's choice: `HttpClient { }`
- * resolves one off the classpath, which leaves no seam for a test to answer requests without a
- * network.
- */
-@Suppress("LongMethod", "LongParameterList")
-internal fun HttpClientConfig<*>.installNetworking(
+@Suppress("LongParameterList")
+private fun HttpClientConfig<*>.installNetworking(
     config: NetworkConfig,
     credentialProvider: CredentialProvider,
-    json: Json,
+    headers: DynamicHeaders,
     clientLogger: Logger,
     logLevel: LogLevel,
+    json: Json,
 ) {
-    install(ContentNegotiation) { json(json) }
+    installRetry()
     install(HttpTimeout) {
         requestTimeoutMillis = config.requestTimeout.inWholeMilliseconds
         connectTimeoutMillis = config.connectTimeout.inWholeMilliseconds
         socketTimeoutMillis = config.socketTimeout.inWholeMilliseconds
     }
+    install(ContentNegotiation) { json(json) }
     install(Logging) {
-        logger = clientLogger
+        logger = ktorPlatformLogger(clientLogger)
         level = logLevel
-        // HEADERS level would otherwise write the bearer token into whatever the app logs to.
-        sanitizeHeader { header -> header == HttpHeaders.Authorization }
+        sanitizeHeader { header ->
+            header == HttpHeaders.Authorization ||
+                header == HttpHeaders.Cookie ||
+                header == HttpHeaders.SetCookie
+        }
+    }
+    installAuthentication(config, credentialProvider)
+    install(RequestId)
+    defaultRequest {
+        // Fills in only what the call left out: an absolute url keeps its own host.
+        url.takeFrom(config.baseUrl)
+        headers.current().forEach { (name, value) -> header(name, value) }
     }
     expectSuccess = true
-    defaultRequest {
-        // Only fills in what the call left out: `DefaultRequest` keeps a request's own host when it
-        // has one, so an absolute url still goes where it says.
-        url.takeFrom(config.baseUrl)
-        config.defaultHeaders.forEach { (key, value) -> header(key, value) }
-        headers[RequestIdHeader] = Uuid.random().toString()
-    }
+}
 
+private fun HttpClientConfig<*>.installRetry() {
+    install(HttpRequestRetry) {
+        maxRetries = MaximumRetries
+        retryIf { request, response ->
+            request.attributes.contains(Retryable) &&
+                request.method in IdempotentMethods &&
+                (response.status.value in ServerErrorRange ||
+                    response.status == HttpStatusCode.TooManyRequests)
+        }
+        retryOnExceptionIf { request, cause ->
+            val unwrapped = cause.unwrapCancellationException()
+            request.attributes.contains(Retryable) &&
+                request.method in IdempotentMethods &&
+                cause !is CancellationException &&
+                unwrapped !is CancellationException &&
+                unwrapped !is HttpRequestTimeoutException &&
+                unwrapped !is ConnectTimeoutException &&
+                unwrapped !is SocketTimeoutException
+        }
+        exponentialDelay()
+    }
+}
+
+private fun HttpClientConfig<*>.installAuthentication(
+    config: NetworkConfig,
+    credentialProvider: CredentialProvider,
+) {
     install(Auth) {
         // One predicate feeds both gates, so a request either carries the base host's credentials
-        // and may be refreshed on 401, or is left alone entirely. Without the response gate Ktor
-        // answers any 401 by retrying with the cached token first.
+        // and may be refreshed on 401, or is left alone entirely.
         reAuthorizeOnResponse { response ->
             response.status == HttpStatusCode.Unauthorized &&
-                wantsCredentials(response.request.attributes, response.request.url.host, config)
+                requiresCredentials(response.request.attributes, response.request.url.host, config)
         }
         bearer {
-            sendWithoutRequest { wantsCredentials(it.attributes, it.url.host, config) }
+            sendWithoutRequest { requiresCredentials(it.attributes, it.url.host, config) }
+            cacheTokens = false
+            nonCancellableRefresh = true
             loadTokens {
-                credentialProvider.currentBearerToken()?.let { BearerTokens(it, null) }
+                credentialProvider.currentCredential()?.let { BearerTokens(it, null) }
             }
             refreshTokens {
-                // Another caller may already have refreshed while this request was in flight.
-                val current = credentialProvider.currentBearerToken()
-                if (current != null && current != oldTokens?.accessToken) {
+                // With Ktor's token cache disabled, oldTokens is reloaded at refresh time rather
+                // than necessarily being the credential rejected on the wire.
+                val rejected =
+                    response.request.headers[HttpHeaders.Authorization]?.removePrefix(BearerPrefix)
+                        ?: oldTokens?.accessToken
+                val current = credentialProvider.currentCredential()
+                if (current != null && current != rejected) {
                     return@refreshTokens BearerTokens(current, null)
                 }
 
                 try {
-                    when (val result = credentialProvider.refreshBearerToken()) {
+                    when (val result = credentialProvider.refreshCredential(rejected)) {
                         is CredentialRefreshResult.Refreshed ->
-                            BearerTokens(result.bearerToken, null)
+                            BearerTokens(result.credential, null)
                         CredentialRefreshResult.Rejected,
                         CredentialRefreshResult.Unavailable -> null
                     }
@@ -151,24 +185,26 @@ internal fun HttpClientConfig<*>.installNetworking(
     }
 }
 
-private fun wantsCredentials(attributes: Attributes, host: String, config: NetworkConfig): Boolean =
-    !attributes.contains(noAuthAttribute) && host.equals(config.baseUrl.host, ignoreCase = true)
+private fun requiresCredentials(attributes: Attributes, host: String, config: NetworkConfig) =
+    attributes.contains(RequiresAuth) && host.equals(config.baseUrl.host, ignoreCase = true)
 
 /**
  * The Identity Capability's side of the neutral network inversion (§18.6.1). Foundation network
- * asks for the current bearer token before an authenticated request and for a refresh after a 401;
- * what a refresh means for the session -- sign-out, re-login, nothing -- is the provider's call.
+ * asks for the current credential before an `authenticated()` request and for a refresh after a
+ * 401; what a refresh means for the session is the provider's call.
  */
 public interface CredentialProvider {
-    public suspend fun currentBearerToken(): String?
+    /** The credential to send now, or null when signed out. Cheap: an in-memory read. */
+    public suspend fun currentCredential(): String?
 
-    public suspend fun refreshBearerToken(): CredentialRefreshResult
+    /** Called once per rejected credential. Identity decides what a rejection means. */
+    public suspend fun refreshCredential(rejected: String?): CredentialRefreshResult
 }
 
 public sealed interface CredentialRefreshResult {
-    public data class Refreshed(public val bearerToken: String) : CredentialRefreshResult
+    public data class Refreshed(public val credential: String) : CredentialRefreshResult
 
-    /** The credentials are invalid; the provider has already applied its session semantics. */
+    /** Invalid credentials; the provider has already applied its session semantics. */
     public data object Rejected : CredentialRefreshResult
 
     /** Refresh could not run right now (offline, server down); the session is unchanged. */
@@ -176,17 +212,35 @@ public sealed interface CredentialRefreshResult {
 }
 
 public object AnonymousCredentialProvider : CredentialProvider {
-    public override suspend fun currentBearerToken(): String? = null
+    public override suspend fun currentCredential(): String? = null
 
-    public override suspend fun refreshBearerToken(): CredentialRefreshResult =
+    public override suspend fun refreshCredential(rejected: String?): CredentialRefreshResult =
         CredentialRefreshResult.Rejected
 }
 
-private const val RequestIdHeader = "X-Request-Id"
+internal const val RequestIdHeader: String = "X-Request-Id"
 
-private val noAuthAttribute = AttributeKey<Unit>("NoAuthAttributeKey")
+internal val RequiresAuth = AttributeKey<Unit>("RequiresAuth")
+internal val Retryable = AttributeKey<Unit>("Retryable")
 
-/** Marks one request as anonymous: no bearer token is attached and a 401 is never retried. */
-public fun HttpRequestBuilder.disableAuthentication() {
-    attributes.put(noAuthAttribute, Unit)
+/** Opts one request into credentials and a credential-refresh retry. */
+public fun HttpRequestBuilder.authenticated() {
+    attributes.put(RequiresAuth, Unit)
 }
+
+/** Opts an idempotent request into transient transport and response retries. */
+public fun HttpRequestBuilder.retryable() {
+    attributes.put(Retryable, Unit)
+}
+
+private val RequestId =
+    createClientPlugin("RequestId") {
+        on(SendingRequest) { request, _ ->
+            request.headers[RequestIdHeader] = Uuid.random().toString()
+        }
+    }
+
+private const val MaximumRetries = 2
+private const val BearerPrefix = "Bearer "
+private val ServerErrorRange = 500..599
+private val IdempotentMethods = setOf(HttpMethod.Get, HttpMethod.Head, HttpMethod.Options)

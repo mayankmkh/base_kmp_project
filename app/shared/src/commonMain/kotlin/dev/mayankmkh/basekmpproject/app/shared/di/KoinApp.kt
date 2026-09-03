@@ -4,13 +4,13 @@ import co.touchlab.kermit.Logger
 import co.touchlab.kermit.StaticConfig
 import co.touchlab.kermit.platformLogWriter
 import dev.mayankmkh.basekmpproject.app.shared.config.KermitKtorLogger
+import dev.mayankmkh.basekmpproject.app.shared.config.apiBaseUrl
 import dev.mayankmkh.basekmpproject.capability.identity.impl.identityCapabilityModule
 import dev.mayankmkh.basekmpproject.capability.posts.impl.PostsDatabaseProvider
 import dev.mayankmkh.basekmpproject.capability.posts.impl.postsCapabilityModule
 import dev.mayankmkh.basekmpproject.feature.posts.api.postsFeatureModule
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
-import dev.mayankmkh.basekmpproject.foundation.network.prodBaseUrls
 import dev.mayankmkh.basekmpproject.foundation.preferences.PrefContext
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.foundation.runtime.dispatchers.AppDispatchers
@@ -21,7 +21,6 @@ import dev.mayankmkh.basekmpproject.storage.database.AppDatabaseProvider
 import dev.mayankmkh.basekmpproject.storage.database.DatabaseContext
 import dev.mayankmkh.basekmpproject.storage.database.DefaultAppDatabaseProvider
 import io.ktor.client.plugins.logging.Logger as KtorLogger
-import io.ktor.http.Url
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.serialization.json.Json
 import org.koin.core.context.startKoin
@@ -83,16 +82,16 @@ private val preferencesModule = module {
  *
  * `single`, not `factory`: a client owns a connection pool and an engine, so handing every caller
  * its own would leak both. `NetworkConfig` is a definition of its own so a flavour or a test can
- * override just the host without rebuilding the plugin stack. The `BearerTokenSource` comes from
+ * override just the host without rebuilding the plugin stack. The `CredentialProvider` comes from
  * `identityCapabilityModule` through App composition.
  */
 private val networkModule = module {
-    single { NetworkConfig(baseUrl = Url(prodBaseUrls.main), defaultHeaders = emptyMap()) }
+    single { NetworkConfig(baseUrl = apiBaseUrl) }
     singleOf(::KermitKtorLogger) bind KtorLogger::class
     single {
         createHttpClient(
             config = get(),
-            bearerTokenSource = get(),
+            credentialProvider = get(),
             clientLogger = get(),
             json = get(),
         )

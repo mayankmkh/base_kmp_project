@@ -3,6 +3,7 @@ package dev.mayankmkh.basekmpproject.capability.identity.impl
 import app.cash.turbine.test
 import dev.mayankmkh.basekmpproject.capability.identity.api.AuthToken
 import dev.mayankmkh.basekmpproject.capability.identity.api.SessionState
+import dev.mayankmkh.basekmpproject.foundation.network.CredentialRefreshResult
 import dev.mayankmkh.basekmpproject.foundation.preferences.inMemoryPreferenceStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,26 +45,26 @@ class IdentityCapabilityImplTest {
     }
 
     @Test
-    fun `unauthorized refresh clears credential and session`() = runTest {
+    fun `rejected refresh clears credential and session`() = runTest {
         val capability = capability()
         capability.signIn(AuthToken("access"))
 
         capability.observeSession().test {
             assertEquals(SessionState.SignedIn, awaitItem())
-            capability.refreshUnauthorized()
+            assertEquals(CredentialRefreshResult.Rejected, capability.refreshBearerToken())
             assertEquals(SessionState.Anonymous, awaitItem())
-            assertNull(capability.getAuthToken())
+            assertNull(capability.currentBearerToken())
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `bearer token source reflects the credential store`() = runTest {
+    fun `credential provider reflects the credential store`() = runTest {
         val capability = capability()
 
-        assertNull(capability.getAuthToken())
+        assertNull(capability.currentBearerToken())
         capability.signIn(AuthToken("access"))
-        assertEquals("access", capability.getAuthToken())
+        assertEquals("access", capability.currentBearerToken())
     }
 
     private fun capability() = IdentityCapabilityImpl(CredentialStore(inMemoryPreferenceStore()))

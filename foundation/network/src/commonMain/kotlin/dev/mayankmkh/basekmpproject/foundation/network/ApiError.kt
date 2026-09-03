@@ -1,54 +1,34 @@
 package dev.mayankmkh.basekmpproject.foundation.network
 
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.RedirectResponseException
 import io.ktor.client.plugins.ResponseException
-import io.ktor.client.plugins.ServerResponseException
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.HttpStatusCode
 
-sealed class ApiError(val throwable: Throwable) {
-    data class Network(val kind: NetworkFailureKind, val exception: Throwable) : ApiError(exception)
+/**
+ * What `tryCatching` hands back when a call fails. Status comes first; an error body is decoded
+ * only when the Capability asks for it through [ApiError.Http.bodyOrNull].
+ */
+public sealed interface ApiError {
+    public val cause: Throwable
 
-    data class Redirect(val exception: RedirectResponseException) : ApiError(exception)
+    /** Transport failure before any response arrived. */
+    public data class Network(
+        public val kind: NetworkFailureKind,
+        public override val cause: Throwable,
+    ) : ApiError
 
-    sealed class ClientRequest(exception: ClientRequestException) : ApiError(exception) {
-        data class BadRequest(private val e: ClientRequestException, val errors: BadRequestErrors) :
-            ClientRequest(e)
+    /** The server answered with a non-success status. The body is still readable via [response]. */
+    public data class Http(
+        public val status: HttpStatusCode,
+        public val response: HttpResponse,
+        public override val cause: ResponseException,
+    ) : ApiError
 
-        data class Forbidden(private val e: ClientRequestException, val clientError: ClientError) :
-            ClientRequest(e)
-
-        data class Unauthorized(
-            private val e: ClientRequestException,
-            val clientError: ClientError,
-        ) : ClientRequest(e)
-
-        data class Other(private val e: ClientRequestException, val clientError: ClientError) :
-            ClientRequest(e)
-    }
-
-    data class ServerResponse(
-        val exception: ServerResponseException,
-        val serverError: ServerError,
-    ) : ApiError(exception)
-
-    data class OtherResponse(val exception: ResponseException) : ApiError(exception)
-
-    data class Unknown(private val t: Throwable) : ApiError(t)
+    public data class Unknown(public override val cause: Throwable) : ApiError
 }
 
 /** Transport failures the client can tell apart by type. Anything else stays [ApiError.Unknown]. */
-enum class NetworkFailureKind {
+public enum class NetworkFailureKind {
     OFFLINE,
     TIMEOUT,
 }
-
-@Serializable
-data class BadRequestErrors(@SerialName("errors") val errors: Map<Field, List<String>>)
-
-@Serializable data class ClientError(@SerialName("message") val message: String)
-
-@Serializable data class ServerError(@SerialName("errors") val errors: String)
-
-typealias Field = String

@@ -41,7 +41,7 @@ module that stops at the base — rather than applying a role plugin on top — 
 | `:storage:database` | `bkp.kmp.storage` | Capability-schema assembly, SQLDelight drivers, and merged migrations |
 | `:ui:design-system` | `bkp.kmp.ui` | public application theme |
 | `:capability:identity-api` | `bkp.kmp.capability.api` | observable session state and sign-in/sign-out commands |
-| `:capability:identity-impl` | `bkp.kmp.capability.impl` | credential persistence and the `BearerTokenSource` binding |
+| `:capability:identity-impl` | `bkp.kmp.capability.impl` | credential persistence and the `CredentialProvider` binding |
 | `:capability:posts-api` | `bkp.kmp.capability.api` | grouped `PostsQueries` / intent `PostsCommands` and their models |
 | `:capability:posts-impl` | `bkp.kmp.capability.impl` | Store5-backed posts resources; only `postsCapabilityModule` is public |
 | `:feature:posts` | `bkp.kmp.feature` | feed/detail Screens and the reference Cell, public only under `…feature.posts.api` |

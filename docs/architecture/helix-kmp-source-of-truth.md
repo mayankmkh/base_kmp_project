@@ -3760,9 +3760,22 @@ interface CredentialProvider {
     suspend fun currentBearerToken(): String?
     suspend fun refreshBearerToken(): CredentialRefreshResult
 }
+
+sealed interface CredentialRefreshResult {
+    data class Refreshed(val bearerToken: String) : CredentialRefreshResult
+
+    /** The credentials are invalid; the provider has already applied its session semantics. */
+    data object Rejected : CredentialRefreshResult
+
+    /** Refresh could not run right now (offline, server down); the session is unchanged. */
+    data object Unavailable : CredentialRefreshResult
+}
 ```
 
 Identity implementation supplies it through App composition.
+
+Refresh returning `Rejected` or `Unavailable` surfaces the original 401 to the caller; the client
+never retries with a credential it knows to be invalid.
 
 The authenticated Ktor client may:
 

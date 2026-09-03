@@ -215,7 +215,7 @@ internal fun Project.configureKotlin() {
     // task is realized. Gradle always realizes them before compiling, so a task-level `addAll` is
     // correct for the build -- but the IDE's Gradle import reads a compilation's `compilerOptions`
     // without realizing its task, so those args never reach the IDE analyzer and it reports
-    // warnings (e.g. the `copy()` visibility one on `BaseUrls`) that the build does not.
+    // warnings (e.g. explicit-API visibility diagnostics) that the build does not.
     // `KotlinMultiplatformExtension.compilerOptions` is populated at configuration time and
     // propagates to every target, including the AGP-registered Android one.
     val kotlinMultiplatform = extensions.findByType<KotlinMultiplatformExtension>()

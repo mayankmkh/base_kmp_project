@@ -258,6 +258,15 @@ Resource design-review follow-up (2026-09-03):
 - The Store5 adapter records QoS but executes every class immediately because no scheduler exists
   yet, and it always demotes a cached value to `STALE` on failure.
 
+Network module review follow-up (2026-09-04):
+
+- The credential contract is aligned to §18.6.1, with host-scoped bearer injection and no-auth
+  requests never refreshed or retried with a token known to be invalid.
+- `ApiError.Http` is status-first and leaves Capability-owned error body decoding optional.
+- Every request carries an `X-Request-Id`, `NetworkConfig` owns all three client timeouts, app code
+  owns its environment base URL after `BaseUrls` was deleted, and `:foundation:network` now enables
+  explicit API mode.
+
 Recorded, not fixed (follow-ups, none blocks Feature development):
 
 - Validator hard-codes the `app → app` allowance instead of reading it from policy data

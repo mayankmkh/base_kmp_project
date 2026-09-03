@@ -6,9 +6,9 @@ import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStore
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
-import io.ktor.http.ContentType
 import io.ktor.http.Url
 import kotlin.test.Test
+import kotlin.time.Duration
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import org.koin.dsl.module
@@ -38,9 +38,9 @@ class KoinGraphTest {
                 // Opened inside the Identity module's `CredentialStore` definition lambda.
                 PreferenceStore::class,
                 LoggerConfig::class,
-                // `NetworkConfig`'s own fields, filled in from `BaseUrls` rather than the graph.
+                // `NetworkConfig`'s own fields, filled in by the app environment rather than Koin.
                 Url::class,
-                ContentType::class,
+                Duration::class,
                 Map::class,
                 // `HttpClient`'s constructor: the engine is resolved off the classpath by
                 // `HttpClient { }` and the config block is the lambda itself.

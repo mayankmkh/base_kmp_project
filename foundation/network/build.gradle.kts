@@ -4,14 +4,15 @@ plugins {
 }
 
 kotlin {
+    explicitApi()
     bkpTargets { default() }
 
     sourceSets {
         commonMain {
             dependencies {
                 api(libs.ktor.client.core)
-                api(libs.ktor.client.auth)
                 api(libs.ktor.client.logging)
+                implementation(libs.ktor.client.auth)
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.kotlinx.json)
                 implementation(libs.michael.bull.kotlin.result)

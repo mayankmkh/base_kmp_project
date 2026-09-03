@@ -1,12 +1,8 @@
 package dev.mayankmkh.basekmpproject.foundation.network
 
-import com.github.michaelbull.result.getOrElse
-import com.github.michaelbull.result.runCatching
-import com.github.michaelbull.result.throwIf
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
-import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.providers.BearerTokens
@@ -19,35 +15,33 @@ import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
+import io.ktor.client.statement.request
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
 import io.ktor.http.takeFrom
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.util.AttributeKey
+import io.ktor.util.Attributes
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 
-fun createJson() = Json {
+internal fun createJson(): Json = Json {
     isLenient = true
     ignoreUnknownKeys = true
 }
 
-private const val RequestTimeoutMillis = 30_000L
-private const val SocketTimeoutMillis = 30_000L
-
 @Suppress("LongParameterList")
-fun createHttpClient(
+public fun createHttpClient(
     config: NetworkConfig,
-    bearerTokenSource: BearerTokenSource,
+    credentialProvider: CredentialProvider,
     clientLogger: Logger,
     json: Json = createJson(),
     logLevel: LogLevel = LogLevel.HEADERS,
 ): HttpClient = HttpClient {
     installNetworking(
         config,
-        bearerTokenSource,
+        credentialProvider,
         json,
-        lazy { tokenClient(json, logLevel, clientLogger) },
         ktorPlatformLogger(clientLogger),
         logLevel,
     )
@@ -63,10 +57,10 @@ fun createHttpClient(
  * source set is not visible outside its own module.
  */
 @Suppress("LongParameterList")
-fun createHttpClient(
+public fun createHttpClient(
     engine: HttpClientEngine,
     config: NetworkConfig,
-    bearerTokenSource: BearerTokenSource = AnonymousBearerTokenSource,
+    credentialProvider: CredentialProvider = AnonymousCredentialProvider,
     clientLogger: Logger = Logger.EMPTY,
     json: Json = createJson(),
     logLevel: LogLevel = LogLevel.NONE,
@@ -74,10 +68,9 @@ fun createHttpClient(
     HttpClient(engine) {
         installNetworking(
             config,
-            bearerTokenSource,
+            credentialProvider,
             json,
-            lazy { tokenClient(json, logLevel, clientLogger) },
-            clientLogger,
+            ktorPlatformLogger(clientLogger),
             logLevel,
         )
     }
@@ -90,19 +83,16 @@ fun createHttpClient(
 @Suppress("LongMethod", "LongParameterList")
 internal fun HttpClientConfig<*>.installNetworking(
     config: NetworkConfig,
-    bearerTokenSource: BearerTokenSource,
+    credentialProvider: CredentialProvider,
     json: Json,
-    // `Lazy` because most apps never reach the refresh path: an anonymous `BearerTokenSource`
-    // returns no access token, so the client below would be an engine, a connection pool and its
-    // threads built at startup and held for the process lifetime without ever serving a request.
-    tokenClient: Lazy<HttpClient>,
     clientLogger: Logger,
     logLevel: LogLevel,
 ) {
     install(ContentNegotiation) { json(json) }
     install(HttpTimeout) {
-        requestTimeoutMillis = RequestTimeoutMillis
-        socketTimeoutMillis = SocketTimeoutMillis
+        requestTimeoutMillis = config.requestTimeout.inWholeMilliseconds
+        connectTimeoutMillis = config.connectTimeout.inWholeMilliseconds
+        socketTimeoutMillis = config.socketTimeout.inWholeMilliseconds
     }
     install(Logging) {
         logger = clientLogger
@@ -113,96 +103,87 @@ internal fun HttpClientConfig<*>.installNetworking(
         // Only fills in what the call left out: `DefaultRequest` keeps a request's own host when it
         // has one, so an absolute url still goes where it says.
         url.takeFrom(config.baseUrl)
-        if (contentType() == null) {
-            contentType(config.contentType)
-        }
         config.defaultHeaders.forEach { (key, value) -> header(key, value) }
+        headers[RequestIdHeader] = Uuid.random().toString()
     }
 
     install(Auth) {
+        // One predicate feeds both gates, so a request either carries the base host's credentials
+        // and may be refreshed on 401, or is left alone entirely. Without the response gate Ktor
+        // answers any 401 by retrying with the cached token first.
+        reAuthorizeOnResponse { response ->
+            response.status == HttpStatusCode.Unauthorized &&
+                wantsCredentials(response.request.attributes, response.request.url.host, config)
+        }
         bearer {
-            sendWithoutRequest { it.isAuthenticationEnabled() }
-            loadTokens { getBearerTokensFromSource(bearerTokenSource) }
+            sendWithoutRequest { wantsCredentials(it.attributes, it.url.host, config) }
+            loadTokens {
+                credentialProvider.currentBearerToken()?.let { BearerTokens(it, null) }
+            }
             refreshTokens {
-                runCatching {
-                        val bearerTokens = getBearerTokensFromSource(bearerTokenSource)
-                        if (oldTokens?.accessToken != bearerTokens?.accessToken) {
-                            bearerTokens
-                        } else {
-                            refreshTokenFromClient(bearerTokenSource, tokenClient.value)
-                            getBearerTokensFromSource(bearerTokenSource)
-                        }
+                // Another caller may already have refreshed while this request was in flight.
+                val current = credentialProvider.currentBearerToken()
+                if (current != null && current != oldTokens?.accessToken) {
+                    return@refreshTokens BearerTokens(current, null)
+                }
+
+                try {
+                    when (val result = credentialProvider.refreshBearerToken()) {
+                        is CredentialRefreshResult.Refreshed ->
+                            BearerTokens(result.bearerToken, null)
+                        CredentialRefreshResult.Rejected,
+                        CredentialRefreshResult.Unavailable -> null
                     }
-                    .throwIf { it is CancellationException }
-                    .getOrElse { getBearerTokensFromSource(bearerTokenSource) }
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (
+                    @Suppress("SwallowedException", "TooGenericExceptionCaught")
+                    exception: Exception) {
+                    // A throwing provider counts as `Unavailable`: the caller gets the original
+                    // 401 and the session stays as the provider left it.
+                    null
+                }
             }
         }
     }
 }
 
-fun tokenClient(json: Json, logLevel: LogLevel, clientLogger: Logger) = HttpClient {
-    expectSuccess = true
-    install(ContentNegotiation) { json(json) }
-    install(Logging) {
-        logger = clientLogger
-        level = logLevel
-    }
-}
-
-private suspend fun refreshTokenFromClient(
-    bearerTokenSource: BearerTokenSource,
-    clientWithAuth: HttpClient,
-) {
-    with(bearerTokenSource) {
-        try {
-            clientWithAuth.refreshToken()
-        } catch (exception: ClientRequestException) {
-            if (exception.response.status == HttpStatusCode.Unauthorized) {
-                bearerTokenSource.refreshUnauthorized()
-            }
-            throw exception
-        }
-    }
-}
-
-private suspend fun getBearerTokensFromSource(bearerTokenSource: BearerTokenSource): BearerTokens? {
-    val authToken: String = bearerTokenSource.getAuthToken() ?: return null
-    return BearerTokens(accessToken = authToken, refreshToken = bearerTokenSource.getRefreshToken())
-}
-
-interface BearerTokenSource {
-    suspend fun getAuthToken(): String?
-
-    suspend fun getRefreshToken(): String?
-
-    suspend fun HttpClient.refreshToken()
-
-    suspend fun refreshUnauthorized()
-}
+private fun wantsCredentials(attributes: Attributes, host: String, config: NetworkConfig): Boolean =
+    !attributes.contains(noAuthAttribute) && host.equals(config.baseUrl.host, ignoreCase = true)
 
 /**
- * The token source for an app that has no sign-in yet.
- *
- * Returning `null` is what keeps the `Auth` plugin quiet: with no access token it adds no header
- * and never reaches the refresh path. A real app replaces this binding with one reading from
- * storage -- the rest of the networking stack does not change.
+ * The Identity Capability's side of the neutral network inversion (§18.6.1). Foundation network
+ * asks for the current bearer token before an authenticated request and for a refresh after a 401;
+ * what a refresh means for the session -- sign-out, re-login, nothing -- is the provider's call.
  */
-object AnonymousBearerTokenSource : BearerTokenSource {
-    override suspend fun getAuthToken(): String? = null
+public interface CredentialProvider {
+    public suspend fun currentBearerToken(): String?
 
-    override suspend fun getRefreshToken(): String? = null
-
-    override suspend fun HttpClient.refreshToken() = Unit
-
-    override suspend fun refreshUnauthorized() = Unit
+    public suspend fun refreshBearerToken(): CredentialRefreshResult
 }
+
+public sealed interface CredentialRefreshResult {
+    public data class Refreshed(public val bearerToken: String) : CredentialRefreshResult
+
+    /** The credentials are invalid; the provider has already applied its session semantics. */
+    public data object Rejected : CredentialRefreshResult
+
+    /** Refresh could not run right now (offline, server down); the session is unchanged. */
+    public data object Unavailable : CredentialRefreshResult
+}
+
+public object AnonymousCredentialProvider : CredentialProvider {
+    public override suspend fun currentBearerToken(): String? = null
+
+    public override suspend fun refreshBearerToken(): CredentialRefreshResult =
+        CredentialRefreshResult.Rejected
+}
+
+private const val RequestIdHeader = "X-Request-Id"
 
 private val noAuthAttribute = AttributeKey<Unit>("NoAuthAttributeKey")
 
-fun HttpRequestBuilder.disableAuthentication() {
+/** Marks one request as anonymous: no bearer token is attached and a 401 is never retried. */
+public fun HttpRequestBuilder.disableAuthentication() {
     attributes.put(noAuthAttribute, Unit)
-}
-
-private fun HttpRequestBuilder.isAuthenticationEnabled(): Boolean {
-    return attributes.contains(noAuthAttribute).not()
 }

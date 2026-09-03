@@ -5,13 +5,18 @@ import com.github.michaelbull.result.getError
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.IOException
 import kotlinx.serialization.SerializationException
 
 class SafeCallTest {
@@ -56,6 +61,43 @@ class SafeCallTest {
         val error = assertIs<ApiError.ServerResponse>(client.call().getError())
 
         assertEquals("boom", error.serverError.errors)
+    }
+
+    @Test
+    fun `maps a 401 onto Unauthorized with the parsed body`() = runTest {
+        val client = client(HttpStatusCode.Unauthorized, """{"message":"sign in"}""")
+
+        val error = assertIs<ApiError.ClientRequest.Unauthorized>(client.call().getError())
+
+        assertEquals("sign in", error.clientError.message)
+    }
+
+    @Test
+    fun `maps kotlinx io failures onto offline network errors`() = runTest {
+        val client = HttpClient(MockEngine { throw IOException("offline") })
+
+        val error = assertIs<ApiError.Network>(client.call().getError())
+
+        assertEquals(NetworkFailureKind.OFFLINE, error.kind)
+    }
+
+    @Test
+    fun `maps request timeout onto timeout network errors`() = runTest {
+        val client =
+            HttpClient(MockEngine { throw HttpRequestTimeoutException(HttpRequestBuilder()) })
+
+        val error = assertIs<ApiError.Network>(client.call().getError())
+
+        assertEquals(NetworkFailureKind.TIMEOUT, error.kind)
+    }
+
+    @Test
+    fun `does not turn cancellation into an api error`() = runTest {
+        val client = HttpClient(MockEngine { respond("unused") })
+
+        assertFailsWith<CancellationException> {
+            client.tryCatching<String> { throw CancellationException("cancelled") }
+        }
     }
 
     @Test

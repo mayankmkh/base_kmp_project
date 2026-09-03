@@ -250,6 +250,14 @@ Fixed in phase 6 (details in the plan §6 phase 6 row):
   invalid intermediate state cannot exist. Found by the Simulator smoke test, not by the JVM/wasmJs
   unit tests (single-threaded test dispatcher).
 
+Resource design-review follow-up (2026-09-03):
+
+- Commands now return `RefreshOutcome`; `StoreResource` moved to
+  `:foundation:resource-store5`; transport classification is typed in `:foundation:network`; and
+  `ResourceProblem.message` was removed.
+- The Store5 adapter records QoS but executes every class immediately because no scheduler exists
+  yet, and it always demotes a cached value to `STALE` on failure.
+
 Recorded, not fixed (follow-ups, none blocks Feature development):
 
 - Validator hard-codes the `app → app` allowance instead of reading it from policy data

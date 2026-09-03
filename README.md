@@ -26,6 +26,7 @@ The path and the role must agree; `./gradlew checkModuleGraph` enforces both.
 | `:foundation:preferences` | foundation_runtime | DataStore-backed key-value preference stores |
 | `:foundation:presentation` | foundation_api | `FeatureInstanceKey`, `CellPlacementId`, `CellSpec` |
 | `:foundation:resource` | foundation_api | `ResourceObservation`, freshness, refresh QoS, problem taxonomy |
+| `:foundation:resource-store5` | foundation_runtime | shared Store5-to-resource adapter |
 | `:foundation:runtime` | foundation_runtime | Application scope, dispatchers, logging |
 | `:platform:connectivity` | platform | Network-reachability seam, per platform |
 | `:storage:database` | storage | Assembles capability schemas, drivers, merged migrations, and the product cache `app.db` |

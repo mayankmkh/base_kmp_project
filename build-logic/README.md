@@ -35,6 +35,7 @@ module that stops at the base — rather than applying a role plugin on top — 
 | `:foundation:network` | `bkp.kmp.foundation.runtime` | Ktor client construction and transport errors |
 | `:foundation:preferences` | `bkp.kmp.foundation.runtime` | DataStore-backed key-value preference stores |
 | `:foundation:resource` | `bkp.kmp.foundation.api` | resource observation and refresh QoS contracts |
+| `:foundation:resource-store5` | `bkp.kmp.foundation.runtime` | shared Store5-to-resource adapter |
 | `:foundation:presentation` | `bkp.kmp.foundation.api` + Compose opt-in | keyed presentation identity/ownership |
 | `:platform:connectivity` | `bkp.kmp.platform` | cohesive connectivity expect/actual mechanism |
 | `:storage:database` | `bkp.kmp.storage` | Capability-schema assembly, SQLDelight drivers, and merged migrations |

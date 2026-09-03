@@ -5,6 +5,7 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostFeed
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
+import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceFreshness
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
@@ -36,12 +37,11 @@ object ResourceObservationFixtures {
         value: T? = null,
         category: ResourceProblemCategory = ResourceProblemCategory.UNKNOWN,
         retryable: Boolean = false,
-        message: String? = null,
     ): ResourceObservation<T> =
         ResourceObservation(
             value = value,
             freshness = if (value == null) ResourceFreshness.UNKNOWN else ResourceFreshness.STALE,
-            operation = ResourceOperation.Failed(ResourceProblem(category, retryable, message)),
+            operation = ResourceOperation.Failed(ResourceProblem(category, retryable)),
         )
 }
 
@@ -77,16 +77,18 @@ class FakePostsCommands : PostsCommands {
         private set
 
     val postRefreshes = mutableListOf<PostId>()
-    var onRefreshFeed: suspend (RefreshQos) -> Unit = {}
-    var onRefreshPost: suspend (PostId, RefreshQos) -> Unit = { _, _ -> }
-
-    override suspend fun refreshFeed(qos: RefreshQos) {
-        feedRefreshCount++
-        onRefreshFeed(qos)
+    var onRefreshFeed: suspend (RefreshQos) -> RefreshOutcome = { RefreshOutcome.Succeeded }
+    var onRefreshPost: suspend (PostId, RefreshQos) -> RefreshOutcome = { _, _ ->
+        RefreshOutcome.Succeeded
     }
 
-    override suspend fun refreshPost(id: PostId, qos: RefreshQos) {
+    override suspend fun refreshFeed(qos: RefreshQos): RefreshOutcome {
+        feedRefreshCount++
+        return onRefreshFeed(qos)
+    }
+
+    override suspend fun refreshPost(id: PostId, qos: RefreshQos): RefreshOutcome {
         postRefreshes += id
-        onRefreshPost(id, qos)
+        return onRefreshPost(id, qos)
     }
 }

@@ -5,6 +5,8 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostDetailOutput
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostFeedOutput
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.testkit.FakePostsCommands
 import dev.mayankmkh.basekmpproject.testkit.FakePostsQueries
@@ -14,7 +16,6 @@ import dev.mayankmkh.basekmpproject.testkit.runMainTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlinx.coroutines.test.runCurrent
 
 class PostViewModelTest {
     @Test
@@ -34,33 +35,38 @@ class PostViewModelTest {
     }
 
     @Test
-    fun `feed refresh delegates to commands and failed stale data emits ui command`() =
+    fun `feed refresh failure emits ui command while stream failure only updates state`() =
         runMainTest {
             val queries = FakePostsQueries()
-            val commands = FakePostsCommands()
+            val problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true)
+            val commands =
+                FakePostsCommands().apply {
+                    onRefreshFeed = { RefreshOutcome.Failed(problem) }
+                }
             val viewModel = PostFeedViewModel(feedKey(), queries, commands)
 
-            viewModel.state.test {
+            viewModel.state.test state@{
                 awaitItem()
                 awaitItem()
-                viewModel.onAction(PostFeedAction.Refresh)
-                runCurrent()
-                assertEquals(1, commands.feedRefreshCount)
-
-                queries.feed.value =
-                    ResourceObservationFixtures.failed(
-                        value = PostsFixtures.feed(),
-                        category = ResourceProblemCategory.OFFLINE,
-                        retryable = true,
-                    )
-                val failed = awaitItem()
-                assertEquals(true, failed.isStale)
-                assertEquals(PostsFixtures.feed().posts, failed.posts)
                 viewModel.uiCommands.test {
+                    viewModel.onAction(PostFeedAction.Refresh)
                     assertEquals(
                         ResourceProblemCategory.OFFLINE,
                         assertIs<PostFeedUiCommand.ShowRefreshFailed>(awaitItem()).category,
                     )
+                    assertEquals(1, commands.feedRefreshCount)
+
+                    queries.feed.value =
+                        ResourceObservationFixtures.failed(
+                            value = PostsFixtures.feed(),
+                            category = ResourceProblemCategory.OFFLINE,
+                            retryable = true,
+                        )
+                    val failed = this@state.awaitItem()
+                    assertEquals(true, failed.isStale)
+                    assertEquals(PostsFixtures.feed().posts, failed.posts)
+                    expectNoEvents()
+                    cancelAndIgnoreRemainingEvents()
                 }
                 cancelAndIgnoreRemainingEvents()
             }
@@ -69,7 +75,14 @@ class PostViewModelTest {
     @Test
     fun `detail maps its resource and handles retry and back`() = runMainTest {
         val queries = FakePostsQueries()
-        val commands = FakePostsCommands()
+        val commands =
+            FakePostsCommands().apply {
+                onRefreshPost = { _, _ ->
+                    RefreshOutcome.Failed(
+                        ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true)
+                    )
+                }
+            }
         val post = PostsFixtures.post(2)
         val viewModel = PostDetailViewModel(post.id, detailKey(), queries, commands)
 
@@ -77,7 +90,12 @@ class PostViewModelTest {
             assertEquals(PostDetailState(), awaitItem())
             assertEquals(post, awaitItem().post)
             viewModel.onAction(PostDetailAction.Retry)
-            runCurrent()
+            viewModel.uiCommands.test {
+                assertEquals(
+                    ResourceProblemCategory.TEMPORARY,
+                    assertIs<PostDetailUiCommand.ShowRefreshFailed>(awaitItem()).category,
+                )
+            }
             assertEquals(listOf(post.id), commands.postRefreshes)
             viewModel.onAction(PostDetailAction.Back)
             viewModel.outputs.test { assertEquals(PostDetailOutput.Back, awaitItem()) }

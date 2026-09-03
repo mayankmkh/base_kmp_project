@@ -51,6 +51,7 @@ include(
     ":foundation:network",
     ":foundation:preferences",
     ":foundation:resource",
+    ":foundation:resource-store5",
     ":foundation:presentation",
     ":platform:connectivity",
     ":storage:database",

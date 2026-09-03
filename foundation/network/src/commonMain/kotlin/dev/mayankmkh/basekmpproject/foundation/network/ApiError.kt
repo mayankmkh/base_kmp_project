@@ -8,6 +8,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 sealed class ApiError(val throwable: Throwable) {
+    data class Network(val kind: NetworkFailureKind, val exception: Throwable) : ApiError(exception)
+
     data class Redirect(val exception: RedirectResponseException) : ApiError(exception)
 
     sealed class ClientRequest(exception: ClientRequestException) : ApiError(exception) {
@@ -16,6 +18,11 @@ sealed class ApiError(val throwable: Throwable) {
 
         data class Forbidden(private val e: ClientRequestException, val clientError: ClientError) :
             ClientRequest(e)
+
+        data class Unauthorized(
+            private val e: ClientRequestException,
+            val clientError: ClientError,
+        ) : ClientRequest(e)
 
         data class Other(private val e: ClientRequestException, val clientError: ClientError) :
             ClientRequest(e)
@@ -29,6 +36,12 @@ sealed class ApiError(val throwable: Throwable) {
     data class OtherResponse(val exception: ResponseException) : ApiError(exception)
 
     data class Unknown(private val t: Throwable) : ApiError(t)
+}
+
+/** Transport failures the client can tell apart by type. Anything else stays [ApiError.Unknown]. */
+enum class NetworkFailureKind {
+    OFFLINE,
+    TIMEOUT,
 }
 
 @Serializable

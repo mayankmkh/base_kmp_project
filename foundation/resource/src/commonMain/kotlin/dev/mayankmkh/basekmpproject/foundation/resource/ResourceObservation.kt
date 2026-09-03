@@ -48,7 +48,6 @@ public sealed interface ResourceOperation {
 public data class ResourceProblem(
     val category: ResourceProblemCategory,
     val retryable: Boolean,
-    val message: String? = null,
 )
 
 public enum class ResourceProblemCategory {

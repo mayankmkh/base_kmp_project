@@ -7,6 +7,7 @@ import __CAP_PACKAGE__.__CAP_NAME__Id
 import __CAP_PACKAGE__.__CAP_NAME__Queries
 import __PACKAGE__.api.__NAME__Output
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,8 +41,9 @@ internal sealed interface __NAME__UiCommand {
 // `Commands`. The Capability owns the data; this ViewModel owns only the presentation of it.
 //
 // Next step: once the Capability reports freshness, replace the raw `Flow` collection with
-// `ResourceObservation` from `:foundation:resource` -- `:feature:posts` (`PostDetailViewModel`) is
-// the reference.
+// `ResourceObservation` from `:foundation:resource`. Map its persistent failure into State for a
+// banner; keep transient snackbar feedback sourced only from the command's `RefreshOutcome`.
+// `:feature:posts` (`PostDetailViewModel`) is the reference.
 /** Owns this Cell instance's state for as long as the instance lives. */
 internal class __NAME__ViewModel(
     val id: String,
@@ -87,9 +89,14 @@ internal class __NAME__ViewModel(
     private fun refresh() {
         viewModelScope.launch {
             mutableState.value = mutableState.value.copy(isBusy = true)
-            commands.refresh()
+            val outcome = commands.refresh()
             mutableState.value = mutableState.value.copy(isBusy = false)
-            uiCommandChannel.send(__NAME__UiCommand.ShowMessage("Refreshed"))
+            if (outcome is RefreshOutcome.Failed) {
+                // Product code should map this stable category to a localized string resource.
+                uiCommandChannel.send(
+                    __NAME__UiCommand.ShowMessage(outcome.problem.category.name)
+                )
+            }
         }
     }
 }

@@ -8,6 +8,7 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostDetailOutput
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceFreshness
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
@@ -21,7 +22,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -59,11 +59,6 @@ internal class PostDetailViewModel(
         queries
             .observePost(postId)
             .distinctUntilChanged()
-            .onEach { observation ->
-                observation.failure?.let { problem ->
-                    uiCommandChannel.send(PostDetailUiCommand.ShowRefreshFailed(problem.category))
-                }
-            }
             .map(ResourceObservation<Post>::toDetailState)
             .stateIn(
                 viewModelScope,
@@ -77,7 +72,15 @@ internal class PostDetailViewModel(
 
     fun onAction(action: PostDetailAction) {
         when (action) {
-            PostDetailAction.Retry -> viewModelScope.launch { commands.refreshPost(postId) }
+            PostDetailAction.Retry ->
+                viewModelScope.launch {
+                    val outcome = commands.refreshPost(postId)
+                    if (outcome is RefreshOutcome.Failed) {
+                        uiCommandChannel.send(
+                            PostDetailUiCommand.ShowRefreshFailed(outcome.problem.category)
+                        )
+                    }
+                }
             PostDetailAction.Back ->
                 viewModelScope.launch { outputChannel.send(PostDetailOutput.Back) }
         }

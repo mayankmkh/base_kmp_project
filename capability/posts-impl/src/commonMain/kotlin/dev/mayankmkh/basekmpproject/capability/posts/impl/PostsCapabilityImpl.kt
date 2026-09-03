@@ -6,8 +6,10 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostFeed
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
+import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
+import dev.mayankmkh.basekmpproject.foundation.resource.store5.StoreResource
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.reconnects
@@ -138,13 +140,10 @@ internal class PostsCapabilityImpl(
         emitAll(postResource(id).observations)
     }
 
-    override suspend fun refreshFeed(qos: RefreshQos) {
-        feedResource.refresh(qos)
-    }
+    override suspend fun refreshFeed(qos: RefreshQos): RefreshOutcome = feedResource.refresh(qos)
 
-    override suspend fun refreshPost(id: PostId, qos: RefreshQos) {
+    override suspend fun refreshPost(id: PostId, qos: RefreshQos): RefreshOutcome =
         postResource(id).refresh(qos)
-    }
 
     override fun close() {
         scope.cancel()

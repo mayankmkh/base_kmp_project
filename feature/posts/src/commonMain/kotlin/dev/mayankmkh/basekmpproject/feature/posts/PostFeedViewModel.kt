@@ -9,6 +9,7 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostFeedOutput
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceFreshness
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
@@ -22,7 +23,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -59,11 +59,6 @@ internal class PostFeedViewModel(
         queries
             .observeFeed()
             .distinctUntilChanged()
-            .onEach { observation ->
-                observation.failure?.let { problem ->
-                    uiCommandChannel.send(PostFeedUiCommand.ShowRefreshFailed(problem.category))
-                }
-            }
             .map { it.toFeedState() }
             .stateIn(
                 viewModelScope,
@@ -77,7 +72,15 @@ internal class PostFeedViewModel(
 
     fun onAction(action: PostFeedAction) {
         when (action) {
-            PostFeedAction.Refresh -> viewModelScope.launch { commands.refreshFeed() }
+            PostFeedAction.Refresh ->
+                viewModelScope.launch {
+                    val outcome = commands.refreshFeed()
+                    if (outcome is RefreshOutcome.Failed) {
+                        uiCommandChannel.send(
+                            PostFeedUiCommand.ShowRefreshFailed(outcome.problem.category)
+                        )
+                    }
+                }
             is PostFeedAction.OpenPost ->
                 viewModelScope.launch { outputChannel.send(PostFeedOutput.OpenPost(action.id)) }
         }

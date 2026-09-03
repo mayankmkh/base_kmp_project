@@ -8,6 +8,7 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
+                api(projects.foundation.resource)
                 api(libs.kotlinx.coroutines.core)
             }
         }

@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.foundation.resource
 
+/** Semantics are defined in the architecture source of truth §13.7 (RefreshQos semantics). */
 public enum class RefreshPriority {
     CRITICAL_VISIBLE,
     VISIBLE,
@@ -7,6 +8,7 @@ public enum class RefreshPriority {
     PREFETCH,
 }
 
+/** Semantics are defined in the architecture source of truth §13.7 (RefreshQos semantics). */
 public enum class NetworkPreference {
     ANY_NETWORK,
     UNMETERED_PREFERRED,

@@ -1889,6 +1889,7 @@ Examples:
 ```text
 :foundation:presentation -> foundation_api
 :foundation:resource     -> foundation_api
+:foundation:resource-store5 -> foundation_runtime
 :foundation:time         -> foundation_api
 :foundation:network      -> foundation_runtime
 :foundation:runtime      -> foundation_runtime
@@ -3107,6 +3108,9 @@ Action.FollowTeam
 
 Capability API modules depend on this one product-neutral contract; they must not redefine local copies.
 
+The Store5 adapter `StoreResource` lives in `:foundation:resource-store5` (`foundation_runtime`);
+Capability impls use it rather than copying an adapter.
+
 A plain `Flow<T>` is insufficient for a remotely synchronized read when presentation must distinguish initial load, fresh content, stale cached content, refresh-in-flight, stale-while-refreshing, cached-offline failure, and hard failure.
 
 Canonical contract:
@@ -3154,9 +3158,32 @@ enum class ResourceProblemCategory {
     PERMANENT,
     UNKNOWN,
 }
+
+sealed interface RefreshOutcome {
+    data object Succeeded : RefreshOutcome
+
+    data class Failed(
+        val problem: ResourceProblem,
+    ) : RefreshOutcome
+}
 ```
 
 `T : Any` is deliberate. If "no business value" is a valid domain result, model that explicitly in `T`; do not use the outer nullable `value` for both "not loaded" and "domain says absent."
+
+Refresh (synchronization) Commands return `RefreshOutcome` for the caller's transient feedback;
+other Commands return their own domain result. The observation stream carries persistent status;
+the two are never derived from each other.
+
+**Freshness semantics:** `FRESH` means the remote fetcher confirmed the value during this process
+lifetime. `STALE` means the value was served from the source of truth and is not yet confirmed, or
+was demoted after a failed sync. The contract carries no age/time policy; a Capability that needs
+one models the timestamp inside `T`.
+
+**RefreshQos semantics:** `CRITICAL_VISIBLE` means the user is blocked on the resource; `VISIBLE`
+means the user is looking at it; `BACKGROUND` is maintenance/reconnect work that must not compete
+with visible work; and `PREFETCH` is speculative and may be dropped. `ANY_NETWORK` permits any
+available network; `UNMETERED_PREFERRED` may fall back to metered; and `UNMETERED_ONLY` skips on a
+metered network.
 
 The legal structural combinations are exhaustive:
 
@@ -3166,7 +3193,7 @@ The legal structural combinations are exhaustive:
 | `null` | `UNKNOWN` | `Failed(...)` | hard failure with no cached value |
 | `T` | `FRESH` | `Idle` | fresh, no active sync |
 | `T` | `FRESH` | `Refreshing` | forced/background refresh while current value is still fresh |
-| `T` | `FRESH` | `Failed(...)` | latest sync attempt failed but current value is still within fresh policy |
+| `T` | `FRESH` | `Failed(...)` | latest sync attempt failed and the adapter, which owns the freshness policy, chose not to demote |
 | `T` | `STALE` | `Idle` | stale cached value, no active refresh |
 | `T` | `STALE` | `Refreshing` | stale-while-refresh |
 | `T` | `STALE` | `Failed(...)` | stale/offline or failed refresh with cached value |

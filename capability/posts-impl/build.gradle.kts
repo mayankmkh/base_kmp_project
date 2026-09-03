@@ -13,6 +13,7 @@ kotlin {
                 implementation(projects.capability.postsApi)
                 implementation(projects.foundation.network)
                 implementation(projects.foundation.resource)
+                implementation(projects.foundation.resourceStore5)
                 implementation(projects.foundation.runtime)
                 implementation(projects.platform.connectivity)
                 api(libs.sqldelight.runtime)

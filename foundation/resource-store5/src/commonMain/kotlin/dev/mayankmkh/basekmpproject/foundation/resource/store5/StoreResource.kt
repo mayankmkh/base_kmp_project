@@ -1,14 +1,14 @@
-package dev.mayankmkh.basekmpproject.capability.posts.impl
+package dev.mayankmkh.basekmpproject.foundation.resource.store5
 
 import dev.mayankmkh.basekmpproject.foundation.network.ApiError
+import dev.mayankmkh.basekmpproject.foundation.network.toApiError
+import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceFreshness
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceOperation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
-import io.ktor.client.plugins.ResponseException
-import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +29,7 @@ import org.mobilenativefoundation.store.store5.StoreReadResponseOrigin
  * of truth is served immediately as STALE, a fetcher-origin value promotes it to FRESH, and a
  * failure never clears the value it already holds.
  */
-internal class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
+public class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
     private val scope: CoroutineScope,
     private val store: Store<Key, StoreValue>,
     private val key: Key,
@@ -43,11 +43,11 @@ internal class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
     private val state = MutableStateFlow(ResourceObservation.initial<Value>())
     private val refreshMutex = Mutex()
 
-    val observations: StateFlow<ResourceObservation<Value>> = state.asStateFlow()
+    public val observations: StateFlow<ResourceObservation<Value>> = state.asStateFlow()
 
     init {
         scope.launch {
-            store.stream(StoreReadRequest.cached(key, refresh = false)).collect(::accept)
+            store.stream(StoreReadRequest.cached(key, refresh = false)).collect { accept(it) }
         }
     }
 
@@ -62,14 +62,14 @@ internal class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
      * fetch and the state it owns run to completion under the capability's lifetime.
      */
     @Suppress("UNUSED_PARAMETER")
-    suspend fun refresh(qos: RefreshQos) {
+    public suspend fun refresh(qos: RefreshQos): RefreshOutcome {
         // QoS is already part of the durable capability contract. This reference app has no
         // metered-network/scheduling mechanism yet, so every class executes immediately.
-        scope.async { runRefresh() }.await()
+        return scope.async { runRefresh() }.await()
     }
 
-    private suspend fun runRefresh() {
-        refreshMutex.withLock {
+    private suspend fun runRefresh(): RefreshOutcome {
+        return refreshMutex.withLock {
             state.update { it.copy(operation = ResourceOperation.Refreshing) }
             try {
                 val terminal =
@@ -78,7 +78,8 @@ internal class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
                             response is StoreReadResponse.Error ||
                             response is StoreReadResponse.NoNewData
                     }
-                accept(terminal)
+                val problem = accept(terminal)
+                if (problem == null) RefreshOutcome.Succeeded else RefreshOutcome.Failed(problem)
             } finally {
                 // Only reached with `Refreshing` still set when the fetch never produced a terminal
                 // response -- the capability scope was cancelled mid-flight. Settling here keeps
@@ -107,9 +108,9 @@ internal class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
         }
     }
 
-    private fun accept(response: StoreReadResponse<StoreValue>) {
-        when (response) {
-            is StoreReadResponse.Data ->
+    private fun accept(response: StoreReadResponse<StoreValue>): ResourceProblem? {
+        return when (response) {
+            is StoreReadResponse.Data -> {
                 state.value =
                     ResourceObservation(
                         value = mapValue(response.value),
@@ -121,20 +122,27 @@ internal class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
                             },
                         operation = ResourceOperation.Idle,
                     )
-            is StoreReadResponse.Loading ->
+                null
+            }
+            is StoreReadResponse.Loading -> {
                 state.update { it.copy(operation = ResourceOperation.Refreshing) }
-            is StoreReadResponse.Error ->
+                null
+            }
+            is StoreReadResponse.Error -> {
                 // A failure never clears the value it already holds, but it does demote it: the
                 // last fetch did not confirm it.
+                val problem = response.toResourceProblem()
                 state.update { current ->
                     current.copy(
                         freshness =
                             if (current.value == null) ResourceFreshness.UNKNOWN
                             else ResourceFreshness.STALE,
-                        operation = ResourceOperation.Failed(response.toResourceProblem()),
+                        operation = ResourceOperation.Failed(problem),
                     )
                 }
-            is StoreReadResponse.NoNewData ->
+                problem
+            }
+            is StoreReadResponse.NoNewData -> {
                 // `Idle` without a value would violate `ResourceObservation`'s invariant. Store
                 // only reports "nothing new" against something it already had, so this is a guard
                 // rather than a live branch.
@@ -142,7 +150,9 @@ internal class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
                     if (current.value == null) current
                     else current.copy(operation = ResourceOperation.Idle)
                 }
-            StoreReadResponse.Initial -> Unit
+                null
+            }
+            StoreReadResponse.Initial -> null
         }
     }
 }
@@ -151,59 +161,11 @@ private fun StoreReadResponse.Error.toResourceProblem(): ResourceProblem {
     val custom = (this as? StoreReadResponse.Error.Custom<*>)?.error as? ApiError
     return custom?.toResourceProblem()
         ?: when (this) {
-            is StoreReadResponse.Error.Exception -> error.toResourceProblem()
-            is StoreReadResponse.Error.Message -> unknownProblem()
-            is StoreReadResponse.Error.Custom<*> -> unknownProblem()
+            is StoreReadResponse.Error.Exception -> error.toApiError().toResourceProblem()
+            is StoreReadResponse.Error.Message,
+            is StoreReadResponse.Error.Custom<*> ->
+                ResourceProblem(ResourceProblemCategory.UNKNOWN, retryable = false)
         }
 }
 
-private fun ApiError.toResourceProblem(): ResourceProblem =
-    when (this) {
-        is ApiError.ServerResponse -> temporaryProblem()
-        is ApiError.ClientRequest -> {
-            val status = (throwable as? ResponseException)?.response?.status?.value
-            when {
-                status == HttpStatusCode.Unauthorized.value ||
-                    status == HttpStatusCode.Forbidden.value -> accessProblem()
-                status != null && status in CLIENT_ERROR_STATUSES -> permanentProblem()
-                else -> unknownProblem()
-            }
-        }
-        is ApiError.Unknown -> throwable.toResourceProblem()
-        is ApiError.Redirect,
-        is ApiError.OtherResponse -> unknownProblem()
-    }
-
-private val CLIENT_ERROR_STATUSES =
-    HttpStatusCode.BadRequest.value until HttpStatusCode.InternalServerError.value
-
-private fun Throwable.toResourceProblem(): ResourceProblem {
-    val type = this::class.simpleName.orEmpty()
-    val detail = message.orEmpty()
-    return when {
-        "Timeout" in type || "timed out" in detail.lowercase() -> temporaryProblem()
-        OFFLINE_EXCEPTION_MARKERS.any { marker -> marker in type } -> offlineProblem()
-        else -> unknownProblem()
-    }
-}
-
-private val OFFLINE_EXCEPTION_MARKERS =
-    listOf("IOException", "UnknownHost", "ConnectException", "NoRouteToHost")
-
-private fun offlineProblem() =
-    ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true, "No network connection")
-
-private fun temporaryProblem() =
-    ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true, "Temporarily unavailable")
-
-private fun accessProblem() =
-    ResourceProblem(ResourceProblemCategory.ACCESS, retryable = false, "Access denied")
-
-private fun permanentProblem() =
-    ResourceProblem(ResourceProblemCategory.PERMANENT, retryable = false, "Request rejected")
-
-private fun unknownProblem() =
-    ResourceProblem(ResourceProblemCategory.UNKNOWN, retryable = false, "Request failed")
-
-private fun cancelledProblem() =
-    ResourceProblem(ResourceProblemCategory.UNKNOWN, retryable = true, "Refresh was cancelled")
+private fun cancelledProblem() = ResourceProblem(ResourceProblemCategory.UNKNOWN, retryable = true)

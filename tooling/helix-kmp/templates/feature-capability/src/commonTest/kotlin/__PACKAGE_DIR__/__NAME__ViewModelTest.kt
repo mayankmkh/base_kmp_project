@@ -7,6 +7,9 @@ import __CAP_PACKAGE__.__CAP_NAME__Queries
 import __CAP_PACKAGE__.__CAP_NAME__Record
 import __PACKAGE__.api.__NAME__Output
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
+import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.testkit.runMainTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,14 +25,17 @@ private class Fake__CAP_NAME__ : __CAP_NAME__Queries, __CAP_NAME__Commands {
     var refreshCount: Int = 0
         private set
 
+    var refreshOutcome: RefreshOutcome = RefreshOutcome.Succeeded
+
     override fun observeAll(): Flow<List<__CAP_NAME__Record>> = records
 
     override fun observe(id: __CAP_NAME__Id): Flow<__CAP_NAME__Record?> {
         return records.map { current -> current.firstOrNull { it.id == id } }
     }
 
-    override suspend fun refresh() {
+    override suspend fun refresh(): RefreshOutcome {
         refreshCount++
+        return refreshOutcome
     }
 }
 
@@ -52,6 +58,10 @@ class __NAME__ViewModelTest {
     @Test
     fun `refresh asks the capability to synchronize`() = runMainTest {
         val capability = Fake__CAP_NAME__()
+        capability.refreshOutcome =
+            RefreshOutcome.Failed(
+                ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true)
+            )
         val viewModel = viewModel(capability)
 
         viewModel.onAction(__NAME__Action.Refresh)

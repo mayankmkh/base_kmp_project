@@ -58,8 +58,8 @@ class PostViewModelTest {
                 assertEquals(PostsFixtures.feed().posts, failed.posts)
                 viewModel.uiCommands.test {
                     assertEquals(
-                        "You're offline",
-                        assertIs<PostFeedUiCommand.ShowRefreshFailed>(awaitItem()).message,
+                        ResourceProblemCategory.OFFLINE,
+                        assertIs<PostFeedUiCommand.ShowRefreshFailed>(awaitItem()).category,
                     )
                 }
                 cancelAndIgnoreRemainingEvents()

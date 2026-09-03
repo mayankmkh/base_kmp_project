@@ -11,6 +11,7 @@ import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceFreshness
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
+import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.foundation.resource.failure
 import dev.mayankmkh.basekmpproject.foundation.resource.hasValue
 import dev.mayankmkh.basekmpproject.foundation.resource.isRefreshing
@@ -40,11 +41,11 @@ internal sealed interface PostDetailAction {
 }
 
 internal sealed interface PostDetailUiCommand {
-    data class ShowRefreshFailed(val message: String) : PostDetailUiCommand
+    data class ShowRefreshFailed(val category: ResourceProblemCategory) : PostDetailUiCommand
 }
 
 internal class PostDetailViewModel(
-    private val postId: PostId,
+    val postId: PostId,
     instanceKey: FeatureInstanceKey,
     queries: PostsQueries,
     private val commands: PostsCommands,
@@ -60,9 +61,7 @@ internal class PostDetailViewModel(
             .distinctUntilChanged()
             .onEach { observation ->
                 observation.failure?.let { problem ->
-                    uiCommandChannel.send(
-                        PostDetailUiCommand.ShowRefreshFailed(problem.userMessage())
-                    )
+                    uiCommandChannel.send(PostDetailUiCommand.ShowRefreshFailed(problem.category))
                 }
             }
             .map(ResourceObservation<Post>::toDetailState)

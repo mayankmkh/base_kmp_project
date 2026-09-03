@@ -90,6 +90,26 @@ expect_grep() {
     fi
 }
 
+expect_no_grep() {
+    local pattern="$1" file="$2"
+    if grep -q "$pattern" "$REPO_ROOT/$file"; then
+        fail "$file must not match /$pattern/"
+    else
+        log "  ok: $file does not match /$pattern/"
+    fi
+}
+
+# The canonical Cell shape (source-of-truth §30.4): fills width, never owns its size or scrolling,
+# and fails fast when a host reuses a placement key for a different id. The templates are
+# hand-derived from `:feature:posts`, so both the reference and the generated Cells are checked.
+expect_cell_shape() {
+    local file="$1" id="$2"
+    expect_no_grep "fillMaxSize" "$file"
+    expect_no_grep "verticalScroll" "$file"
+    expect_grep "contentPadding: PaddingValues = PaddingValues()," "$file"
+    expect_grep "check(viewModel.$id == $id)" "$file"
+}
+
 # --------------------------------------------------------------------------
 # 0. baseline
 # --------------------------------------------------------------------------
@@ -232,12 +252,15 @@ expect_file "capability/sample-impl/src/commonTest/kotlin/dev/mayankmkh/basekmpp
 log "create feature sample"
 "$CLI" create feature sample
 expect_file "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/SampleCell.kt"
+expect_cell_shape "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/SampleCell.kt" id
 expect_file "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/SampleScreen.kt"
 expect_file "feature/sample/src/jvmTest/kotlin/dev/mayankmkh/basekmpproject/feature/sample/SampleContentTest.kt"
 
 log "create cell sample Detail"
 "$CLI" create cell sample Detail
 expect_file "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/DetailCell.kt"
+expect_cell_shape "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/DetailCell.kt" id
+expect_cell_shape "feature/posts/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/posts/api/PostDetailCell.kt" postId
 expect_grep "DetailViewModel" "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/sampleFeatureModule.kt"
 
 log "create feature sample-linked --capability sample"

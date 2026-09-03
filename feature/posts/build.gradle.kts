@@ -11,6 +11,7 @@ kotlin {
                 api(projects.capability.postsApi)
                 api(projects.foundation.presentation)
                 implementation(projects.foundation.resource)
+                implementation(projects.ui.designSystem)
             }
         }
         commonTest {

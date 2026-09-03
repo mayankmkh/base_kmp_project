@@ -44,7 +44,7 @@ internal sealed interface __NAME__UiCommand {
 // the reference.
 /** Owns this Cell instance's state for as long as the instance lives. */
 internal class __NAME__ViewModel(
-    private val id: String,
+    val id: String,
     instanceKey: FeatureInstanceKey,
     private val queries: __CAP_NAME__Queries,
     private val commands: __CAP_NAME__Commands,

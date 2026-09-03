@@ -130,7 +130,9 @@ verification tier is `check` plus debug assembles).
   (a hidden host must keep its Cells; `hostLeavingCompositionWhileParentStoreLivesRetainsChildStores`).
 - `:capability:posts-impl` `PostsCapabilityImplTest` (Store5 → `ResourceObservation` mapping,
   reconnect refresh, per-post memoisation).
-- `:feature:posts` `PostViewModelTest` (common), `PostContentTest`, `PostDetailCellTest` (jvm).
+- `:feature:posts` `PostViewModelTest` (3 common cases), `PostContentTest` (3 JVM cases), and
+  `PostDetailCellTest` (3 JVM cases, including lazy-list composition and instance-key/post-id drift
+  rejection); `PostContentPreviews.kt` provides 6 stateless detail/feed state previews.
 - `:app:shared` `KoinGraphTest` (DI graph verifies), `RootContentTest`.
 - Moved with their modules: network `ClientTest`/`SafeCallTest`, storage
   `PostsLocalStoreTest`, `DataStorePreferenceStoreTest` in `:foundation:preferences`, and

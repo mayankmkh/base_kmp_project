@@ -2,15 +2,12 @@ package dev.mayankmkh.basekmpproject.feature.posts
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,8 +27,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import base_kmp_project.feature.posts.generated.resources.Res
+import base_kmp_project.feature.posts.generated.resources.could_not_refresh_posts
+import base_kmp_project.feature.posts.generated.resources.nothing_here_yet
+import base_kmp_project.feature.posts.generated.resources.offline_showing_saved_posts
+import base_kmp_project.feature.posts.generated.resources.post_unavailable
+import base_kmp_project.feature.posts.generated.resources.posts
+import base_kmp_project.feature.posts.generated.resources.posts_temporarily_unavailable
+import base_kmp_project.feature.posts.generated.resources.retry
+import base_kmp_project.feature.posts.generated.resources.showing_saved_posts
+import base_kmp_project.feature.posts.generated.resources.you_are_offline
+import base_kmp_project.feature.posts.generated.resources.you_do_not_have_access
+import dev.mayankmkh.basekmpproject.capability.posts.api.Post
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +55,7 @@ internal fun PostFeedContent(
     val pullState = rememberPullToRefreshState()
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text("Posts") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(Res.string.posts)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         PullToRefreshBox(
@@ -66,34 +77,39 @@ internal fun PostFeedContent(
                 if (state.isStale) {
                     StaleBanner(state.problem)
                 }
-                Box(Modifier.fillMaxSize()) {
-                    when {
-                        state.isInitialLoading ->
-                            CircularProgressIndicator(Modifier.align(Alignment.Center))
-                        state.posts.isNotEmpty() ->
-                            LazyColumn(contentPadding = padding) {
-                                items(state.posts, key = { it.id.value }) { post ->
-                                    Column {
-                                        Text(
-                                            text = post.title,
-                                            modifier =
-                                                Modifier.fillMaxWidth()
-                                                    .clickable {
-                                                        onAction(PostFeedAction.OpenPost(post.id))
-                                                    }
-                                                    .padding(16.dp),
-                                        )
-                                        HorizontalDivider()
-                                    }
-                                }
+                when {
+                    state.isInitialLoading ->
+                        Centred(Modifier.fillMaxSize()) { CircularProgressIndicator() }
+                    state.posts.isNotEmpty() ->
+                        LazyColumn(contentPadding = padding) {
+                            items(state.posts, key = { it.id.value }) { post ->
+                                PostRow(post) { onAction(PostFeedAction.OpenPost(post.id)) }
                             }
-                        state.problem != null ->
-                            Failure(state.problem, { onAction(PostFeedAction.Refresh) })
-                        else -> Centred { Text("Nothing here yet. Pull down to refresh.") }
-                    }
+                        }
+                    state.problem != null ->
+                        Failure(
+                            problem = state.problem,
+                            onRetry = { onAction(PostFeedAction.Refresh) },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    else ->
+                        Centred(Modifier.fillMaxSize()) {
+                            Text(stringResource(Res.string.nothing_here_yet))
+                        }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PostRow(post: Post, onOpen: () -> Unit) {
+    Column {
+        Text(
+            text = post.title,
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(16.dp),
+        )
+        HorizontalDivider()
     }
 }
 
@@ -103,25 +119,18 @@ internal fun PostDetailContent(
     onAction: (PostDetailAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.fillMaxSize()) {
+    Column(modifier.fillMaxWidth()) {
         if (state.isStale) {
             StaleBanner(state.problem)
         }
-        Box(Modifier.fillMaxSize()) {
-            when {
-                state.isInitialLoading ->
-                    CircularProgressIndicator(Modifier.align(Alignment.Center))
-                state.post != null ->
-                    Text(
-                        text = state.post.body,
-                        modifier =
-                            Modifier.fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                                .padding(16.dp),
-                    )
-                state.problem != null ->
-                    Failure(state.problem, { onAction(PostDetailAction.Retry) })
-            }
+        when {
+            state.isInitialLoading -> Centred { CircularProgressIndicator() }
+            state.post != null ->
+                Text(
+                    text = state.post.body,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                )
+            state.problem != null -> Failure(state.problem, { onAction(PostDetailAction.Retry) })
         }
     }
 }
@@ -130,9 +139,9 @@ internal fun PostDetailContent(
 private fun StaleBanner(problem: ResourceProblem?) {
     val message =
         if (problem?.category == ResourceProblemCategory.OFFLINE) {
-            "Offline — showing saved posts"
+            stringResource(Res.string.offline_showing_saved_posts)
         } else {
-            "Showing saved posts"
+            stringResource(Res.string.showing_saved_posts)
         }
     Text(
         text = message,
@@ -142,21 +151,25 @@ private fun StaleBanner(problem: ResourceProblem?) {
 }
 
 @Composable
-private fun Failure(problem: ResourceProblem, onRetry: () -> Unit) {
-    Centred {
+private fun Failure(
+    problem: ResourceProblem,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Centred(modifier) {
         Text(
-            text = problem.userMessage(),
+            text = stringResource(problem.category.messageResource()),
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )
-        Button(onClick = onRetry) { Text("Retry") }
+        Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
     }
 }
 
 @Composable
-private fun Centred(content: @Composable () -> Unit) {
+private fun Centred(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = modifier.fillMaxWidth().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
@@ -164,11 +177,11 @@ private fun Centred(content: @Composable () -> Unit) {
     }
 }
 
-internal fun ResourceProblem.userMessage(): String =
-    when (category) {
-        ResourceProblemCategory.OFFLINE -> "You're offline"
-        ResourceProblemCategory.TEMPORARY -> "Posts are temporarily unavailable"
-        ResourceProblemCategory.ACCESS -> "You don't have access to these posts"
-        ResourceProblemCategory.PERMANENT -> "This post is unavailable"
-        ResourceProblemCategory.UNKNOWN -> "Could not refresh posts"
+internal fun ResourceProblemCategory.messageResource(): StringResource =
+    when (this) {
+        ResourceProblemCategory.OFFLINE -> Res.string.you_are_offline
+        ResourceProblemCategory.TEMPORARY -> Res.string.posts_temporarily_unavailable
+        ResourceProblemCategory.ACCESS -> Res.string.you_do_not_have_access
+        ResourceProblemCategory.PERMANENT -> Res.string.post_unavailable
+        ResourceProblemCategory.UNKNOWN -> Res.string.could_not_refresh_posts
     }

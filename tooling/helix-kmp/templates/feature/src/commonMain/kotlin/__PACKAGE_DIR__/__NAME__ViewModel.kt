@@ -37,7 +37,7 @@ internal sealed interface __NAME__UiCommand {
 // reference. A Feature depends on `:capability:*-api` only, never on an `-impl` module.
 /** Owns this Cell instance's state for as long as the instance lives. */
 internal class __NAME__ViewModel(
-    private val id: String,
+    val id: String,
     instanceKey: FeatureInstanceKey,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(__NAME__State(id = id))

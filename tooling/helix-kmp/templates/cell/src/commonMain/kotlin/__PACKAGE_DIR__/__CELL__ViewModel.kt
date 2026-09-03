@@ -26,7 +26,7 @@ internal sealed interface __CELL__Action {
 // required, not optional.
 /** Owns this Cell instance's state for as long as the instance lives. */
 internal class __CELL__ViewModel(
-    private val id: String,
+    val id: String,
     instanceKey: FeatureInstanceKey,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(__CELL__State(id = id))

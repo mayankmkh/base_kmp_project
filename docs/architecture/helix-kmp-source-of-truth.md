@@ -6213,7 +6213,10 @@ Why these details are canonical:
 - current Koin Compose ViewModel resolution accepts a `ParametersDefinition`, so the parameter expression is a lambda;
 - `collectAsStateWithLifecycle()` is available in common lifecycle-compose APIs and stops unnecessary StateFlow collection when the presentation lifecycle is inactive;
 - `rememberUpdatedState` prevents callback identity churn from restarting the Output collector;
-- the effect is keyed to the ViewModel/lifecycle owner, not to an unstable bound callback reference.
+- the effect is keyed to the ViewModel/lifecycle owner, not to an unstable bound callback reference;
+- a Cell fills width and wraps height; it never uses `fillMaxSize()` or owns vertical scrolling. The host supplies scrolling through `modifier` and insets through `contentPadding`, applied inside the Cell so content can scroll under translucent bars;
+- surface-level element state such as `SnackbarHostState` is hoisted as a nullable parameter with a self-hosting default;
+- the Cell checks that the resolved ViewModel's id equals the `id` parameter and fails fast otherwise: the ViewModel is keyed by `instanceKey` alone, so a host that reuses one placement key for a different id would otherwise keep rendering the stale instance.
 
 Koin definition:
 

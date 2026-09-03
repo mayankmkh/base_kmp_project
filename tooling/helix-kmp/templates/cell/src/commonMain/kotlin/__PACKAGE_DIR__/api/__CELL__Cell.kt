@@ -1,8 +1,6 @@
 package __PACKAGE__.api
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,7 +16,11 @@ import org.koin.core.parameter.parametersOf
 // The Helix Cell signature is `(id, instanceKey, onOutput)`: `id` says *what* is shown,
 // `instanceKey` says *which instance* owns the state, and `onOutput` is the only way out of the
 // Feature. Two hosts may show this Cell at once as long as they pass different instance keys.
-// `contentPadding` lets a host pass its own insets, so the Cell never assumes it owns the surface.
+// A Cell fills the available width, sizes its height to its content, and never scrolls itself. The
+// host supplies scrolling through `modifier` and insets through `contentPadding`, which the Cell
+// applies inside its root so content can scroll under translucent system bars.
+// The identity guard fails fast when a host reuses one placement key for a different `id`: the
+// ViewModel is keyed by `instanceKey` alone, so the stale instance would otherwise keep rendering.
 /** Independently hostable stateful presentation unit. */
 @Composable
 public fun __CELL__Cell(
@@ -30,10 +32,16 @@ public fun __CELL__Cell(
 ) {
     val viewModel: __CELL__ViewModel =
         koinViewModel(key = instanceKey.value, parameters = { parametersOf(id, instanceKey) })
+    check(viewModel.id == id) {
+        "FeatureInstanceKey '${instanceKey.value}' is already bound to id " +
+            "'${viewModel.id}'; fold the id into the instance key"
+    }
     val state by viewModel.state.collectAsStateWithLifecycle()
     CollectWhileStarted(viewModel.outputs, onOutput)
 
-    Box(modifier.fillMaxSize().padding(contentPadding)) {
-        __CELL__Content(state = state, onAction = viewModel::onAction)
-    }
+    __CELL__Content(
+        state = state,
+        onAction = viewModel::onAction,
+        modifier = modifier.padding(contentPadding),
+    )
 }

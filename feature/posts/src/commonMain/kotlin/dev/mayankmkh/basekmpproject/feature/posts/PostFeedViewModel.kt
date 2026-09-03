@@ -12,6 +12,7 @@ import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceFreshness
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
+import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.foundation.resource.failure
 import dev.mayankmkh.basekmpproject.foundation.resource.hasValue
 import dev.mayankmkh.basekmpproject.foundation.resource.isRefreshing
@@ -41,7 +42,7 @@ internal sealed interface PostFeedAction {
 }
 
 internal sealed interface PostFeedUiCommand {
-    data class ShowRefreshFailed(val message: String) : PostFeedUiCommand
+    data class ShowRefreshFailed(val category: ResourceProblemCategory) : PostFeedUiCommand
 }
 
 internal class PostFeedViewModel(
@@ -60,9 +61,7 @@ internal class PostFeedViewModel(
             .distinctUntilChanged()
             .onEach { observation ->
                 observation.failure?.let { problem ->
-                    uiCommandChannel.send(
-                        PostFeedUiCommand.ShowRefreshFailed(problem.userMessage())
-                    )
+                    uiCommandChannel.send(PostFeedUiCommand.ShowRefreshFailed(problem.category))
                 }
             }
             .map { it.toFeedState() }

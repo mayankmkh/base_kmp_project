@@ -38,6 +38,8 @@ kotlinx-coroutines = "1.11.0"
 # wasmJs. Kotlin/Wasm has no browser API in its stdlib, so this is not optional there.
 kotlinx-browser = "0.5.0"
 kotlinxSerialization = "1.11.0"
+# Native desktop access to macOS Keychain, Windows DPAPI and Linux libsecret.
+jna = "5.19.1"
 # Pinned rather than left to Spotless's bundled default, which would otherwise reformat the whole
 # repository as a side effect of a Spotless version bump.
 ktfmt = "0.63"
@@ -52,6 +54,7 @@ store5 = "5.1.0-alpha11"
 touchlabKermit = "2.1.0"
 truth = "1.4.5"
 turbine = "1.2.0"
+tink = "1.23.0"
 
 [libraries]
 
@@ -74,6 +77,8 @@ navigation3-browser = { group = "com.github.terrakok", name = "navigation3-brows
 androidx-datastore-core = { group = "androidx.datastore", name = "datastore-core", version.ref = "androidx-datastore" }
 androidx-datastore-preferences-core = { group = "androidx.datastore", name = "datastore-preferences-core", version.ref = "androidx-datastore" }
 androidx-datastore-core-okio = { group = "androidx.datastore", name = "datastore-core-okio", version.ref = "androidx-datastore" }
+# Encrypts DataStore serializers with Tink on Android and JVM.
+androidx-datastore-tink = { group = "androidx.datastore", name = "datastore-tink", version.ref = "androidx-datastore" }
 androidx-lifecycle-runtimeTesting = { group = "androidx.lifecycle", name = "lifecycle-runtime-testing", version.ref = "androidx-lifecycle" }
 # Supplies the `AndroidJUnitRunner` the Android modules name as their instrumentation runner.
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidx-test-runner" }
@@ -118,6 +123,9 @@ kotlinx-browser = { group = "org.jetbrains.kotlinx", name = "kotlinx-browser", v
 
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 
+jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
+jna-platform = { group = "net.java.dev.jna", name = "jna-platform", version.ref = "jna" }
+
 ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
 ktor-client-auth = { group = "io.ktor", name = "ktor-client-auth", version.ref = "ktor" }
 ktor-client-logging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor" }
@@ -146,6 +154,10 @@ michael-bull-kotlin-result = { group = "com.michael-bull.kotlin-result", name = 
 touchlab-kermit = { group = "co.touchlab", name = "kermit", version.ref = "touchlabKermit" }
 
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+# Android Keystore-backed keyset management for the encrypted secrets store.
+tink-android = { group = "com.google.crypto.tink", name = "tink-android", version.ref = "tink" }
+# Plain JVM Tink manages the desktop keyset and verifies the encrypted serializer in tests.
+tink = { group = "com.google.crypto.tink", name = "tink", version.ref = "tink" }
 
 # Dependencies of the included build-logic
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }

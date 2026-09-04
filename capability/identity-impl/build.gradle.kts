@@ -10,7 +10,7 @@ kotlin {
             dependencies {
                 implementation(projects.capability.identityApi)
                 implementation(projects.foundation.network)
-                implementation(projects.foundation.preferences)
+                implementation(projects.platform.secureStorage)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }

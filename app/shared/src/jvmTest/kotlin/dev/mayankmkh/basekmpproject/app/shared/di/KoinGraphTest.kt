@@ -4,8 +4,8 @@ import co.touchlab.kermit.LoggerConfig
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.foundation.network.AnonymousCredentialProvider
 import dev.mayankmkh.basekmpproject.foundation.network.CredentialProvider
-import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStore
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.platform.securestorage.SecretStore
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
@@ -64,7 +64,7 @@ class KoinGraphTest {
                 FeatureInstanceKey::class,
                 PostId::class,
                 // Opened inside the Identity module's `CredentialStore` definition lambda.
-                PreferenceStore::class,
+                SecretStore::class,
                 LoggerConfig::class,
                 // `NetworkConfig`'s own fields, filled in by the app environment rather than Koin.
                 Url::class,

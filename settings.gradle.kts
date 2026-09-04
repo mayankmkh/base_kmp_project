@@ -54,6 +54,7 @@ include(
     ":foundation:resource-store5",
     ":foundation:presentation",
     ":platform:connectivity",
+    ":platform:secure-storage",
     ":storage:database",
     ":ui:design-system",
 )

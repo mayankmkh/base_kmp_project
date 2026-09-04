@@ -1,7 +1,9 @@
 package dev.mayankmkh.basekmpproject.app.shared.di
 
-import dev.mayankmkh.basekmpproject.foundation.preferences.PrefContext
+import dev.mayankmkh.basekmpproject.app.shared.config.ApplicationId
+import dev.mayankmkh.basekmpproject.foundation.preferences.PreferencesContext
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityContext
+import dev.mayankmkh.basekmpproject.platform.securestorage.SecureStorageContext
 import dev.mayankmkh.basekmpproject.storage.database.DatabaseContext
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.Platform
@@ -11,7 +13,10 @@ import org.koin.core.scope.Scope
 @OptIn(ExperimentalNativeApi::class)
 internal actual fun Scope.isDebugBuild(): Boolean = Platform.isDebugBinary
 
-internal actual fun Scope.createPrefContext(): PrefContext = PrefContext()
+internal actual fun Scope.createPreferencesContext(): PreferencesContext = PreferencesContext()
+
+internal actual fun Scope.createSecureStorageContext(): SecureStorageContext =
+    SecureStorageContext(ApplicationId)
 
 internal actual fun Scope.createDatabaseContext(): DatabaseContext = DatabaseContext()
 

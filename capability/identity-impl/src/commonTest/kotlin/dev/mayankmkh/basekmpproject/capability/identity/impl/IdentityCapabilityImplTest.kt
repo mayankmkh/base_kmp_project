@@ -4,7 +4,7 @@ import app.cash.turbine.test
 import dev.mayankmkh.basekmpproject.capability.identity.api.AuthToken
 import dev.mayankmkh.basekmpproject.capability.identity.api.SessionState
 import dev.mayankmkh.basekmpproject.foundation.network.CredentialRefreshResult
-import dev.mayankmkh.basekmpproject.foundation.preferences.inMemoryPreferenceStore
+import dev.mayankmkh.basekmpproject.platform.securestorage.inMemorySecretStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -67,5 +67,5 @@ class IdentityCapabilityImplTest {
         assertEquals("access", capability.currentCredential())
     }
 
-    private fun capability() = IdentityCapabilityImpl(CredentialStore(inMemoryPreferenceStore()))
+    private fun capability() = IdentityCapabilityImpl(CredentialStore(inMemorySecretStore()))
 }

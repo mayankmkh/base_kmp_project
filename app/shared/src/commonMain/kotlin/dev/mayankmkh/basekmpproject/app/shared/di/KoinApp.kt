@@ -12,12 +12,13 @@ import dev.mayankmkh.basekmpproject.feature.posts.api.postsFeatureModule
 import dev.mayankmkh.basekmpproject.foundation.network.DynamicHeaders
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
-import dev.mayankmkh.basekmpproject.foundation.preferences.PrefContext
+import dev.mayankmkh.basekmpproject.foundation.preferences.PreferencesContext
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.foundation.runtime.dispatchers.AppDispatchers
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityContext
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.createConnectivityMonitor
+import dev.mayankmkh.basekmpproject.platform.securestorage.SecureStorageContext
 import dev.mayankmkh.basekmpproject.storage.database.AppDatabaseProvider
 import dev.mayankmkh.basekmpproject.storage.database.DatabaseContext
 import dev.mayankmkh.basekmpproject.storage.database.DefaultAppDatabaseProvider
@@ -77,9 +78,12 @@ private val runtimeModule = module {
     } onClose { it?.close() }
 }
 
-/** The platform context preference stores are opened with; Capabilities open their own files. */
+/**
+ * Platform-shaped storage handles. Capabilities still own their files, keys and product meaning.
+ */
 private val preferencesModule = module {
-    factory { createPrefContext() }
+    factory { createPreferencesContext() }
+    factory { createSecureStorageContext() }
 }
 
 /**
@@ -169,7 +173,9 @@ internal val appModules = libModules + productModules
  */
 internal expect fun Scope.isDebugBuild(): Boolean
 
-internal expect fun Scope.createPrefContext(): PrefContext
+internal expect fun Scope.createPreferencesContext(): PreferencesContext
+
+internal expect fun Scope.createSecureStorageContext(): SecureStorageContext
 
 internal expect fun Scope.createDatabaseContext(): DatabaseContext
 

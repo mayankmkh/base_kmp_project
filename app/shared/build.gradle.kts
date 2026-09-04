@@ -54,6 +54,7 @@ kotlin {
                 implementation(projects.storage.database)
                 // Same story: the app supplies the platform connectivity mechanism.
                 implementation(projects.platform.connectivity)
+                implementation(projects.platform.secureStorage)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.touchlab.kermit)
                 api(libs.androidx.navigation3.runtime)

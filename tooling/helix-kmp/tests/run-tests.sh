@@ -190,7 +190,7 @@ GALLERY_TEXT="$WORK_DIR/gallery.txt"
 GALLERY_JSON="$WORK_DIR/gallery.json"
 
 "$CLI" graph --json --no-refresh > "$GRAPH_JSON" || fail "graph --json"
-python3 -c 'import json,sys; value=json.load(open(sys.argv[1])); assert value["schema"] == 2; assert len(value["nodes"]) == 19; assert "reverseEdges" in value' "$GRAPH_JSON" || fail "graph JSON shape or node count"
+python3 -c 'import json,sys; value=json.load(open(sys.argv[1])); assert value["schema"] == 2; assert len(value["nodes"]) == 20; assert "reverseEdges" in value' "$GRAPH_JSON" || fail "graph JSON shape or node count"
 
 "$CLI" impact :capability:posts-api --json --no-refresh > "$IMPACT_JSON" || fail "impact module"
 python3 -c 'import json,sys; value=json.load(open(sys.argv[1])); assert ":feature:posts" in value["directReverseDependents"]; assert ":app:shared" in value["directReverseDependents"]' "$IMPACT_JSON" || fail "impact module reverse dependents"

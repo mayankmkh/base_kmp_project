@@ -2,8 +2,10 @@ package dev.mayankmkh.basekmpproject.app.shared.di
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
-import dev.mayankmkh.basekmpproject.foundation.preferences.PrefContext
+import dev.mayankmkh.basekmpproject.app.shared.config.ApplicationId
+import dev.mayankmkh.basekmpproject.foundation.preferences.PreferencesContext
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityContext
+import dev.mayankmkh.basekmpproject.platform.securestorage.SecureStorageContext
 import dev.mayankmkh.basekmpproject.storage.database.DatabaseContext
 import org.koin.core.scope.Scope
 
@@ -12,7 +14,10 @@ import org.koin.core.scope.Scope
 internal actual fun Scope.isDebugBuild(): Boolean =
     get<Context>().applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
 
-internal actual fun Scope.createPrefContext(): PrefContext = PrefContext(get())
+internal actual fun Scope.createPreferencesContext(): PreferencesContext = PreferencesContext(get())
+
+internal actual fun Scope.createSecureStorageContext(): SecureStorageContext =
+    SecureStorageContext(get(), ApplicationId)
 
 internal actual fun Scope.createDatabaseContext(): DatabaseContext = DatabaseContext(get())
 

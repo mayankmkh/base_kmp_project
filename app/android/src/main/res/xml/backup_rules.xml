@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 and below. The secure-storage keyset is wrapped by an Android Keystore key that never
+  leaves this device, so a restored copy cannot be decrypted; see docs/architecture/preferences.md
+  section 8.3. Ciphertext already lives in noBackupFilesDir and needs no rule.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="dev.mayankmkh.basekmpproject.secure-storage.xml"/>
+</full-backup-content>

@@ -17,7 +17,6 @@ import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.EMPTY
-import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.HttpRequestBuilder
@@ -51,11 +50,10 @@ public fun createHttpClient(
     credentialProvider: CredentialProvider = AnonymousCredentialProvider,
     headers: DynamicHeaders = DynamicHeaders.None,
     clientLogger: Logger = Logger.EMPTY,
-    logLevel: LogLevel = LogLevel.NONE,
     json: Json = createJson(),
 ): HttpClient =
     HttpClient(platformEngineFactory) {
-        installNetworking(config, credentialProvider, headers, clientLogger, logLevel, json)
+        installNetworking(config, credentialProvider, headers, clientLogger, json)
     }
 
 /**
@@ -70,11 +68,10 @@ public fun createHttpClient(
     credentialProvider: CredentialProvider = AnonymousCredentialProvider,
     headers: DynamicHeaders = DynamicHeaders.None,
     clientLogger: Logger = Logger.EMPTY,
-    logLevel: LogLevel = LogLevel.NONE,
     json: Json = createJson(),
 ): HttpClient =
     HttpClient(engine) {
-        installNetworking(config, credentialProvider, headers, clientLogger, logLevel, json)
+        installNetworking(config, credentialProvider, headers, clientLogger, json)
     }
 
 @Suppress("LongParameterList")
@@ -83,7 +80,6 @@ private fun HttpClientConfig<*>.installNetworking(
     credentialProvider: CredentialProvider,
     headers: DynamicHeaders,
     clientLogger: Logger,
-    logLevel: LogLevel,
     json: Json,
 ) {
     installRetry()
@@ -95,7 +91,7 @@ private fun HttpClientConfig<*>.installNetworking(
     install(ContentNegotiation) { json(json) }
     install(Logging) {
         logger = ktorPlatformLogger(clientLogger)
-        level = logLevel
+        level = config.logLevel
         sanitizeHeader { header ->
             header == HttpHeaders.Authorization ||
                 header == HttpHeaders.Cookie ||

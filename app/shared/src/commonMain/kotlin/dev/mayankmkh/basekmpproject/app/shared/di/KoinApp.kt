@@ -21,6 +21,7 @@ import dev.mayankmkh.basekmpproject.platform.connectivity.createConnectivityMoni
 import dev.mayankmkh.basekmpproject.storage.database.AppDatabaseProvider
 import dev.mayankmkh.basekmpproject.storage.database.DatabaseContext
 import dev.mayankmkh.basekmpproject.storage.database.DefaultAppDatabaseProvider
+import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger as KtorLogger
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.serialization.json.Json
@@ -90,7 +91,14 @@ private val preferencesModule = module {
  * `identityCapabilityModule` through App composition.
  */
 private val networkModule = module {
-    single { NetworkConfig(baseUrl = apiBaseUrl) }
+    single {
+        NetworkConfig(
+            baseUrl = apiBaseUrl,
+            // Headers, never bodies: the plugin buffers bodies to print them, and the sensitive
+            // headers are sanitised inside the client. Release builds log nothing.
+            logLevel = if (isDebugBuild()) LogLevel.HEADERS else LogLevel.NONE,
+        )
+    }
     // Locale comes from the app language owner and app version from platform build metadata once
     // either is required by the backend; the sample API needs no changing headers today.
     single<DynamicHeaders> { DynamicHeaders.None }
@@ -103,7 +111,7 @@ private val networkModule = module {
             clientLogger = get(),
             json = get(),
         )
-    }
+    } onClose { it?.close() }
 }
 
 /**
@@ -137,7 +145,7 @@ private val databaseModule = module {
 // Declared last: top-level properties initialise in source order, so a list assembled any earlier
 // would capture nulls.
 
-private val libModules =
+internal val libModules =
     listOf(
         jsonModule,
         dispatchersModule,
@@ -154,6 +162,12 @@ private val productModules =
 
 // One list so `KoinGraphTest` verifies the graph `initKoin` starts.
 internal val appModules = libModules + productModules
+
+/**
+ * Whether this process is a debug build. Each target answers from its own runtime signal, so no
+ * generated `BuildConfig` is needed in a library module.
+ */
+internal expect fun Scope.isDebugBuild(): Boolean
 
 internal expect fun Scope.createPrefContext(): PrefContext
 

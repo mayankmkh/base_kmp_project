@@ -46,6 +46,7 @@ public data class NetworkConfig(
     public val requestTimeout: Duration = 30.seconds, // the only portable timeout
     public val connectTimeout: Duration = 10.seconds, // best effort: ignored on Darwin and Js
     public val socketTimeout: Duration = 30.seconds,  // best effort: ignored on Js
+    public val logLevel: LogLevel = LogLevel.NONE,    // the app raises it for debug builds
 )
 
 /** Header values that may change between requests. Read once per request, must not suspend. */
@@ -76,7 +77,6 @@ public fun createHttpClient(
     credentialProvider: CredentialProvider = AnonymousCredentialProvider,
     headers: DynamicHeaders = DynamicHeaders.None,
     clientLogger: Logger = Logger.EMPTY,
-    logLevel: LogLevel = LogLevel.NONE,
     json: Json = createJson(),
 ): HttpClient
 
@@ -118,6 +118,13 @@ The factory form `HttpClient(EngineFactory) { }` is used so the client owns and 
 The explicit-engine overload uses `HttpClient(engine) { }`, which leaves the engine to the caller;
 that is the right ownership for a `MockEngine` in a test.
 
+**Lifecycle.** The app's Koin definition is a `single` with `onClose { it?.close() }`. Stopping Koin
+closes the client, which completes its job and closes the managed engine: OkHttp evicts its
+connection pool and shuts its dispatcher down, Darwin invalidates its session. A process that exits
+without stopping Koin loses nothing, but tests, desktop restarts and Koin context replacement would
+otherwise keep pooled threads and sessions alive. `close()` only initiates shutdown; an owner that
+must wait for every resource joins the client's job.
+
 ## 5. Requests
 
 **Plugin install order** matters because the first plugin installed into the send pipeline is the
@@ -140,6 +147,13 @@ from its own flows, and the transport never waits on a header value.
 **Request id.** A tiny `createClientPlugin` on the `SendingRequest` hook sets `X-Request-Id` to a
 fresh UUID on every wire attempt, so a retried request is distinguishable server-side. This is the
 only custom plugin.
+
+**Redirects.** Ktor's own `HttpRedirect` stays at its defaults: only GET and HEAD are followed, an
+HTTPS to HTTP hop is refused, and a 3xx that is not followed surfaces as `RedirectResponseException`
+under `expectSuccess`. Ktor drops `Authorization` when the authority changes; the redirected builder
+keeps its attributes and re-enters `Auth`, and the base-host predicate (§6) is what stops the token
+from being re-added on the foreign host. Each hop runs `SendingRequest`, so each hop carries its own
+request id.
 
 On web, every non-standard header costs a CORS preflight and the server must list it in
 `Access-Control-Allow-Headers`. Keep the dynamic set small, prefer standard headers such as
@@ -278,10 +292,15 @@ be forgotten.
 
 ## 10. Logging
 
-Default `LogLevel.NONE`. Ktor's own default is `HEADERS`, which would write every header to whatever
-the app logs to. `Authorization`, `Cookie` and `Set-Cookie` are sanitised at every level. Body logging
-is a debug-only choice because the plugin buffers bodies to print them. Output goes through Ktor's
-`Logger` interface to the app's logger.
+The level lives on `NetworkConfig` and defaults to `LogLevel.NONE`. Ktor's own default is `HEADERS`,
+which would write every header to whatever the app logs to. `Authorization`, `Cookie` and
+`Set-Cookie` are sanitised at every level. Body logging is a debug-only choice because the plugin
+buffers bodies to print them. Output goes through Ktor's `Logger` interface to the app's logger.
+
+The app sets `HEADERS` for debug builds and `NONE` otherwise, deciding per target from a runtime
+signal rather than a generated `BuildConfig`: the debuggable flag on Android, the debug binary on
+iOS, and the absence of the `jpackage.app-path` property on desktop. Web stays at `NONE`; the
+browser's Network tab already shows every request and the console belongs to the host page.
 
 ## 11. Testing
 
@@ -303,7 +322,9 @@ Contract tests the module must keep green:
   non-`retryable()` GET; `Retry-After` is honoured;
 - failure mapping for 4xx with a body, HTML 503, malformed 2xx JSON, timeout, IO failure,
   cancellation, unexpected exception; the token never appears in the log;
-- every target names an engine.
+- a same-host redirect keeps the token and a cross-host redirect drops it, each hop with its own
+  request id; a POST redirect and an HTTPS downgrade are not followed;
+- every target names an engine; closing the Koin context closes the client.
 
 ## 12. Decisions and rejected alternatives
 
@@ -319,6 +340,29 @@ Contract tests the module must keep green:
 - **Body bytes, not a live response, in `Http` failures.** Bodies are saved in 3.x anyway, and a
   value can be asserted on and passed around without the call.
 
+### Ktor plugins and options reviewed
+
+Reviewed against Ktor 3.5.2 docs and source on 2026-09-04. Nothing here is installed; the reason is
+recorded so the question is not reopened by default.
+
+| Plugin or option | Decision | Reason |
+| --- | --- | --- |
+| `HttpCache` | Not installed | Store5 over SQLDelight owns durable caching, freshness and account isolation (§2). Ktor's default cache is unbounded, in memory, and keeps account-scoped bodies. Revisit only as a conditional-request layer under Store5, see §13. |
+| `Resources` | When needed | Typed routes pay off with a large, stable endpoint surface. `appendPathSegments` covers the current one without a generated route model per endpoint. |
+| `UserAgent` | Not installed | OkHttp and Darwin already send an identity, browsers refuse to set the header. Client identification goes in a custom header (§5). |
+| `ContentEncoding` | Not installed | OkHttp, Darwin and Fetch decompress responses transparently. Install only for request compression a backend measurably wants. |
+| `HttpCookies` | Not installed | Bearer auth needs no second credential store. Browser cookies are a Fetch credentials-mode question (§13), not an in-memory jar. |
+| `HttpRedirect` | Defaults kept | See §5. Do not relax method checking or the HTTPS downgrade guard globally. |
+| `HttpCallValidator`, extra `HttpSend` interceptors | Not added | No transport-wide 2xx error envelope exists; endpoint error semantics belong to Capability implementations. `expectSuccess` plus `tryCatching` is the whole policy. |
+| `BodyProgress` | Already installed by Ktor | A capability adds `onUpload`/`onDownload` per request for a large transfer; nothing to configure here. |
+| Monitoring observer | When a consumer exists | A dependency-free `HttpSend` observer is cheap once metrics have somewhere to go; a no-op observer is pipeline cost for nothing. OpenTelemetry is not planned. |
+| `WebSockets`, `SSE` | When a capability needs one | Every selected engine supports both. Each plugin adds pipeline work; the first consumer installs it and owns the session. |
+| `DataConversion`, `Charsets`, `SaveBody`, `PluginsTrace` | Not installed | Defaults already give UTF-8 and repeatable non-streaming bodies; the old save-body plugin is deprecated; the trace plugin is debugger plumbing. |
+| Per-platform engine hook | When needed | A narrow, typed hook for a concrete need such as TLS pinning, a proxy or `waitsForConnectivity`. Not a configure-anything escape hatch. |
+| `retryOnTimeout`, `modifyRequest` attempt attribute | Not used | Retry stays outside timeout so the time budget is spent once. An attempt attribute only earns its place alongside the monitoring observer. |
+| `LoggingFormat.OkHttp` | Not used | Presentation only; it adds no wire fidelity. Level `NONE` and header sanitisation are the policy that matters (§10). |
+| `ktor-client-test-base` | Not depended on | Ktor-internal, not published to Maven Central. `MockEngine` history, reusable handlers and `MockEngine.Queue` cover the tests. |
+
 ## 13. Open questions
 
 1. Number of backends. One client per base URL; media or analytics hosts get their own, without
@@ -328,6 +372,8 @@ Contract tests the module must keep green:
 3. Whether web needs cookies. Fetch credentials mode is configurable on the Js engine; bearer-only
    is the default and the safer CORS story.
 4. Whether desktop must honour system proxies. OkHttp needs explicit proxy configuration.
+5. Whether `HttpCache` earns a place beneath Store5 as a conditional-request layer (ETag,
+   `If-None-Match`) once a backend sends validators. Two caches disagreeing on freshness is the cost.
 
 ## 14. References
 

@@ -2,15 +2,23 @@ package dev.mayankmkh.basekmpproject.app.shared.di
 
 import co.touchlab.kermit.LoggerConfig
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
+import dev.mayankmkh.basekmpproject.foundation.network.AnonymousCredentialProvider
+import dev.mayankmkh.basekmpproject.foundation.network.CredentialProvider
 import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStore
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
+import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.http.Url
 import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.isActive
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import org.koin.test.verify.verify
 
@@ -23,6 +31,26 @@ class KoinGraphTest {
         // isolated
         // verification would report holes the running app does not have.
         module { includes(appModules) }.verify(extraTypes = LAMBDA_BUILT)
+    }
+
+    @Test
+    fun `closing koin closes the http client`() {
+        // The library modules alone, with an anonymous provider in place of the Identity module,
+        // so resolving the client opens no secure storage on the test machine.
+        val koin =
+            koinApplication {
+                    modules(
+                        libModules +
+                            module { single<CredentialProvider> { AnonymousCredentialProvider } }
+                    )
+                }
+                .koin
+        val client = koin.get<HttpClient>()
+        assertTrue(client.isActive)
+
+        koin.close()
+
+        assertFalse(client.isActive)
     }
 
     private companion object {
@@ -41,6 +69,7 @@ class KoinGraphTest {
                 // `NetworkConfig`'s own fields, filled in by the app environment rather than Koin.
                 Url::class,
                 Duration::class,
+                LogLevel::class,
                 // `HttpClient`'s constructor: the engine is resolved off the classpath by
                 // `HttpClient { }` and the config block is the lambda itself.
                 HttpClientEngine::class,

@@ -1,10 +1,12 @@
 package dev.mayankmkh.basekmpproject.foundation.network
 
 import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.respondOk
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.plugins.RedirectResponseException
 import io.ktor.client.plugins.ServerResponseException
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
@@ -134,6 +136,50 @@ class ClientTest {
             listOf("Bearer first", null, null),
             engine.requestHistory.map { it.headers[HttpHeaders.Authorization] },
         )
+    }
+
+    @Test
+    fun `redirect keeps the token on the base host and drops it across hosts`() = runTest {
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/moved" -> redirectTo("https://api.example.com/here")
+                "/leaving" -> redirectTo("https://elsewhere.example.com/there")
+                else -> respondOk()
+            }
+        }
+        val client = client(engine)
+
+        client.get("moved") { authenticated() }
+        client.get("leaving") { authenticated() }
+
+        val hops = engine.requestHistory
+        assertEquals(
+            listOf("/moved", "/here", "/leaving", "/there"),
+            hops.map { it.url.encodedPath },
+        )
+        assertEquals(
+            listOf("Bearer first", "Bearer first", "Bearer first", null),
+            hops.map { it.headers[HttpHeaders.Authorization] },
+        )
+        // Every hop is its own wire attempt and gets its own id.
+        assertEquals(hops.size, hops.mapNotNull { it.headers[RequestIdHeader] }.toSet().size)
+    }
+
+    @Test
+    fun `redirect is not followed for a post or onto plain http`() = runTest {
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/post" -> redirectTo("https://api.example.com/elsewhere")
+                "/downgrade" -> redirectTo("http://api.example.com/insecure")
+                else -> respondOk()
+            }
+        }
+        val client = client(engine)
+
+        assertFailsWith<RedirectResponseException> { client.post("post") }
+        assertFailsWith<RedirectResponseException> { client.get("downgrade") }
+
+        assertEquals(2, engine.requestHistory.size)
     }
 
     @Test
@@ -354,10 +400,9 @@ class ClientTest {
 
         createHttpClient(
                 engine = engine,
-                config = config,
+                config = config.copy(logLevel = LogLevel.HEADERS),
                 credentialProvider = FakeCredentialProvider(),
                 clientLogger = logger,
-                logLevel = LogLevel.HEADERS,
             )
             .get("thing") {
                 authenticated()
@@ -393,6 +438,9 @@ class ClientTest {
             credentialProvider = provider,
             headers = headers,
         )
+
+    private fun MockRequestHandleScope.redirectTo(location: String) =
+        respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, location))
 
     private class FakeCredentialProvider(
         private val refreshAction: suspend FakeCredentialProvider.() -> CredentialRefreshResult = {

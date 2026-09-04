@@ -231,7 +231,7 @@ Fixed in phase 6 (details in the plan §6 phase 6 row):
   (page loaded nothing). `BkpWebAppPlugin` now pins `outputFileName = "webApp.js"`.
 - `StoreResource.refresh` ran the network fetch in the caller's coroutine, so clearing a
   ViewModel mid-fetch left every observer at `Refreshing` forever. The fetch now runs in the
-  capability scope (`scope.async { }.await()`) and a `finally` settles an abandoned refresh;
+  resource child scope through `async { }.await()`, and a `finally` settles an abandoned refresh;
   regression test added to `PostsCapabilityImplTest`.
 - `RootContent` popped an unguarded back stack; a web session restored straight onto a detail
   route would empty the stack on Back. Pop is guarded and falls back to the feed route;
@@ -257,6 +257,10 @@ Resource design-review follow-up (2026-09-03):
   `ResourceProblem.message` was removed.
 - The Store5 adapter records QoS but executes every class immediately because no scheduler exists
   yet, and it always demotes a cached value to `STALE` on failure.
+- The adapter gates source-of-truth collection on subscribers with a grace timeout. Posts detail
+  resources are lease-counted and evicted after the last collector or refresh finishes, and a
+  reconnect refreshes the feed only while it has an observer and otherwise defers the refresh to
+  the next observer.
 
 Network module review follow-up (2026-09-04):
 
@@ -301,8 +305,6 @@ Recorded, not fixed (follow-ups, none blocks Feature development):
   edge declared via `compileOnly`/`runtimeOnly` is not reported.
 - `currentDate` is an `@Input` of the cacheable graph task, so it is never up-to-date across
   days.
-- `PostsCapabilityImpl.postResources` never evicts; every post ever opened stays hot for the
-  application lifetime (`stateIn(scope)` per post).
 - `KeyedOwnerHost` reconciles a set diff against remembered known keys in `SideEffect`; lifecycle's
   provider defers a requested clear while an item remains composed and completes it on disposal.
 - `StoreResource` serialises overlapping refreshes behind a mutex rather than sharing the

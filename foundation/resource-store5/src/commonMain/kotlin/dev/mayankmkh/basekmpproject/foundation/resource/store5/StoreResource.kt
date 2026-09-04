@@ -9,13 +9,20 @@ import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceOperation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingCommand
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -30,11 +37,15 @@ import org.mobilenativefoundation.store.store5.StoreReadResponseOrigin
  * failure never clears the value it already holds.
  */
 public class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
     private val store: Store<Key, StoreValue>,
     private val key: Key,
     private val mapValue: (StoreValue) -> Value,
-) {
+    stopTimeout: Duration = 5.seconds,
+) : AutoCloseable {
+    private val resourceScope =
+        CoroutineScope(scope.coroutineContext + Job(scope.coroutineContext.job))
+
     // One flow, not a value flow combined with a sync flow: `combine` collects its sources in
     // separate coroutines, so on a multi-threaded dispatcher it can observe a new operation before
     // the value that came with it and build an `Idle` observation without a value, which the
@@ -44,29 +55,43 @@ public class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
     private val refreshMutex = Mutex()
 
     public val observations: StateFlow<ResourceObservation<Value>> = state.asStateFlow()
+    public val subscriptionCount: StateFlow<Int> = state.subscriptionCount
 
     init {
-        scope.launch {
-            store.stream(StoreReadRequest.cached(key, refresh = false)).collect { accept(it) }
+        resourceScope.launch {
+            SharingStarted.WhileSubscribed(stopTimeoutMillis = stopTimeout.inWholeMilliseconds)
+                .command(state.subscriptionCount)
+                .collectLatest { command ->
+                    when (command) {
+                        SharingCommand.START ->
+                            store.stream(StoreReadRequest.cached(key, refresh = false)).collect {
+                                accept(it)
+                            }
+                        SharingCommand.STOP,
+                        SharingCommand.STOP_AND_RESET_REPLAY_CACHE -> Unit
+                    }
+                }
         }
     }
 
     /**
-     * Runs on the capability's own [scope] rather than the caller's.
+     * Runs on this resource's child scope rather than the caller's.
      *
      * The observation is shared by every observer of this key, so a fetch that publishes
      * `Refreshing` has to publish its terminal state too. Callers are ViewModels launching into
      * `viewModelScope`: leaving the fetch in the caller would let a cleared ViewModel cancel it
      * between those two writes and strand every remaining observer on `Refreshing` forever. `async
      * { }.await()` keeps the caller's cancellation meaningful -- it stops *waiting* -- while the
-     * fetch and the state it owns run to completion under the capability's lifetime.
+     * fetch and the state it owns run to completion under the resource's lifetime.
      */
     @Suppress("UNUSED_PARAMETER")
     public suspend fun refresh(qos: RefreshQos): RefreshOutcome {
         // QoS is already part of the durable capability contract. This reference app has no
         // metered-network/scheduling mechanism yet, so every class executes immediately.
-        return scope.async { runRefresh() }.await()
+        return resourceScope.async { runRefresh() }.await()
     }
+
+    override fun close(): Unit = resourceScope.coroutineContext.job.cancel()
 
     private suspend fun runRefresh(): RefreshOutcome {
         return refreshMutex.withLock {
@@ -82,7 +107,7 @@ public class StoreResource<Key : Any, StoreValue : Any, Value : Any>(
                 if (problem == null) RefreshOutcome.Succeeded else RefreshOutcome.Failed(problem)
             } finally {
                 // Only reached with `Refreshing` still set when the fetch never produced a terminal
-                // response -- the capability scope was cancelled mid-flight. Settling here keeps
+                // response -- the resource scope was cancelled mid-flight. Settling here keeps
                 // the promise the `Refreshing` write made.
                 settleAbandonedRefresh()
             }

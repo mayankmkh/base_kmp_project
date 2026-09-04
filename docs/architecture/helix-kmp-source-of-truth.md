@@ -3110,6 +3110,9 @@ Capability API modules depend on this one product-neutral contract; they must no
 
 The Store5 adapter `StoreResource` lives in `:foundation:resource-store5` (`foundation_runtime`);
 Capability impls use it rather than copying an adapter.
+Its source-of-truth collection follows observation subscribers with a grace timeout while retaining
+the last observation. Capability owners lease and evict keyed instances according to their product
+lifetime policy.
 
 A plain `Flow<T>` is insufficient for a remotely synchronized read when presentation must distinguish initial load, fresh content, stale cached content, refresh-in-flight, stale-while-refreshing, cached-offline failure, and hard failure.
 

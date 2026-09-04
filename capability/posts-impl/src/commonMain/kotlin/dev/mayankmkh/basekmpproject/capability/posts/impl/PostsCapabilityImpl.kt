@@ -13,15 +13,19 @@ import dev.mayankmkh.basekmpproject.foundation.resource.store5.StoreResource
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.reconnects
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.mobilenativefoundation.store.store5.Converter
 import org.mobilenativefoundation.store.store5.Fetcher
 import org.mobilenativefoundation.store.store5.FetcherResult
@@ -119,48 +123,109 @@ internal class PostsCapabilityImpl(
             mapValue = FeedSnapshot::feed,
         )
 
-    // Reached from every observer and command coroutine, so the map is only ever touched while
-    // holding this mutex: `getOrPut` is not atomic, and a lost race would start a second
-    // collector for the same post inside the capability scope.
     private val postResourcesMutex = Mutex()
-    private val postResources = mutableMapOf<PostId, StoreResource<PostId, Post, Post>>()
+    private val postResources = mutableMapOf<PostId, PostResourceLease>()
+
+    // A reconnect that arrives while nobody observes the feed is remembered rather than acted on,
+    // so no request is spent on data nobody is looking at. The first observer to arrive afterwards
+    // settles the debt, which is the "first subscriber ensures current state" step of the Helix
+    // subscriber model. Both writers run in the capability scope.
+    private val feedRevalidationPending = MutableStateFlow(false)
 
     init {
-        // Reconnect is capability/resource policy, not presentation lifetime. Background QoS is
-        // recorded at the command boundary even though the current transport executes all QoS
-        // classes immediately (there is no shared refresh scheduler in this adoption phase).
+        // Reconnect is capability policy, not presentation lifetime. Background QoS is recorded at
+        // the command boundary even though the current transport executes every class immediately.
         scope.launch {
-            connectivityMonitor.reconnects().collect { refreshFeed(RefreshQos.background()) }
+            connectivityMonitor.reconnects().collect {
+                if (feedResource.subscriptionCount.value > 0) {
+                    refreshFeed(RefreshQos.background())
+                } else {
+                    feedRevalidationPending.value = true
+                }
+            }
+        }
+        scope.launch {
+            feedResource.subscriptionCount
+                .map { count -> count > 0 }
+                .distinctUntilChanged()
+                .collect { observed ->
+                    if (
+                        observed &&
+                            feedRevalidationPending.compareAndSet(expect = true, update = false)
+                    ) {
+                        refreshFeed(RefreshQos.background())
+                    }
+                }
         }
     }
 
     override fun observeFeed(): Flow<ResourceObservation<PostFeed>> = feedResource.observations
 
     override fun observePost(id: PostId): Flow<ResourceObservation<Post>> = flow {
-        emitAll(postResource(id).observations)
+        withPostResource(id) { emitAll(it.observations) }
     }
 
-    override suspend fun refreshFeed(qos: RefreshQos): RefreshOutcome = feedResource.refresh(qos)
+    // Any successful feed refresh, including one driven by a background job, settles the deferred
+    // reconnect debt so the next first observer does not repeat it.
+    override suspend fun refreshFeed(qos: RefreshQos): RefreshOutcome =
+        feedResource.refresh(qos).also { outcome ->
+            if (outcome is RefreshOutcome.Succeeded) feedRevalidationPending.value = false
+        }
 
     override suspend fun refreshPost(id: PostId, qos: RefreshQos): RefreshOutcome =
-        postResource(id).refresh(qos)
+        withPostResource(id) { it.refresh(qos) }
 
     override fun close() {
         scope.cancel()
     }
 
-    private suspend fun postResource(id: PostId): StoreResource<PostId, Post, Post> =
-        postResourcesMutex.withLock {
-            postResources.getOrPut(id) {
-                StoreResource(
-                    scope = scope,
-                    store = postStore,
-                    key = id,
-                    mapValue = { post -> post },
-                )
+    // Lease changes and zero-count eviction share one critical section. A new caller either joins
+    // the existing positive lease count or creates a resource after the old one is removed.
+    private suspend fun <T> withPostResource(
+        id: PostId,
+        block: suspend (StoreResource<PostId, Post, Post>) -> T,
+    ): T {
+        val lease = postResourcesMutex.withLock {
+            postResources
+                .getOrPut(id) {
+                    PostResourceLease(
+                        StoreResource(
+                            scope = scope,
+                            store = postStore,
+                            key = id,
+                            mapValue = { post -> post },
+                        )
+                    )
+                }
+                .also { it.count++ }
+        }
+        try {
+            return block(lease.resource)
+        } finally {
+            // The release must run even when the caller was cancelled, or the lease would leak and
+            // the resource would stay hot forever. Taking the mutex suspends, so make it immune.
+            withContext(NonCancellable) {
+                postResourcesMutex.withLock {
+                    lease.count--
+                    if (lease.count == 0) {
+                        postResources.remove(id)
+                        lease.resource.close()
+                    }
+                }
             }
         }
+    }
+
+    // Test seam for verifying that every map entry has a live lease.
+    internal suspend fun postResourceCountForTest(): Int = postResourcesMutex.withLock {
+        postResources.size
+    }
 }
+
+private class PostResourceLease(
+    val resource: StoreResource<PostId, Post, Post>,
+    var count: Int = 0,
+)
 
 internal data class FeedSnapshot(val feed: PostFeed, val initialized: Boolean)
 

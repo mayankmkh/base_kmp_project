@@ -1,9 +1,14 @@
 package dev.mayankmkh.basekmpproject.capability.posts.impl
 
 import app.cash.turbine.test
+import dev.mayankmkh.basekmpproject.capability.posts.api.PostFeed
+import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
+import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceFreshness
+import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceOperation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
@@ -19,10 +24,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -124,6 +136,93 @@ class PostsCapabilityImplTest {
             capability.close()
         }
 
+    @Test
+    fun `reconnect without a feed observer defers the refresh to the next observer`() =
+        runTest(dispatcher) {
+            val local = createInMemoryPostsLocalSource()
+            local.replaceAll(listOf(PostEntity("7", "Cached", "Cached body", authorId = 70)))
+            val online = MutableStateFlow(false)
+            val engine = MockEngine { respondJson(FEED_JSON) }
+            val capability = capability(engine, local, ConnectivityMonitor { online })
+
+            online.value = true
+            assertEquals(0, engine.requestHistory.size)
+
+            // The deferred refresh may start before or after the cached row is read, so assert on
+            // the sequence of distinct feed contents rather than on the interleaved operations.
+            capability.observeFeed().postIds().test {
+                assertEquals(listOf(7L), awaitItem())
+                assertEquals(listOf(10L, 2L), awaitItem())
+                assertEquals(1, engine.requestHistory.size)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            // The debt is settled once: a second observer inherits the fresh feed without a fetch.
+            capability.observeFeed().postIds().test {
+                assertEquals(listOf(10L, 2L), awaitItem())
+                assertEquals(1, engine.requestHistory.size)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            capability.close()
+        }
+
+    @Test
+    fun `a background refresh after an unobserved reconnect settles the deferred refresh`() =
+        runTest(dispatcher) {
+            val local = createInMemoryPostsLocalSource()
+            local.replaceAll(listOf(PostEntity("7", "Cached", "Cached body", authorId = 70)))
+            val online = MutableStateFlow(false)
+            val engine = MockEngine { respondJson(FEED_JSON) }
+            val capability = capability(engine, local, ConnectivityMonitor { online })
+
+            online.value = true
+            assertIs<RefreshOutcome.Succeeded>(capability.refreshFeed(RefreshQos.background()))
+            assertEquals(1, engine.requestHistory.size)
+
+            capability.observeFeed().postIds().test {
+                assertEquals(listOf(10L, 2L), awaitItem())
+                assertEquals(1, engine.requestHistory.size)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            capability.close()
+        }
+
+    @Test
+    fun `post observers share one resource and release it after the last collector`() =
+        runTest(dispatcher) {
+            val local = createInMemoryPostsLocalSource()
+            local.upsert(PostEntity("1", "Cached", "Cached body", authorId = 1))
+            val engine = MockEngine { respondJson(POST_JSON) }
+            val capability = capability(engine, local)
+            val id = PostId(1)
+
+            val first = launch { capability.observePost(id).collect() }
+            val second = launch { capability.observePost(id).collect() }
+            assertEquals(1, capability.postResourceCountForTest())
+
+            first.cancelAndJoin()
+            assertEquals(1, capability.postResourceCountForTest())
+            second.cancelAndJoin()
+            assertEquals(0, capability.postResourceCountForTest())
+
+            capability.close()
+        }
+
+    @Test
+    fun `refreshing an unobserved post does not retain its resource`() =
+        runTest(dispatcher) {
+            val local = createInMemoryPostsLocalSource()
+            val engine = MockEngine { respondJson(POST_JSON) }
+            val capability = capability(engine, local)
+
+            assertSame(RefreshOutcome.Succeeded, capability.refreshPost(PostId(1)))
+
+            assertEquals(0, capability.postResourceCountForTest())
+            capability.close()
+        }
+
     /**
      * A ViewModel cleared mid-fetch cancels the coroutine that called `refreshFeed`. The
      * `Refreshing` it published is shared by every other observer of the feed, so the fetch has to
@@ -205,3 +304,8 @@ class PostsCapabilityImplTest {
             )
     }
 }
+
+private fun Flow<ResourceObservation<PostFeed>>.postIds(): Flow<List<Long>> =
+    map { observation -> observation.value?.posts?.map { post -> post.id.value } }
+        .filterNotNull()
+        .distinctUntilChanged()

@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.platform.connectivity
 
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -12,7 +13,7 @@ import kotlinx.coroutines.flow.flow
  * The consequence is only that desktop never gets the reconnect-triggered refresh; a failed fetch
  * still surfaces as a failure, and pull-to-refresh still works.
  */
-actual fun createConnectivityMonitor(context: ConnectivityContext): ConnectivityMonitor =
+actual fun createConnectivityMonitor(context: PlatformContext): ConnectivityMonitor =
     ConnectivityMonitor {
         alwaysOnline
     }

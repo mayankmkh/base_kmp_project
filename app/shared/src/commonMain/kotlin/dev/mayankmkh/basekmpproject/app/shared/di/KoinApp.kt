@@ -12,15 +12,12 @@ import dev.mayankmkh.basekmpproject.feature.posts.api.postsFeatureModule
 import dev.mayankmkh.basekmpproject.foundation.network.DynamicHeaders
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
-import dev.mayankmkh.basekmpproject.foundation.preferences.PreferencesContext
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import dev.mayankmkh.basekmpproject.foundation.runtime.dispatchers.AppDispatchers
-import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityContext
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.createConnectivityMonitor
-import dev.mayankmkh.basekmpproject.platform.securestorage.SecureStorageContext
 import dev.mayankmkh.basekmpproject.storage.database.AppDatabaseProvider
-import dev.mayankmkh.basekmpproject.storage.database.DatabaseContext
 import dev.mayankmkh.basekmpproject.storage.database.DefaultAppDatabaseProvider
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger as KtorLogger
@@ -78,12 +75,9 @@ private val runtimeModule = module {
     } onClose { it?.close() }
 }
 
-/**
- * Platform-shaped storage handles. Capabilities still own their files, keys and product meaning.
- */
-private val preferencesModule = module {
-    factory { createPreferencesContext() }
-    factory { createSecureStorageContext() }
+/** The platform handle shared by storage and platform modules. */
+private val platformContextModule = module {
+    single { createPlatformContext() }
 }
 
 /**
@@ -123,11 +117,9 @@ private val networkModule = module {
  *
  * `single`: on Android and iOS the monitor registers a system callback, and one registration shared
  * by every collector is the point -- a `factory` would open a fresh one per use case and leak the
- * lot. The context is a `factory` for the same reason the other platform contexts are: it is a thin
- * wrapper the `single` below consumes once.
+ * lot. The monitor receives the app's shared platform context.
  */
 private val connectivityModule = module {
-    factory { createConnectivityContext() }
     single<ConnectivityMonitor> { createConnectivityMonitor(get()) }
 }
 
@@ -138,7 +130,6 @@ private val connectivityModule = module {
  * second connection to the same file and the two would not see each other's writes.
  */
 private val databaseModule = module {
-    factory { createDatabaseContext() }
     singleOf(::DefaultAppDatabaseProvider) bind AppDatabaseProvider::class
     single<PostsDatabaseProvider> {
         val appDatabaseProvider = get<AppDatabaseProvider>()
@@ -155,7 +146,7 @@ internal val libModules =
         dispatchersModule,
         loggerModule,
         runtimeModule,
-        preferencesModule,
+        platformContextModule,
         networkModule,
         connectivityModule,
         databaseModule,
@@ -173,10 +164,4 @@ internal val appModules = libModules + productModules
  */
 internal expect fun Scope.isDebugBuild(): Boolean
 
-internal expect fun Scope.createPreferencesContext(): PreferencesContext
-
-internal expect fun Scope.createSecureStorageContext(): SecureStorageContext
-
-internal expect fun Scope.createDatabaseContext(): DatabaseContext
-
-internal expect fun Scope.createConnectivityContext(): ConnectivityContext
+internal expect fun Scope.createPlatformContext(): PlatformContext

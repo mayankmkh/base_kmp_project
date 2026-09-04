@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.platform.connectivity
 
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -20,7 +21,7 @@ import platform.darwin.dispatch_get_global_queue
  * question the other platforms are being asked. The handler runs on a global queue rather than the
  * main one: nothing here touches UI, and the flow's collector decides its own context.
  */
-actual fun createConnectivityMonitor(context: ConnectivityContext): ConnectivityMonitor =
+actual fun createConnectivityMonitor(context: PlatformContext): ConnectivityMonitor =
     ConnectivityMonitor {
         callbackFlow {
                 val monitor = nw_path_monitor_create()

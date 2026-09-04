@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -16,7 +17,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  * the monitor. `NET_CAPABILITY_VALIDATED` is the interesting bit: a network can be connected and
  * still have no route out, and treating that as online would trigger a refresh that cannot work.
  */
-actual fun createConnectivityMonitor(context: ConnectivityContext): ConnectivityMonitor =
+actual fun createConnectivityMonitor(context: PlatformContext): ConnectivityMonitor =
     ConnectivityMonitor {
         callbackFlow {
                 val manager =

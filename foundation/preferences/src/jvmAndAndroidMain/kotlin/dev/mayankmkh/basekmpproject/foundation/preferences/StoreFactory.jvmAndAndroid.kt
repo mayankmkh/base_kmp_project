@@ -8,13 +8,14 @@ import androidx.datastore.core.okio.OkioStorage
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import java.io.File
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
 
 internal actual fun createPreferenceDataStore(
-    context: PreferencesContext,
+    context: PlatformContext,
     file: PrefFile,
 ): DataStore<Preferences> =
     PreferenceDataStoreFactory.createWithPath(
@@ -23,7 +24,7 @@ internal actual fun createPreferenceDataStore(
     )
 
 internal actual fun <T> createDocumentDataStore(
-    context: PreferencesContext,
+    context: PlatformContext,
     file: PrefFile,
     serializer: OkioSerializer<T>,
 ): DataStore<T> =
@@ -38,10 +39,10 @@ internal actual fun <T> createDocumentDataStore(
     )
 
 /** The directory this platform keeps DataStore files in. Created here, on the DataStore scope. */
-internal expect fun PreferencesContext.dataStoreDirectory(): File
+internal expect fun PlatformContext.dataStoreDirectory(): File
 
 // `java.nio.file` needs API 26; `mkdirs` is the common denominator with Android's minSdk 24.
-private fun PreferencesContext.storePath(fileName: String): Path {
+private fun PlatformContext.storePath(fileName: String): Path {
     val directory = dataStoreDirectory()
     check(directory.mkdirs() || directory.isDirectory) {
         "Could not create DataStore directory: ${directory.absolutePath}"

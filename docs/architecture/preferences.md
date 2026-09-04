@@ -32,7 +32,7 @@ mechanics inside the two modules.
 | --- | --- |
 | Opening stores, serialisation, corruption recovery, file naming | `:foundation:preferences` |
 | Secrets on each platform | `:platform:secure-storage` |
-| Application identifier, platform contexts | `:app:*` supplies a `PreferencesContext` and a `SecureStorageContext` |
+| Platform context contract | `:foundation:runtime` owns `PlatformContext`; `:app:*` supplies one instance |
 | Which files exist, which keys they hold, what the values mean | Capability implementations |
 | Session credential lifecycle | `:capability:identity-impl` over `SecretStore` |
 
@@ -48,8 +48,6 @@ the physical split would buy nothing.
 ## 3. Public surface of `:foundation:preferences`
 
 ```kotlin
-public expect class PreferencesContext
-
 @JvmInline public value class PrefFile(public val name: String)
 
 public class PrefKey<T> internal constructor(public val name: String, ...)
@@ -82,9 +80,9 @@ public interface DocumentStore<T> {
     public suspend fun update(transform: (T) -> T): T
 }
 
-public fun openPreferenceStore(context: PreferencesContext, file: PrefFile): PreferenceStore
+public fun openPreferenceStore(context: PlatformContext, file: PrefFile): PreferenceStore
 public fun <T> openDocumentStore(
-    context: PreferencesContext,
+    context: PlatformContext,
     file: PrefFile,
     serializer: KSerializer<T>,
     defaultValue: T,
@@ -103,10 +101,10 @@ is deliberately absent: bytes in a preferences file are either a secret, which b
 keys must not be observable half-done. `observe` applies `distinctUntilChanged`, so a write to an
 unrelated key in the same file does not wake observers of this one.
 
-`PreferencesContext` has a different constructor per target. Android takes an `android.content.Context`.
-iOS takes nothing; the sandbox already scopes the app. Desktop JVM and wasmJs take an
-`applicationId: String`, because on those two targets nothing else scopes the app: the desktop
-directory is named after it and every `localStorage` key is prefixed with it.
+`PlatformContext` is the shared public contract from `:foundation:runtime`. Android takes an
+`android.content.Context` and an `applicationId: String`, then retains the application context.
+iOS, desktop JVM and wasmJs take the application identifier. The identifier names desktop storage,
+Keychain services, Android keysets and web storage keys.
 
 The desktop directory comes from `applicationDataDirectory(applicationId: String): File` in
 `:foundation:runtime`'s JVM source set, so that this module and `:platform:secure-storage` resolve
@@ -232,9 +230,10 @@ that used the same Tink pattern, is deprecated since 1.1.0-beta01 in favour of d
 
 ### 8.2 Public surface of `:platform:secure-storage`
 
-```kotlin
-public expect class SecureStorageContext
+`PlatformContext` is owned by `:foundation:runtime` and reaches consumers through this module's
+public runtime dependency.
 
+```kotlin
 public interface SecretStore {
     public suspend fun get(key: String): String?
     public fun observe(key: String): Flow<String?>
@@ -243,7 +242,7 @@ public interface SecretStore {
     public suspend fun clear()
 }
 
-public fun openSecretStore(context: SecureStorageContext, name: String): SecretStore
+public fun openSecretStore(context: PlatformContext, name: String): SecretStore
 public fun inMemorySecretStore(): SecretStore
 ```
 
@@ -323,22 +322,22 @@ and not with `dependsOn`, which would switch the template off for iOS and web.
 
 `CredentialStore` in `:capability:identity-impl` moves from `PreferenceStore` to `SecretStore`,
 opened as `openSecretStore(context, "identity.credentials")`. Its tests use `inMemorySecretStore()`.
-The Identity Koin module takes a `SecureStorageContext` from the app the same way it took a
-`PreferencesContext`. The old plain `credentials.preferences_pb` file is not migrated: the sample
-app has no users, and a token migration would be a Capability concern in a product, written as a
-one-shot read from the old store followed by a delete.
+The Identity Koin module resolves the app's shared `PlatformContext`. The old plain
+`credentials.preferences_pb` file is not migrated: the sample app has no users, and a token
+migration would be a Capability concern in a product, written as a one-shot read from the old store
+followed by a delete.
 
 The ownership table in [`network.md`](network.md) §2 changes its "Credential persistence" row to
 `:platform:secure-storage`.
 
 ## 10. Composition
 
-`:app:shared` supplies both contexts through the same `expect fun Scope.create…Context()` pattern
-used for connectivity and the database. It also owns a single `ApplicationId` constant next to
-`apiBaseUrl` in `config/Environment.kt`; the desktop and web `PreferencesContext` and every
-`SecureStorageContext` take it from there. The Android application id and the iOS bundle
-identifier stay what the platform build files say; `ApplicationId` here is the stable name the app
-uses for its own storage and must never change once a build has shipped.
+`:app:shared` supplies one Koin singleton through
+`expect fun Scope.createPlatformContext(): PlatformContext`. Android constructs it with the app
+`Context` and `ApplicationId`. iOS, desktop JVM and wasmJs construct it with `ApplicationId`.
+The constant remains next to `apiBaseUrl` in `config/Environment.kt`. The Android application id
+and the iOS bundle identifier stay what the platform build files say. `ApplicationId` is the stable
+name the app uses for its own storage and must never change once a build has shipped.
 
 ## 11. Testing
 

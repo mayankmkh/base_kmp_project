@@ -26,7 +26,7 @@ kotlin {
         commonMain {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
-                implementation(projects.foundation.runtime)
+                api(projects.foundation.runtime)
             }
         }
         val jvmAndAndroidMain by getting {

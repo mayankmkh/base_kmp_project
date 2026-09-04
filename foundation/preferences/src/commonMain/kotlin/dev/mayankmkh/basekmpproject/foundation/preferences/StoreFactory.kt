@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.core.okio.OkioSerializer
 import androidx.datastore.preferences.core.Preferences
 import dev.mayankmkh.basekmpproject.foundation.runtime.OpenNameRegistry
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 
 internal val PrefFile.preferencesFileName: String
     get() = "$name.preferences_pb"
@@ -22,12 +23,12 @@ internal fun registerOpenFile(file: PrefFile): Unit = openFiles.register(file.na
 // functions here; nothing in the template needs it yet.
 
 internal expect fun createPreferenceDataStore(
-    context: PreferencesContext,
+    context: PlatformContext,
     file: PrefFile,
 ): DataStore<Preferences>
 
 internal expect fun <T> createDocumentDataStore(
-    context: PreferencesContext,
+    context: PlatformContext,
     file: PrefFile,
     serializer: OkioSerializer<T>,
 ): DataStore<T>

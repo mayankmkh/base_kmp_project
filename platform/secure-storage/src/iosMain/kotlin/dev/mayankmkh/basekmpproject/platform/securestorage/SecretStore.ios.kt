@@ -2,6 +2,7 @@
 
 package dev.mayankmkh.basekmpproject.platform.securestorage
 
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.COpaquePointer
@@ -66,7 +67,7 @@ import platform.Security.kSecReturnData
 import platform.Security.kSecValueData
 
 // One Keychain service per store keeps `clear()` on one namespace from touching another.
-internal actual fun createSecretStore(context: SecureStorageContext, name: String): SecretStore =
+internal actual fun createSecretStore(context: PlatformContext, name: String): SecretStore =
     KeychainSecretStore(service = "${context.applicationId}.$name")
 
 /**

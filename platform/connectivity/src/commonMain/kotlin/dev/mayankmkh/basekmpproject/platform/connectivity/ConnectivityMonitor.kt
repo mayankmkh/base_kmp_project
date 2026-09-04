@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.platform.connectivity
 
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -32,4 +33,5 @@ fun interface ConnectivityMonitor {
 fun ConnectivityMonitor.reconnects(): Flow<Unit> =
     isOnline().distinctUntilChanged().drop(1).filter { it }.map {}
 
-expect fun createConnectivityMonitor(context: ConnectivityContext): ConnectivityMonitor
+/** Creates the platform monitor with the app's shared [PlatformContext]. */
+expect fun createConnectivityMonitor(context: PlatformContext): ConnectivityMonitor

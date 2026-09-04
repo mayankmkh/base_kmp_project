@@ -27,7 +27,7 @@ kotlin {
         commonMain {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
-                implementation(projects.foundation.runtime)
+                api(projects.foundation.runtime)
                 implementation(libs.androidx.datastore.core)
                 implementation(libs.androidx.datastore.core.okio)
                 implementation(libs.androidx.datastore.preferences.core)

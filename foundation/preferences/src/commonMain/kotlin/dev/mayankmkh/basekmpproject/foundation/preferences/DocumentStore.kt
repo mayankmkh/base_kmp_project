@@ -3,6 +3,7 @@ package dev.mayankmkh.basekmpproject.foundation.preferences
 import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.okio.OkioSerializer
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
@@ -17,7 +18,7 @@ public interface DocumentStore<T> {
 }
 
 public fun <T> openDocumentStore(
-    context: PreferencesContext,
+    context: PlatformContext,
     file: PrefFile,
     serializer: KSerializer<T>,
     defaultValue: T,

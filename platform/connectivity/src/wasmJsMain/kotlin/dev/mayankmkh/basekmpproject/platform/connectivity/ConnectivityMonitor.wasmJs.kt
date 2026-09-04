@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.platform.connectivity
 
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.browser.window
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
@@ -13,7 +14,7 @@ import org.w3c.dom.events.Event
  * machine on a network that cannot reach the internet reports true, so this is the weakest of the
  * four implementations -- which is why a failed fetch, not this flow, is what reports a problem.
  */
-actual fun createConnectivityMonitor(context: ConnectivityContext): ConnectivityMonitor =
+actual fun createConnectivityMonitor(context: PlatformContext): ConnectivityMonitor =
     ConnectivityMonitor {
         callbackFlow {
                 val onOnline: (Event) -> Unit = { trySend(true) }

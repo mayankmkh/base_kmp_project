@@ -10,6 +10,7 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(projects.capability.postsImpl)
+                api(projects.foundation.runtime)
                 // The assembled database is this module's public surface and its generated
                 // interface is declared in terms of SQLDelight runtime types.
                 api(libs.sqldelight.runtime)

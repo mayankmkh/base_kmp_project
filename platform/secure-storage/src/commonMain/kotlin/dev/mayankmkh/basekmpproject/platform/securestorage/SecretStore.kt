@@ -1,6 +1,7 @@
 package dev.mayankmkh.basekmpproject.platform.securestorage
 
 import dev.mayankmkh.basekmpproject.foundation.runtime.OpenNameRegistry
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.coroutines.flow.Flow
 
 public interface SecretStore {
@@ -21,7 +22,7 @@ public interface SecretStore {
  * Android keeps the Tink keyset in `<applicationId>.secure-storage`; app backup rules can use this
  * stable name to exclude the keyset alongside the non-backed-up ciphertext.
  */
-public fun openSecretStore(context: SecureStorageContext, name: String): SecretStore {
+public fun openSecretStore(context: PlatformContext, name: String): SecretStore {
     openStores.register(name)
     return createSecretStore(context, name)
 }
@@ -42,4 +43,4 @@ private val openStores = OpenNameRegistry("secret store named")
 public class SecretStoreException(message: String, cause: Throwable? = null) :
     RuntimeException(message, cause)
 
-internal expect fun createSecretStore(context: SecureStorageContext, name: String): SecretStore
+internal expect fun createSecretStore(context: PlatformContext, name: String): SecretStore

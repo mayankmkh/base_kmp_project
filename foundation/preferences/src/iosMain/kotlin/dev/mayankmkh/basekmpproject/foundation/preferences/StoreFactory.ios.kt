@@ -8,6 +8,7 @@ import androidx.datastore.core.okio.OkioStorage
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.cinterop.ExperimentalForeignApi
 import okio.FileSystem
 import okio.Path.Companion.toPath
@@ -18,7 +19,7 @@ import platform.Foundation.NSUserDomainMask
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun createPreferenceDataStore(
-    context: PreferencesContext,
+    context: PlatformContext,
     file: PrefFile,
 ): DataStore<Preferences> =
     PreferenceDataStoreFactory.createWithPath(
@@ -28,7 +29,7 @@ internal actual fun createPreferenceDataStore(
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun <T> createDocumentDataStore(
-    context: PreferencesContext,
+    context: PlatformContext,
     file: PrefFile,
     serializer: OkioSerializer<T>,
 ): DataStore<T> =

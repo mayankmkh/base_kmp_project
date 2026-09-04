@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.storage.database
 
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import dev.mayankmkh.basekmpproject.storage.database.db.AppDatabase
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.sync.Mutex
@@ -8,8 +9,8 @@ import kotlinx.coroutines.sync.withLock
 /**
  * Supplies the fully assembled application database.
  *
- * An interface rather than the concrete provider so a test can supply an in-memory database without
- * a `DatabaseContext` and without touching the user's home directory.
+ * An interface rather than the concrete provider lets a test supply an in-memory database without a
+ * [PlatformContext] and without touching the user's home directory.
  */
 fun interface AppDatabaseProvider {
     suspend fun database(): AppDatabase
@@ -22,7 +23,7 @@ fun interface AppDatabaseProvider {
  * would put disk I/O on the path that builds the object graph. So the singleton is this provider,
  * and the database it hands out is created on whichever coroutine asks for it first.
  */
-class DefaultAppDatabaseProvider(private val context: DatabaseContext) : AppDatabaseProvider {
+class DefaultAppDatabaseProvider(private val context: PlatformContext) : AppDatabaseProvider {
     private val mutex = Mutex()
 
     // `@Volatile` so the fast path below is a safe publication rather than a data race: without it

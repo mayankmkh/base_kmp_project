@@ -9,9 +9,10 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferencesSerializer
 import androidx.datastore.preferences.core.emptyPreferences
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 
 internal actual fun createPreferenceDataStore(
-    context: PreferencesContext,
+    context: PlatformContext,
     file: PrefFile,
 ): DataStore<Preferences> =
     PreferenceDataStoreFactory.create(
@@ -24,7 +25,7 @@ internal actual fun createPreferenceDataStore(
     )
 
 internal actual fun <T> createDocumentDataStore(
-    context: PreferencesContext,
+    context: PlatformContext,
     file: PrefFile,
     serializer: OkioSerializer<T>,
 ): DataStore<T> =

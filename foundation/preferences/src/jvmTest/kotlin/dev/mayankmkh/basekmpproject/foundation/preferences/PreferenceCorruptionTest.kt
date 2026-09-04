@@ -3,6 +3,7 @@ package dev.mayankmkh.basekmpproject.foundation.preferences
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.emptyPreferences
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
@@ -41,7 +42,7 @@ class PreferenceCorruptionTest {
 
     @Test
     fun `opening the same logical file twice fails immediately and names it`() {
-        val context = PreferencesContext("preferences-registry-test")
+        val context = PlatformContext("preferences-registry-test")
         val file = PrefFile("registry-${System.nanoTime()}")
         openPreferenceStore(context, file)
 

@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlin.jvm.JvmInline
 import kotlinx.coroutines.flow.Flow
 
@@ -60,7 +61,7 @@ public interface PreferenceEditor {
 }
 
 public fun openPreferenceStore(
-    context: PreferencesContext,
+    context: PlatformContext,
     file: PrefFile,
 ): PreferenceStore {
     registerOpenFile(file)

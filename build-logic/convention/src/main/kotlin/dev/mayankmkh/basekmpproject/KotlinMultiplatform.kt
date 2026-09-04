@@ -58,10 +58,8 @@ private val COMMON_FREE_COMPILER_ARGS =
          */
         "-Xconsistent-data-class-copy-visibility",
         // `expect`/`actual` classes are still Beta and warn on every `actual` declaration. The
-        // design
-        // deliberately uses them (see `PreferencesContext`), so accept them project-wide instead of
-        // annotating
-        // each actual. Drop this once KT-61573 stabilises them.
+        // design deliberately uses them for `PlatformContext`, so accept them project-wide instead
+        // of annotating each actual. Drop this once KT-61573 stabilises them.
         "-Xexpect-actual-classes",
     )
 

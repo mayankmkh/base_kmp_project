@@ -8,6 +8,7 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
+                api(projects.foundation.runtime)
                 // `api`: `ConnectivityMonitor` hands back a `Flow`, so a caller cannot use this
                 // module without it.
                 api(libs.kotlinx.coroutines.core)

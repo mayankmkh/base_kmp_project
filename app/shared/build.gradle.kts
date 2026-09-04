@@ -49,8 +49,8 @@ kotlin {
                 implementation(projects.capability.postsApi)
                 implementation(projects.capability.postsImpl)
                 implementation(projects.feature.posts)
-                // The app module owns the object graph, so it hands the data layer its platform
-                // pieces: a `DatabaseContext` and a configured `HttpClient`.
+                // The app module owns the object graph, so it hands the data layer a shared
+                // `PlatformContext` and a configured `HttpClient`.
                 implementation(projects.storage.database)
                 // Same story: the app supplies the platform connectivity mechanism.
                 implementation(projects.platform.connectivity)

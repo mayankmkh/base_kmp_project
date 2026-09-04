@@ -9,10 +9,11 @@ import com.google.crypto.tink.KeysetHandle
 import com.google.crypto.tink.RegistryConfiguration
 import com.google.crypto.tink.TinkJsonProtoKeysetFormat
 import com.google.crypto.tink.aead.AeadConfig
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import dev.mayankmkh.basekmpproject.foundation.runtime.applicationDataDirectory
 import java.security.GeneralSecurityException
 
-internal actual fun createSecretStore(context: SecureStorageContext, name: String): SecretStore =
+internal actual fun createSecretStore(context: PlatformContext, name: String): SecretStore =
     dataStoreSecretStore(
         produceSerializer = {
             val directory = applicationDataDirectory(context.applicationId)

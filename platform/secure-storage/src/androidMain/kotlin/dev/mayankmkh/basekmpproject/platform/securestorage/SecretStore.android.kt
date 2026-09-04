@@ -6,8 +6,9 @@ import com.google.crypto.tink.KeyTemplates
 import com.google.crypto.tink.RegistryConfiguration
 import com.google.crypto.tink.aead.AeadConfig
 import com.google.crypto.tink.integration.android.AndroidKeysetManager
+import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 
-internal actual fun createSecretStore(context: SecureStorageContext, name: String): SecretStore =
+internal actual fun createSecretStore(context: PlatformContext, name: String): SecretStore =
     dataStoreSecretStore(
         produceSerializer = {
             AeadSerializer(keystoreAead(context), MapStringSerializer, name.encodeToByteArray())
@@ -19,7 +20,7 @@ internal actual fun createSecretStore(context: SecureStorageContext, name: Strin
 // master key; the store name is the associated data, so files cannot be swapped between stores.
 // `AeadConfig.register()` is idempotent, so every store may call it.
 
-private fun keystoreAead(context: SecureStorageContext): Aead {
+private fun keystoreAead(context: PlatformContext): Aead {
     AeadConfig.register()
     val keysetName = "${context.applicationId}.secure-storage.keyset"
     val preferencesName = "${context.applicationId}.secure-storage"

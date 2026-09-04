@@ -63,7 +63,6 @@ class PostViewModelTest {
                             retryable = true,
                         )
                     val failed = this@state.awaitItem()
-                    assertEquals(true, failed.isStale)
                     assertEquals(PostsFixtures.feed().posts, failed.posts)
                     expectNoEvents()
                     cancelAndIgnoreRemainingEvents()

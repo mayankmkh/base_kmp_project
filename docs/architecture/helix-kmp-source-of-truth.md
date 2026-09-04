@@ -39,7 +39,7 @@ This table is a quick orientation only. The referenced sections contain the reas
 | business reads | grouped Capability Query interfaces | normative convention |
 | writes | intent-shaped Commands | normative convention |
 | resource model | Snapshot / Live / Projection | normative |
-| Snapshot implementation | Store5 + SQLDelight + REST where appropriate | current replaceable choice |
+| Snapshot implementation | owned `SyncCoordinator` + SQLDelight + REST where appropriate | current replaceable choice |
 | Live implementation | capability-owned keyed coordinator + shared resource state + WebSocket | normative ownership; mechanism replaceable |
 | durable storage | SQLDelight; one physical DB is default, not invariant | current qualified choice |
 | refresh | common external triggers/QoS; Capability owns freshness/retry/invalidation | normative responsibility split |
@@ -50,7 +50,7 @@ This table is a quick orientation only. The referenced sections contain the reas
 | GraphQL | deliberately deferred; backend is REST-oriented; future implementation remains possible behind Capability API | current product constraint |
 | architecture tooling | stable `helix-kmp` CLI; deterministic replaceable scripts; graph-first facts | normative control-plane contract |
 | AI operating model | few workflow Skills + generated context + same verification/permissions as humans | normative operating model |
-| synchronized Query status | remotely synchronized reads expose a transport-neutral `ResourceObservation<T>` when loading/freshness/refresh/error matters | normative Capability contract |
+| synchronized Query status | remotely synchronized reads expose a transport-neutral `ResourceObservation<T>` when loading/refresh/error matters | normative Capability contract |
 | coroutine ownership | App owns the application runtime parent scope; Capability resource owners create/cancel child jobs; never borrow ViewModel scope for shared resources | normative lifetime rule |
 | session/auth | Identity owns session/token refresh; Foundation network owns generic bearer/401 mechanism; terminal session end is a typed cross-cutting fact | normative ownership split |
 | verification | fast affected tier for human/agent inner loop; full supported-target matrix in CI/release/qualification | normative operating contract |
@@ -103,7 +103,7 @@ A selected technology or mechanism behind a stable Helix boundary. Examples:
 
 - Navigation 3;
 - Koin;
-- Store5;
+- owned Snapshot resource runtime;
 - SQLDelight;
 - Kermit;
 - Ktor.
@@ -486,7 +486,7 @@ Debug/QA tooling should answer:
 
 ## 3.12 Replaceable technology
 
-Navigation 3, Koin, Store5, SQLDelight, Ktor, Coil, WebSocket implementation, and telemetry adapters are qualified choices, not Helix identity.
+Navigation 3, Koin, the owned Snapshot resource runtime, SQLDelight, Ktor, Coil, WebSocket implementation, and telemetry adapters are qualified choices, not Helix identity.
 
 ## 3.13 Evidence-driven evolution
 
@@ -1076,7 +1076,7 @@ Apollo Kotlin was still evaluated conceptually because it demonstrates the repla
 Final decision:
 
 - **do not run or fund a GraphQL-specific POC now**;
-- retain REST/Store5/SQLDelight/WebSocket implementation;
+- retain REST/owned Snapshot runtime/SQLDelight/WebSocket implementation;
 - keep Capability APIs transport-neutral so GraphQL/Apollo can be introduced later if backend/product economics change;
 - if GraphQL is introduced, keep Apollo/schema/generated transport models below Capability implementation rather than exposing raw GraphQL fragments/models as Cell contracts;
 - do not redesign Helix around fragment-colocated presentation contracts merely to mimic Relay.
@@ -1153,7 +1153,7 @@ Master 1.2 disposition:
 | FeatureInstanceKey examples inconsistent | accept; define construction contract |
 | auth/session ownership absent | accept; Identity owns session/refresh, Foundation network owns generic mechanism |
 | FeatureObserver boilerplate | accept; non-generic trace delegate |
-| Store5 cost could exceed value | accept measurable revisit condition |
+| third-party Snapshot orchestration cost could exceed value | revisit condition fired 2026-09-04; use the owned runtime |
 | flags/localization/theme/background replay unplaced | accept; assign owners |
 | verify latency missing | strong accept; fast/full tiers |
 | private primitives need complete references | accept; Standard Primitive First |
@@ -1400,7 +1400,7 @@ UI must not own or import:
 - navigation;
 - repositories;
 - Capability APIs/implementations;
-- Store5;
+- Snapshot resource runtime;
 - SQLDelight generated types;
 - raw networking.
 
@@ -1442,7 +1442,7 @@ It does not expose repositories by default.
 It must not expose:
 
 - Ktor types;
-- Store5 types;
+- Snapshot resource runtime types;
 - SQLDelight rows/queries;
 - WebSocket frames;
 - Compose/ViewModel types;
@@ -1456,7 +1456,7 @@ Owns hidden product/data behavior:
 - repositories;
 - endpoint DTOs;
 - mapping;
-- Store5;
+- Snapshot resource orchestration;
 - SQLDelight access;
 - REST/WebSocket clients;
 - live-resource coordinators;
@@ -1554,7 +1554,7 @@ Examples:
 Typical current implementation:
 
 ```text
-Query -> Store5 -> Fetcher/REST + SourceOfTruth/SQLDelight
+Query -> SyncCoordinator.observing(local/SQLDelight) + sync/REST
 ```
 
 Capability-internal source names follow §7.8.
@@ -1775,9 +1775,9 @@ Do not conflate operational tracing with business analytics.
 
 ## 7.32 ResourceObservation
 
-A transport-neutral observation envelope for synchronized Capability reads when presentation needs current value plus freshness/refresh/failure semantics.
+A transport-neutral observation envelope for synchronized Capability reads when presentation needs current value plus refresh/failure semantics.
 
-It is **not** a universal presentation State and does not expose Store5/Ktor/SQLDelight types.
+It is **not** a universal presentation State and does not expose Snapshot runtime/Ktor/SQLDelight types.
 
 Canonical semantics are defined in Section 13.7.
 
@@ -1853,7 +1853,7 @@ This is a taxonomy of allowed roles, not a requirement to create every role or a
 - implementation logic;
 - repositories;
 - REST/DTO/mapping;
-- Store5;
+- Snapshot resource orchestration;
 - capability-owned SQLDelight schema and access;
 - WebSocket/live coordinators;
 - batching;
@@ -1889,7 +1889,7 @@ Examples:
 ```text
 :foundation:presentation -> foundation_api
 :foundation:resource     -> foundation_api
-:foundation:resource-store5 -> foundation_runtime
+:foundation:resource-runtime -> foundation_runtime
 :foundation:time         -> foundation_api
 :foundation:network      -> foundation_runtime
 :foundation:runtime      -> foundation_runtime
@@ -2091,7 +2091,7 @@ This block governs **main/application dependency edges**. Test source sets may d
 | App | Feature, UI, Capability API/Impl, Foundation API/Runtime, Platform API/Impl, Storage | nothing may depend on App |
 | Feature | UI, Capability API, `foundation_api`, Platform API/cohesive Platform; child Feature only through approved `.api` public presentation surface | Capability Impl, `foundation_runtime`, raw repository/data implementation, peer Feature internals |
 | UI | UI/design + `foundation_api` | Feature, ViewModel, Koin, navigation, Capability, `foundation_runtime`, repository, DB/network |
-| Capability API | other Capability APIs where semantically real + `foundation_api` | Compose, Feature, UI, `foundation_runtime`, network, DB, Store5, implementation |
+| Capability API | other Capability APIs where semantically real + `foundation_api` | Compose, Feature, UI, `foundation_runtime`, network, DB, resource runtime, implementation |
 | Capability Impl | own/other Capability APIs, `foundation_api`, `foundation_runtime`, Platform APIs/cohesive Platform | Feature, UI, Storage, other business Capability Impl |
 | Foundation API | `foundation_api` | product Feature/Capability vocabulary; `foundation_runtime` |
 | Foundation Runtime | `foundation_api`, `foundation_runtime` | product Feature/Capability vocabulary |
@@ -2109,9 +2109,9 @@ These are high-value rules and should fail mechanically.
 Feature -> Capability Impl                       FORBIDDEN
 Feature -> raw repository/DB/network impl       FORBIDDEN
 UI -> Feature/ViewModel/Koin/navigation         FORBIDDEN
-UI -> Capability/repository/Store5/SQLDelight   FORBIDDEN
+UI -> Capability/repository/resource runtime/SQLDelight FORBIDDEN
 Capability API -> Compose/ViewModel             FORBIDDEN
-Capability API -> network/DB/Store5/impl        FORBIDDEN
+Capability API -> network/DB/resource runtime/impl      FORBIDDEN
 Capability Impl -> Feature/UI                   FORBIDDEN
 Capability Impl -> another business Impl        FORBIDDEN
 Anything -> App                                 FORBIDDEN
@@ -3102,42 +3102,43 @@ Action.FollowTeam
   -> update/invalidate affected resources
 ```
 
-## 13.7 Resource observation / error / freshness contract
+## 13.7 Resource observation, status and sync contract
 
 **Module home:** `:foundation:resource`, classified as `foundation_api`.
 
 Capability API modules depend on this one product-neutral contract; they must not redefine local copies.
 
-The Store5 adapter `StoreResource` lives in `:foundation:resource-store5` (`foundation_runtime`);
-Capability impls use it rather than copying an adapter.
-Its source-of-truth collection follows observation subscribers with a grace timeout while retaining
-the last observation. Capability owners lease and evict keyed instances according to their product
-lifetime policy.
+The database is the value owner. A Capability implementation observes its durable rows through a
+cold flow and lets `SyncCoordinator<Key>` from `:foundation:resource-runtime` (`foundation_runtime`)
+coordinate the work that writes them: one worker runs per key, callers join an in-flight worker
+instead of starting another, `syncIfDue` skips a key attempted within `minInterval`, observers are
+counted around the upstream flow so the first collection starts one due background sync and
+`retryOffline` restarts only observed keys whose last attempt failed `OFFLINE` (connectivity
+returning is not evidence that a synchronised value changed), and `status(key)` exposes the per-key
+ledger as `SyncStatus`.
+The ledger is process-local and bounded: once it exceeds `maxEntries`, the oldest unobserved idle
+key is evicted, which resets its status, so consumers collect `status` inside `observing` for the
+same key. The coordinator never reads, caches, or compares values, has no grace timeout, and does
+not catch failures of the durable flow: a durable read that throws is a defect to surface, not a
+resource state.
 
-A plain `Flow<T>` is insufficient for a remotely synchronized read when presentation must distinguish initial load, fresh content, stale cached content, refresh-in-flight, stale-while-refreshing, cached-offline failure, and hard failure.
+A plain `Flow<T>` is insufficient for a remotely synchronized read when presentation must distinguish initial load, loaded content, refresh-in-flight, failure without a value, and failure with a retained value.
 
 Canonical contract:
 
 ```kotlin
 data class ResourceObservation<T : Any>(
     val value: T?,
-    val freshness: ResourceFreshness,
     val operation: ResourceOperation,
 ) {
     init {
-        if (value == null) {
-            require(freshness == ResourceFreshness.UNKNOWN)
-            require(operation !is ResourceOperation.Idle)
-        } else {
-            require(freshness != ResourceFreshness.UNKNOWN)
-        }
+        if (value == null) require(operation !is ResourceOperation.Idle)
     }
-}
 
-enum class ResourceFreshness {
-    UNKNOWN,
-    FRESH,
-    STALE,
+    companion object {
+        fun <T : Any> initial(): ResourceObservation<T> =
+            ResourceObservation(value = null, operation = ResourceOperation.Refreshing)
+    }
 }
 
 sealed interface ResourceOperation {
@@ -3162,6 +3163,12 @@ enum class ResourceProblemCategory {
     UNKNOWN,
 }
 
+data class SyncStatus(
+    val inFlight: Boolean,
+    val lastFailure: ResourceProblem?,
+    val hasSucceeded: Boolean,
+)
+
 sealed interface RefreshOutcome {
     data object Succeeded : RefreshOutcome
 
@@ -3177,10 +3184,22 @@ Refresh (synchronization) Commands return `RefreshOutcome` for the caller's tran
 other Commands return their own domain result. The observation stream carries persistent status;
 the two are never derived from each other.
 
-**Freshness semantics:** `FRESH` means the remote fetcher confirmed the value during this process
-lifetime. `STALE` means the value was served from the source of truth and is not yet confirmed, or
-was demoted after a failed sync. The contract carries no age/time policy; a Capability that needs
-one models the timestamp inside `T`.
+**Value semantics:** `value` is what the durable source currently holds for the key, or `null`
+while the Capability cannot yet vouch for it. A Capability that needs "this collection was
+synchronized at least once" persists that marker next to the rows and writes it in the same
+transaction as the rows, so an empty synchronized collection is a legal `Idle` value and a
+never-synchronized one stays `null`. The contract carries no age or freshness policy; a Capability
+that needs one models the timestamp inside `T`.
+
+**Status mapping:** `SyncStatus.toOperation(hasValue)` in `:foundation:resource` is the one
+mapping from the durable value and the key's `SyncStatus` to an operation, in this order:
+`Refreshing` while `inFlight`; `Failed(lastFailure)` when the last attempt failed; `Refreshing`
+while the value is still `null`; otherwise `Idle`. `SyncCoordinator.observations(key, values)` in
+`:foundation:resource-runtime` applies it: it combines the durable value flow with `status(key)`,
+drops unchanged emissions and wraps the result in `observing` for the same key, so a Capability
+hands over its value flow and never repeats the mapping. A confirmed detail 404 maps to
+`Failed(PERMANENT, retryable = false)` through `lastFailure`. A clean ledger with a `null` value
+remains `Refreshing` while the durable query catches up or until a later attempt confirms a result.
 
 **RefreshQos semantics:** `CRITICAL_VISIBLE` means the user is blocked on the resource; `VISIBLE`
 means the user is looking at it; `BACKGROUND` is maintenance/reconnect work that must not compete
@@ -3188,27 +3207,27 @@ with visible work; and `PREFETCH` is speculative and may be dropped. `ANY_NETWOR
 available network; `UNMETERED_PREFERRED` may fall back to metered; and `UNMETERED_ONLY` skips on a
 metered network.
 
+`SyncCoordinator` passes QoS to `sync`. First-observer work and the offline retry on reconnect use
+`RefreshQos.background()`. No scheduler exists yet, so every class executes immediately.
+
 The legal structural combinations are exhaustive:
 
-| value | freshness | operation | meaning/example |
-|---|---|---|---|
-| `null` | `UNKNOWN` | `Refreshing` | initial load |
-| `null` | `UNKNOWN` | `Failed(...)` | hard failure with no cached value |
-| `T` | `FRESH` | `Idle` | fresh, no active sync |
-| `T` | `FRESH` | `Refreshing` | forced/background refresh while current value is still fresh |
-| `T` | `FRESH` | `Failed(...)` | latest sync attempt failed and the adapter, which owns the freshness policy, chose not to demote |
-| `T` | `STALE` | `Idle` | stale cached value, no active refresh |
-| `T` | `STALE` | `Refreshing` | stale-while-refresh |
-| `T` | `STALE` | `Failed(...)` | stale/offline or failed refresh with cached value |
+| value | operation | meaning/example |
+|---|---|---|
+| `null` | `Refreshing` | initial load, or an unsynchronized key whose sync is in flight |
+| `null` | `Failed(...)` | failure with no value to show, including a detail 404 mapped to `PERMANENT` |
+| `T` | `Idle` | durable value, no active sync |
+| `T` | `Refreshing` | durable value shown while a sync runs |
+| `T` | `Failed(...)` | durable value retained after a failed sync, typically offline |
 
 Rules:
 
-- Store5/Ktor/SQLDelight exceptions and types never leak through this contract.
+- coordinator/Ktor/SQLDelight exceptions and implementation types never leak through this contract.
 - `ResourceObservation` is not a universal UI State; ViewModels map it to product-specific State.
 - product-specific failure semantics may add stable domain contracts; raw HTTP/errors do not escape.
 - session expiration is primarily an Identity/session transition; `ACCESS` may describe the read attempt while that transition resolves.
 - purely local reads with no synchronization semantics may remain `Flow<T>`.
-- Projections derive observation status intentionally instead of discarding stale/failure information.
+- Projections derive observation status intentionally instead of discarding failure information.
 - Live Resources may use the same envelope; socket diagnostics remain implementation/inspector data unless product-facing.
 
 Example:
@@ -3237,29 +3256,31 @@ Typical current architecture:
 
 ```mermaid
 flowchart LR
-    Q[Capability Query] --> S[Store5]
-    S --> F[Fetcher]
-    F --> HTTP[REST]
-    S --> SOT[SourceOfTruth]
-    SOT --> SQL[SQLDelight]
-    SQL --> S
-    S --> Q
+    Q[Capability Query] --> OBS[SyncCoordinator.observing]
+    OBS --> LOCAL[Cold local Flow]
+    LOCAL --> SQL[SQLDelight rows + sync marker]
+    OBS --> SYNC[Capability sync]
+    SYNC --> HTTP[REST]
+    SYNC --> SQL
+    OBS --> ST[SyncCoordinator.status]
+    ST --> Q
 ```
 
-Store5 is an implementation primitive, not a public API.
+`SyncCoordinator` is owned runtime infrastructure, not a Capability API. It coordinates work and
+status; the database owns the value.
 
 ## 14.3 Snapshot semantics
 
 A Capability defines:
 
 - what the resource identity is;
-- what stale/fresh means;
-- whether stale-while-refresh is acceptable;
+- which durable rows and sync marker make up the value;
+- whether a retained value is shown while a sync runs or after it fails;
 - explicit refresh behavior;
 - offline behavior;
 - mapping/error semantics.
 
-The common refresh scheduler must not invent those semantics globally.
+The common coordinator must not invent those semantics globally.
 
 ## 14.4 Live Resource
 
@@ -3299,9 +3320,10 @@ last subscriber leaves
 
 Reconnect/backoff belongs to the Capability/live-resource owner.
 
-## 14.5 Store5 is not the UI event/lifecycle layer
+## 14.5 The sync coordinator is not the UI event/lifecycle layer
 
-Store5 may provide snapshot/cache/source-of-truth orchestration.
+The coordinator joins sync work per key, counts observers, and records process-local status over a
+Capability-owned durable source of truth. It does not own presentation lifecycle.
 
 Do not use it as:
 
@@ -3355,8 +3377,8 @@ Presentation expresses interest/intent; it does not directly construct or retain
 ### Capability owns
 
 - resource identity;
-- freshness/staleness semantics;
-- Store5/resource behavior;
+- when a key is due and what a retained value means;
+- Snapshot resource behavior;
 - invalidation;
 - retry policy;
 - whether a trigger actually requires work.
@@ -3377,7 +3399,7 @@ Presentation expresses interest/intent; it does not directly construct or retain
 refreshHooks.register(
     trigger = RefreshTrigger.Foreground,
 ) {
-    articleResources.refreshIfNeeded()
+    articleSync.syncIfDue(ArticleKey.All, RefreshQos.background())
 }
 ```
 
@@ -3385,11 +3407,11 @@ The common layer says an opportunity occurred. The Capability says whether it is
 
 ## 15.3 Pull-to-refresh
 
-User-forced refresh is semantically distinct from passive freshness checking.
+User-forced refresh is semantically distinct from passive due-checking.
 
 ```text
-Foreground -> refreshIfNeeded()
-PullToRefresh -> refresh(force = true)
+Foreground -> syncIfDue(key, RefreshQos.background())
+PullToRefresh -> sync(key, RefreshQos.visible())
 ```
 
 ## 15.4 Domain-blind QoS
@@ -3424,7 +3446,7 @@ Scheduler must not become a product-domain brain.
 
 ## 15.5 Why not a global policy-heavy RefreshCoordinator
 
-A giant global coordinator would create a second resource framework beside Store5/SQLDelight and centralize product semantics in a common manager.
+A giant global coordinator would create a second resource framework beside the owned Snapshot runtime and SQLDelight, then centralize product semantics in a common manager.
 
 Helix centralizes **external opportunity + generic scheduling**, not domain freshness policy.
 
@@ -3665,40 +3687,39 @@ Their presenter/state-production models influenced the desire for lower ceremony
 
 Revisit if measured ViewModel/presentation ceremony dominates useful logic and a mature alternative materially deletes code across all required targets.
 
-## 18.4 Store5
+## 18.4 Owned sync coordinator
 
-**Choice:** Store5, pinned in the repository version catalog, accepted-experimental, internal to Capability implementation.
+**Choice:** `SyncCoordinator<Key>` in `:foundation:resource-runtime`, internal to Capability
+implementation and owned by this project. The database owns the value.
 
-Historical POC provenance: the validated architecture experiment used `5.1.0-alpha10`. That number is evidence history, not an instruction to ignore the repository pin.
+The revisit condition fired twice. On 2026-09-04 the first representative Posts implementation
+compared the third-party Store5 wiring with a small owned network-bound-resource reference. With
+its cache disabled, Store5 supplied only fetch deduplication and a source-of-truth barrier while the
+project still needed converters in both directions, a snapshot plus validator wrapper for the
+never-synchronised state, freshness inferred from read origin, a mutex that queued duplicate network
+calls, duplicated grace timeouts, and per-post lease, eviction, and cancellation machinery. The
+owned `SnapshotResource` that replaced it kept a per-key confirmed value and derived freshness by
+comparing durable emissions with a completion re-read. On 2026-09-05 its release-gate review showed
+that this made the runtime a second value owner next to SQLDelight: it needed invalidation
+generations, self-heal syncs, structural equality on every emission, and re-read gates to stay
+consistent, and a detail write to a shared table could still change the feed's freshness without any
+feed sync. ADR-43 removed the value from the runtime.
 
-POC evidence:
+Historical POC provenance: Store5 was adopted as the Kotlin analogue of TanStack Query, whose
+observer-driven fetching, in-flight deduplication, and reconnect refetch shaped the resource
+contract in 13.7. The architecture experiment used Store5 `5.1.0-alpha10` for cache-first reads,
+explicit refresh, offline startup, a SQLDelight source of truth, two observers, and REST plus live
+update integration. That evidence remains history, not current implementation guidance.
 
-- cache-first article flow;
-- explicit refresh;
-- offline startup;
-- SQLDelight SourceOfTruth;
-- REST + SQLDelight + live update integration;
-- two simultaneous observers;
-- local-first bookmark/durable retry scenario.
+The coordinator keeps the public observation shape: `ResourceObservation` lost its freshness field
+and `SyncStatus` was added. It provides per-key worker joining, due-checking with a minimum
+interval, observer counting around a Capability-supplied flow, an offline retry of observed keys on
+reconnect, caller-cancellation isolation, and a bounded status ledger. SQLDelight remains the only value owner;
+a Capability persists its own synchronized marker in the same transaction as the rows. Live
+resources still use their own keyed shared stream and coordinator.
 
-Why:
-
-It replaces bespoke NetworkBoundResource/NetworkOnlyResource-style synchronization with an existing KMP resource primitive while preserving Capability APIs.
-
-Risk:
-
-- alpha maturity;
-- adaptation cost;
-- live resources still need a separate keyed shared stream/coordinator.
-
-Revisit if:
-
-- adapter/workaround code outweighs value;
-- project health deteriorates;
-- breaking redesign creates recurring migration cost;
-- Live Resources dominate and Store5 is mostly bypassed.
-
-During the first representative Snapshot implementations, compare Store5-specific wiring/adapters/debug concepts against a small bespoke network-bound-resource reference. If Store5 repeatedly requires more project-specific glue or harder diagnostics than the simpler reference while adding no required behavior, treat that as a fired revisit condition. Do not set a universal LOC threshold; compare expected change/debug cost.
+Revisit if measured diagnostics, correctness, target support, or repeated Capability-specific
+policy show that this narrow runtime no longer earns its ownership cost.
 
 ## 18.5 SQLDelight
 
@@ -4412,8 +4433,8 @@ Separate two layers.
 
 ### Capability layer
 
-- `refreshIfNeeded()` respects freshness;
-- forced refresh bypasses normal freshness where intended;
+- `syncIfDue` skips a key attempted within its minimum interval;
+- forced refresh always starts or joins a worker;
 - retry/invalidation semantics remain product-owned.
 
 ## 20.10 Durable command tests
@@ -4434,7 +4455,7 @@ Version-sensitive seams need dedicated smoke/regression suites:
 - keyed smart item retention/cleanup;
 - SQLDelight DB creation/migration/query/Web worker path;
 - Koin graph/compiler exact toolchain;
-- Store5 cache/offline/live integration;
+- Snapshot runtime cache/offline/live integration;
 - observability adapter target support.
 
 A library upgrade is incomplete until its qualification suite passes.
@@ -5327,7 +5348,7 @@ Recommended operational practice: maintain a scheduled architecture-framework wa
 - Compose Multiplatform;
 - Decompose;
 - Circuit;
-- Store5;
+- third-party snapshot/resource libraries (Store5 and successors) against the owned runtime;
 - SQLDelight;
 - Koin/Koin compiler;
 - observability/KMP tooling;
@@ -5377,17 +5398,24 @@ The exact schedule and existence of that automation are **not Helix architecture
 
 **Decision:** grouped Queries + intent Commands + stable models are presentation-facing contract.
 
-**Why:** product vocabulary remains stable across Store5/SQLDelight/REST/WebSocket/future replacements.
+**Why:** product vocabulary remains stable across Snapshot runtimes, SQLDelight, REST, WebSocket, and future replacements.
 
 **Revisit when:** a transport-specific model becomes the true stable product contract and hiding it creates only duplication.
 
-## ADR-05 - Store5 for Snapshot resources
+## ADR-05 - Snapshot orchestration primitive
 
-**Decision:** current Snapshot orchestration primitive inside Capability Impl.
+**Decision:** superseded by ADR-43, which keeps the value in the database and reduces the runtime
+to a domain-blind `SyncCoordinator`.
 
-**Status:** accepted-experimental / pinned.
+**Status:** the Store5 decision was superseded 2026-09-04 by an owned `SnapshotResource` runtime;
+that runtime was superseded 2026-09-05 by ADR-43.
 
-**Revisit when:** adaptation cost, project health, or Live-resource dominance reduces its value.
+**Why superseded:** the representative Posts implementation required more adaptation and lifecycle
+glue while the disabled library cache added no required behavior beyond refresh joining and a
+source-of-truth barrier. The owned value-tracking replacement then reproduced the same second-owner
+problem in project code; see ADR-43.
+
+**Revisit when:** see ADR-43.
 
 ## ADR-06 - SQLDelight for durable relational state
 
@@ -5413,7 +5441,7 @@ The exact schedule and existence of that automation are **not Helix architecture
 
 **Revisit when:** repeated audits show durable/domain state is still smuggled through despite enforcement.
 
-## ADR-10 - REST/Store5/SQLDelight are replaceable choices
+## ADR-10 - REST/Snapshot runtime/SQLDelight are replaceable choices
 
 **Decision:** REST-oriented backend now; no speculative GraphQL infrastructure.
 
@@ -5571,9 +5599,9 @@ The exact schedule and existence of that automation are **not Helix architecture
 
 ## ADR-31 - Synchronized reads expose one validatable ResourceObservation contract
 
-**Decision:** remotely synchronized Capability reads use the single `ResourceObservation<T : Any>` contract from `:foundation:resource` (`foundation_api`) when value + freshness + refresh/failure semantics matter; simple local reads may remain `Flow<T>`. Constructor invariants reject structurally illegal status combinations.
+**Decision:** remotely synchronized Capability reads use the single `ResourceObservation<T : Any>` contract from `:foundation:resource` (`foundation_api`) when value + refresh/failure semantics matter; simple local reads may remain `Flow<T>`. Constructor invariants reject structurally illegal status combinations.
 
-**Why:** a plain domain-value flow cannot consistently express loading, stale-while-refresh, cached-offline, or failed refresh, while per-Capability copies would immediately drift.
+**Why:** a plain domain-value flow cannot consistently express loading, refresh with a retained value, cached-offline, or failed refresh, while per-Capability copies would immediately drift.
 
 **Revisit when:** a simpler standard resource primitive provides the same transport-neutral semantics and legal-state guarantees.
 
@@ -5665,6 +5693,39 @@ The exact schedule and existence of that automation are **not Helix architecture
 
 **Revisit when:** the control plane reaches a mature steady state where phases no longer provide useful adoption semantics.
 
+## ADR-43 - Sync coordination is domain-blind and the database owns the value
+
+**Decision:** `:foundation:resource-runtime` ships `SyncCoordinator<Key>` and nothing else. It
+starts or joins one worker per key, skips keys attempted within `minInterval`, counts observers
+around a Capability-supplied upstream flow, retries observed keys whose last attempt failed offline
+on demand, and exposes a per-key `SyncStatus` ledger bounded by `maxEntries`. It never reads, caches, compares, or re-reads values.
+Capability implementations observe SQLDelight directly, persist their own "synchronized at least
+once" marker in the same transaction as the rows, apply that marker to the value flow, and hand the
+flow to `observations`, which applies the contract's `SyncStatus.toOperation` mapping.
+`ResourceFreshness` is deleted from the contract and `SyncStatus` is added. Supersedes ADR-05.
+
+**Why:** the owned `SnapshotResource` runtime that replaced Store5 on 2026-09-04 tracked a per-key
+confirmed value and derived `FRESH`/`STALE` by comparing every durable emission with a completion
+re-read. Its release-gate review found that this made the runtime the second owner of the value: it
+needed invalidation generations, self-heal syncs, structural equality on every emission, and re-read
+gates to stay consistent with the database, and a detail write to a shared table could still change
+the feed's freshness without any feed sync. Freshness derived from in-memory comparison is not a
+durable fact, and no consumer used it beyond a boolean the Feature has since dropped. Removing the
+value from the runtime removes that class of consistency bug and shrinks the runtime to a
+mutex-guarded map with a state table.
+
+**Alternatives considered:**
+
+- Keep the owned value ledger and land the remaining repairs. Rejected: each repair added state
+  that duplicated what SQLDelight already knows, and the correctness argument rested on
+  interleavings that only a contention test could exercise.
+- Revert to the Store5 adapter as of commit 0240602. Rejected: the reasons in ADR-05 still hold,
+  and its disabled cache still made the library the second value owner.
+
+**Revisit when:** a Capability needs a domain-blind age or staleness policy that cannot live in its
+own rows, or a qualified third-party primitive provides per-key joining, due-checking, observer
+counting, and status without owning the value.
+
 ---
 
 # 26. Qualification snapshot and evidence ledger
@@ -5681,8 +5742,9 @@ This section separates project POC evidence from public upstream release facts.
 | SQLDelight Web/Wasm | 2.2.1 actual web-worker path passed headless-browser qualification | approved; rerun on upgrades |
 | Koin compiler | application graph verification passed; earlier exact Kotlin combo produced compatibility warning | keep with qualification warning until exact-upgrade suite passes |
 | observability | semantic FeatureObserver worked with Kermit and optional OTel adapter; required Wasm OTel path absent in selected POC | Kermit default; adapter-neutral |
-| Store5 Snapshot | cache-first, refresh, offline, SQLDelight SoT passed | accepted-experimental/pinned |
-| Store5/live integration | REST + SQLDelight + live updates with two observers passed | live keyed coordinator + shared resource; Store5 not UI lifecycle layer |
+| historical Store5 Snapshot POC | cache-first, refresh, offline, SQLDelight SoT passed | superseded 2026-09-04 by the owned runtime after the value comparison fired |
+| owned sync coordinator | per-key joining, due-checking, observer counting, status ledger, eviction, caller cancellation, reconnect, and SQLDelight integration passed | current narrow project-owned runtime; the value-tracking `SnapshotResource` predecessor was superseded 2026-09-05 (ADR-43) |
+| Snapshot/live integration | REST + SQLDelight + live updates with two observers passed | live keyed coordinator + shared resource; the sync coordinator is not the UI lifecycle layer |
 | durable mutation | local-first bookmark + offline retry passed | explicit Commands; outbox only when required |
 | identity | separate FeatureInstanceKey/ResourceKey behavior validated | retain three-identity model |
 
@@ -5739,9 +5801,12 @@ Decision:
 
 The repository pin is authoritative. The historical project POC qualified the asynchronous Web Worker path; upgrades rerun that target-specific suite.
 
-### Store5
+### Sync coordinator runtime
 
-The repository pin is authoritative once adopted. Store5 remains accepted-experimental and isolated in Capability Impl; each upgrade must rerun Snapshot/offline/refresh/resource tests.
+The owned coordinator is qualified by permanent state-table, cancellation, eviction, observer,
+reconnect, and Capability integration tests. The historical Store5 pin was removed when ADR-05 was
+superseded on 2026-09-04; the value-tracking `SnapshotResource` was removed under ADR-43 on
+2026-09-05.
 
 ### Koin / compiler validation
 
@@ -5762,7 +5827,7 @@ Do not transcribe upstream "current" versions here. Project support remains adap
 | keyed `StatefulLazyItem` owner | qualified | backed by lifecycle 2.11.0 `ViewModelStoreProvider`; `rememberViewportKeys` supplies Decompose `ChildItems`-style destroy-beyond-buffer |
 | Compose `retain` / RetainedValuesStore replacement | under-evaluation | evaluate exact repository pin on four-target lazy/keyed/logical-removal suite |
 | SQLDelight | qualified | exact repository pin + required-target/Web Worker regression |
-| Store5 | accepted-experimental | exact repository pin; Snapshot/resource value with maturity risk |
+| owned Snapshot resource runtime | qualified | per-key ledger and SQLDelight integration covered by permanent regression tests |
 | Koin compiler/graph validation | qualified-with-warning | exact repository Kotlin/Koin/compiler pins must remain regression-qualified |
 | Kermit | selected default adapter | broad neutral logging path |
 | OpenTelemetry Kotlin | optional/target-dependent | adapter only; never Feature contract |
@@ -5833,14 +5898,15 @@ Mitigation:
 - physical topology is reversible;
 - measure migration/invalidation/co-change pressure.
 
-## 27.6 Store5 is experimental
+## 27.6 Sync coordinator is owned infrastructure
 
 Mitigation:
 
-- pinned;
-- hidden behind Capability Impl;
-- permanent qualification suite;
-- replacement does not change consumers.
+- narrow and hidden behind Capability Impl;
+- domain-blind: coordinates work and status, never values;
+- process-bounded per-key ledger with eviction;
+- permanent state-table, cancellation, eviction, observer, and reconnect qualification suite;
+- replacement remains possible without changing consumers.
 
 ## 27.7 Custom keyed owner is owned runtime infrastructure
 
@@ -6321,7 +6387,6 @@ data class LiveScoreState(
     val score: LiveScore? = null,
     val isInitialLoading: Boolean = false,
     val isRefreshing: Boolean = false,
-    val isStale: Boolean = false,
     val problem: LiveScoreProblemUi? = null,
 ) {
     companion object {
@@ -6343,7 +6408,6 @@ private fun ResourceObservation<LiveScore>.toLiveScoreState(): LiveScoreState {
         score = value,
         isInitialLoading = value == null && operation is ResourceOperation.Refreshing,
         isRefreshing = value != null && operation is ResourceOperation.Refreshing,
-        isStale = freshness == ResourceFreshness.STALE,
         problem = failure?.problem?.let { problem ->
             when {
                 problem.category == ResourceProblemCategory.OFFLINE ->
@@ -6411,7 +6475,7 @@ LiveScoreViewModel
 
 Cricket Capability Impl
   owns match Snapshot/Live resource keyed by MatchId
-  owns REST refresh policy/Store5/SQLDelight mapping
+  owns REST refresh policy/SyncCoordinator/SQLDelight mapping
   owns keyed WebSocket coordinator
 
 StatefulLazyItem
@@ -6458,7 +6522,7 @@ Tap Refresh
  -> Action.Refresh
  -> LiveScoreViewModel
  -> explicit capability refresh/command path
- -> MatchResource / Store5 fresh
+ -> MatchSync.sync(matchId, RefreshQos.visible())
  -> REST
  -> SQLDelight/resource writer
  -> CricketQueries flow emits
@@ -6517,7 +6581,7 @@ Dark mode
 
 ## 31.1 Explicit goal
 
-A contributor should not need to understand Android lifecycle, Nav3 internals, SQLDelight drivers, or Store5 internals for a task that does not cross those seams.
+A contributor should not need to understand Android lifecycle, Nav3 internals, SQLDelight drivers, or Snapshot runtime internals for a task that does not cross those seams.
 
 ## 31.2 Normal bounded workflow
 
@@ -6920,7 +6984,7 @@ Cell has no stable FeatureInstanceKey despite multiple instances
 Resource identity is a LazyList index
 RouteKey reused as ResourceKey
 UiCommand carries full domain object/resource snapshot
-Store5/SQLDelight types appear in Feature API
+Snapshot runtime/SQLDelight types appear in Feature API
 HomeRepository aggregates unrelated domains only for one screen
 Global RefreshManager owns Cricket/Article-specific TTL rules
 Global EventBus used to avoid dependency design
@@ -7081,7 +7145,8 @@ These URLs are evidence references, not architectural dependencies.
 - Apollo normalized cache docs: `https://www.apollographql.com/docs/kotlin/caching/normalized-cache`
 - Decompose: `https://arkivanov.github.io/Decompose/`
 - Slack Circuit: `https://slackhq.github.io/circuit/`
-- Store5 docs: `https://store.mobilenativefoundation.org/`
+- historical Store5 POC docs: `https://store.mobilenativefoundation.org/`
+- Android offline-first data layer guidance (local-first reads, sync as one suspend function, refresh in an external scope): `https://developer.android.com/topic/architecture/data-layer/offline-first`
 - Konsist: `https://docs.konsist.lemonappdev.com/`
 - OpenRewrite: `https://docs.openrewrite.org/`
 - Android modularization guidance: `https://developer.android.com/topic/modularization`
@@ -7139,7 +7204,7 @@ Capability API
   stable models
 
 Capability Impl
-  Store5 / repository / REST / SQLDelight / WebSocket
+  Snapshot resource runtime / repository / REST / SQLDelight / WebSocket
   refresh/resource semantics
 
 Resources
@@ -7150,7 +7215,7 @@ Resources
 SYNCHRONIZED READ CONTRACT
 --------------------------
 ResourceObservation<T>
-  value + freshness + operation
+  value + operation
   mapped by ViewModel into product-specific State
 
 RUNTIME SCOPE
@@ -7309,7 +7374,7 @@ Do not bypass the rule by importing implementation types or adding a global mana
 - Feature -> Capability Impl: forbidden.
 - Capability Impl -> another business Capability Impl: forbidden.
 - UI -> ViewModel/Koin/navigation/Capability/repository: forbidden.
-- Capability API -> Compose/network/DB/Store5/impl: forbidden.
+- Capability API -> Compose/network/DB/resource runtime/impl: forbidden.
 - Peer Cell implementation -> peer Cell implementation: forbidden.
 - UiCommand must not carry correctness-bearing domain/resource state.
 - RouteKey != FeatureInstanceKey != ResourceKey.
@@ -7479,7 +7544,7 @@ helix-kmp gallery
 | smart embedded lifetime | narrow keyed owner | solves exact lazy Cell gap | full component runtime unnecessary today | first-party replacement or recurring bugs |
 | read contracts | grouped Capability Queries | avoids use-case-class explosion | one `ObserveX` class per trivial read too verbose | grouped API becomes unstable/broad |
 | writes | intent Commands | semantic and testable | generic CRUD loses product intent | real domain semantics demand different contract |
-| Snapshot resource | Store5 | cache/refresh/offline qualified | custom NBR/NOR is owned code | Store adaptation/maturity fails value test |
+| Snapshot resource | owned `SyncCoordinator` with a database-owned value | per-key joining, due-checking, observer counting, status, cancellation, and SQLDelight integration qualified | third-party adapter added more glue; an owned value ledger duplicated the database | diagnostics, correctness, target support, or policy pressure favors a replacement |
 | Live resource | keyed Capability coordinator + shared state | one resource/connection across observers | Cell/ViewModel socket ownership duplicates resources | another resource runtime fully replaces owned code |
 | durable state | SQLDelight | four-target relational path qualified | transport cache alone does not meet durable needs | target/performance/tooling pressure |
 | DB topology | one physical DB initially | simplest starting operations | DB-per-capability premature fragmentation | migration/invalidation/isolation pressure |

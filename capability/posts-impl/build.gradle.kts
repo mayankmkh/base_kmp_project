@@ -13,7 +13,7 @@ kotlin {
                 implementation(projects.capability.postsApi)
                 implementation(projects.foundation.network)
                 implementation(projects.foundation.resource)
-                implementation(projects.foundation.resourceStore5)
+                implementation(projects.foundation.resourceRuntime)
                 implementation(projects.foundation.runtime)
                 implementation(projects.platform.connectivity)
                 api(libs.sqldelight.runtime)
@@ -21,7 +21,6 @@ kotlin {
                 implementation(libs.sqldelight.coroutines.extensions)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.michael.bull.kotlin.result)
-                implementation(libs.store5)
             }
         }
         jvmTest {

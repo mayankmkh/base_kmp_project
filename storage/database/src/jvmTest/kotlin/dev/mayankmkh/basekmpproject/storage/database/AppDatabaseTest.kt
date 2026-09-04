@@ -40,13 +40,33 @@ class AppDatabaseTest {
         val driver = JdbcSqliteDriver("jdbc:sqlite:${databaseFile.absolutePath}")
         try {
             driver.executeSql(
-                "INSERT INTO post(id, title, body, position) VALUES ('kept', 'Title', 'Body', 0)"
+                "INSERT INTO post(id, title, body, position) VALUES ('later', 'Later', 'Body', 7)"
+            )
+            driver.executeSql(
+                "INSERT INTO post(id, title, body, position) VALUES ('earlier', 'Earlier', 'Body', 2)"
             )
 
             AppDatabase.Schema.migrate(driver, 1, AppDatabase.Schema.version).await()
 
-            assertEquals(listOf("kept"), driver.stringColumn("SELECT id FROM post"))
-            assertEquals(listOf(0L), driver.longColumn("SELECT author_id FROM post"))
+            assertEquals(
+                listOf("earlier", "later"),
+                driver.stringColumn("SELECT id FROM post ORDER BY id"),
+            )
+            assertEquals(
+                listOf(0L, 0L),
+                driver.longColumn("SELECT author_id FROM post ORDER BY id"),
+            )
+            assertEquals(
+                listOf("earlier", "later"),
+                driver.stringColumn(
+                    """
+                    SELECT post.id
+                    FROM postFeedEntry
+                    INNER JOIN post ON post.id = postFeedEntry.post_id
+                    ORDER BY postFeedEntry.position
+                    """
+                ),
+            )
         } finally {
             driver.close()
             directory.deleteRecursively()

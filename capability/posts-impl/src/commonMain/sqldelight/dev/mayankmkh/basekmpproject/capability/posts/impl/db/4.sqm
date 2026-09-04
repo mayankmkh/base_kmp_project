@@ -1,0 +1,31 @@
+-- Feed membership moves out of the post entity into postFeedEntry so that a smaller page can
+-- replace the feed without deleting rows that a detail observer still reads. Every pre-version-4
+-- post was a feed member, so its id and position are copied before the old position column is
+-- removed. Column order of the rebuilt table must match PostsSchema.sq because verifyMigrations
+-- compares both.
+CREATE TABLE postFeedEntry (
+    -- replaceFeed guarantees integrity by writing entity rows before entries in one transaction.
+    post_id TEXT NOT NULL PRIMARY KEY,
+    position INTEGER NOT NULL
+);
+
+CREATE INDEX postFeedEntry_position ON postFeedEntry(position);
+
+INSERT INTO postFeedEntry(post_id, position)
+SELECT id, position
+FROM post;
+
+CREATE TABLE post_new (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    author_id INTEGER NOT NULL DEFAULT 0
+);
+
+INSERT INTO post_new(id, title, body, author_id)
+SELECT id, title, body, author_id
+FROM post;
+
+DROP TABLE post;
+
+ALTER TABLE post_new RENAME TO post;

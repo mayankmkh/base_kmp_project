@@ -15,18 +15,12 @@ internal object PostsFeatureFixtures {
     val detail = PostDetailState(post = posts.first(), isInitialLoading = false)
     val loadingDetail = PostDetailState()
     val offlineDetail =
-        detail.copy(
-            isStale = true,
-            problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true),
-        )
+        detail.copy(problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true))
     val failedDetail =
         PostDetailState(
             isInitialLoading = false,
             problem = ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true),
         )
     val offlineFeed =
-        feed.copy(
-            isStale = true,
-            problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true),
-        )
+        feed.copy(problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true))
 }

@@ -347,7 +347,7 @@ recorded so the question is not reopened by default.
 
 | Plugin or option | Decision | Reason |
 | --- | --- | --- |
-| `HttpCache` | Not installed | Store5 over SQLDelight owns durable caching, freshness and account isolation (§2). Ktor's default cache is unbounded, in memory, and keeps account-scoped bodies. Revisit only as a conditional-request layer under Store5, see §13. |
+| `HttpCache` | Not installed | SQLDelight owns durable caching and account isolation, and `SyncCoordinator` decides when a key is synchronised (§2). Ktor's default cache is unbounded, in memory, and keeps account-scoped bodies. Revisit only as a conditional-request layer under the durable source of truth, see §13. |
 | `Resources` | When needed | Typed routes pay off with a large, stable endpoint surface. `appendPathSegments` covers the current one without a generated route model per endpoint. |
 | `UserAgent` | Not installed | OkHttp and Darwin already send an identity, browsers refuse to set the header. Client identification goes in a custom header (§5). |
 | `ContentEncoding` | Not installed | OkHttp, Darwin and Fetch decompress responses transparently. Install only for request compression a backend measurably wants. |
@@ -372,8 +372,9 @@ recorded so the question is not reopened by default.
 3. Whether web needs cookies. Fetch credentials mode is configurable on the Js engine; bearer-only
    is the default and the safer CORS story.
 4. Whether desktop must honour system proxies. OkHttp needs explicit proxy configuration.
-5. Whether `HttpCache` earns a place beneath Store5 as a conditional-request layer (ETag,
-   `If-None-Match`) once a backend sends validators. Two caches disagreeing on freshness is the cost.
+5. Whether `HttpCache` earns a place beneath the SQLDelight source of truth as a conditional-request
+   layer (ETag, `If-None-Match`) once a backend sends validators. Two caches disagreeing on what is
+   current is the cost.
 
 ## 14. References
 

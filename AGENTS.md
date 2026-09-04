@@ -122,7 +122,7 @@ locator.
 <!-- helix:generated:policy-prohibitions END -->
 
 - UI contains no ViewModel, Koin, navigation, or repository code.
-- Capability API contains no Compose, network, DB, Store5, or implementation code.
+- Capability API contains no Compose, network, DB, resource runtime, or implementation code.
 - Peer Cell implementation -> peer Cell implementation: forbidden.
 - A Feature's public surface lives in its `api` package only (`FEATURE-PUBLIC-SURFACE-OUTSIDE-API`).
 - A `UiCommand` must not carry correctness-bearing domain or resource state.

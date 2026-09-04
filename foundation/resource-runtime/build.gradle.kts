@@ -9,7 +9,6 @@ kotlin {
         commonMain {
             dependencies {
                 api(projects.foundation.resource)
-                api(libs.store5)
                 api(libs.kotlinx.coroutines.core)
                 implementation(projects.foundation.network)
             }
@@ -20,5 +19,6 @@ kotlin {
                 implementation(libs.michael.bull.kotlin.result)
             }
         }
+        jvmTest
     }
 }

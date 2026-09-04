@@ -1,4 +1,4 @@
-package dev.mayankmkh.basekmpproject.foundation.resource.store5
+package dev.mayankmkh.basekmpproject.foundation.resource.runtime
 
 import com.github.michaelbull.result.getError
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkFailure

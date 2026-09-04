@@ -7,7 +7,6 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceFreshness
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceOperation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
@@ -27,11 +26,8 @@ object PostsFixtures {
 }
 
 object ResourceObservationFixtures {
-    fun <T : Any> fresh(value: T): ResourceObservation<T> =
-        ResourceObservation(value, ResourceFreshness.FRESH, ResourceOperation.Idle)
-
-    fun <T : Any> stale(value: T): ResourceObservation<T> =
-        ResourceObservation(value, ResourceFreshness.STALE, ResourceOperation.Idle)
+    fun <T : Any> idle(value: T): ResourceObservation<T> =
+        ResourceObservation(value, ResourceOperation.Idle)
 
     fun <T : Any> failed(
         value: T? = null,
@@ -40,15 +36,14 @@ object ResourceObservationFixtures {
     ): ResourceObservation<T> =
         ResourceObservation(
             value = value,
-            freshness = if (value == null) ResourceFreshness.UNKNOWN else ResourceFreshness.STALE,
             operation = ResourceOperation.Failed(ResourceProblem(category, retryable)),
         )
 }
 
 class FakePostsQueries(
-    feed: ResourceObservation<PostFeed> = ResourceObservationFixtures.fresh(PostsFixtures.feed()),
+    feed: ResourceObservation<PostFeed> = ResourceObservationFixtures.idle(PostsFixtures.feed()),
     posts: Map<PostId, ResourceObservation<Post>> =
-        PostsFixtures.feed().posts.associate { it.id to ResourceObservationFixtures.fresh(it) },
+        PostsFixtures.feed().posts.associate { it.id to ResourceObservationFixtures.idle(it) },
 ) : PostsQueries {
     val feed = MutableStateFlow(feed)
     val postFlows = posts.mapValuesTo(mutableMapOf()) { MutableStateFlow(it.value) }

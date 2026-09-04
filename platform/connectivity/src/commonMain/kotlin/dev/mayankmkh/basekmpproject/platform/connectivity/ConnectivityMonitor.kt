@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.map
  *
  * Deliberately coarse. No platform can promise that a request will succeed -- a captive portal
  * answers every DNS lookup and nothing else -- so this is a hint, used to decide *when* to
- * revalidate rather than whether a fetch is allowed. A failed fetch is still handled as a failure.
+ * synchronize rather than whether a fetch is allowed. A failed fetch is still handled as a failure.
  */
 fun interface ConnectivityMonitor {
     /** Emits the current answer as soon as it is collected, then again on every change. */

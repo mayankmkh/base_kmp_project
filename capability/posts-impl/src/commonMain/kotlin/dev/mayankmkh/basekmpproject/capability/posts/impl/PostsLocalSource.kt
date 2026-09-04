@@ -5,9 +5,9 @@ import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.coroutines.asFlow
 import dev.mayankmkh.basekmpproject.capability.posts.impl.db.AppDatabase
-import dev.mayankmkh.basekmpproject.capability.posts.impl.db.Post
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -19,91 +19,78 @@ import kotlinx.coroutines.flow.map
  * with `PostEntity`. It also absorbs the two things that are awkward about the asynchronous query
  * API: `asFlow()` emits the *query*, not its rows, so every observation needs an explicit
  * `awaitAsList`, and a multi-row write has to go through a suspending transaction to land as one
- * table notification instead of N.
+ * table notification instead of N. Feed and detail writes share each entity row, so the last
+ * committed write wins when they overlap.
  */
 internal class PostsLocalSource(private val provider: PostsDatabaseProvider) {
 
     /**
-     * Emits the durable feed, then again after every write to `post`.
+     * Emits the durable feed, then again after every write to `post` or `postFeedEntry`.
      *
      * `flatMapLatest` over a one-shot `flow { emit(database()) }` is what defers opening the
-     * database until somebody collects -- building the flow itself stays non-suspending, which is
-     * what Store5's `SourceOfTruth.reader` contract requires.
+     * database until somebody collects. Building the flow itself stays non-suspending, which keeps
+     * coordinator-backed observation cold.
      */
-    fun observeAll(): Flow<List<PostEntity>> = withDatabase { database ->
-        database.postsSchemaQueries.selectAll().asFlow().map { query ->
-            query.awaitAsList().map { it.toEntity() }
+    fun observeFeed(): Flow<List<PostEntity>> = withDatabase { database ->
+        database.postsSchemaQueries.selectFeed(::PostEntity).asFlow().map { query ->
+            query.awaitAsList()
         }
     }
 
     fun observeById(id: String): Flow<PostEntity?> = withDatabase { database ->
-        database.postsSchemaQueries.selectById(id).asFlow().map { query ->
-            query.awaitAsOneOrNull()?.toEntity()
+        database.postsSchemaQueries.selectById(id, ::PostEntity).asFlow().map { query ->
+            query.awaitAsOneOrNull()
         }
     }
 
     /** Whether the feed endpoint has completed successfully at least once. */
     fun observeFeedInitialized(): Flow<Boolean> = withDatabase { database ->
-        database.postsSchemaQueries.feedInitializationCount().asFlow().map { query ->
-            query.awaitAsOne() > 0L
-        }
+        database.postsSchemaQueries
+            .feedInitializationCount()
+            .asFlow()
+            .map { query -> query.awaitAsOne() > 0L }
+            .distinctUntilChanged()
     }
 
     suspend fun count(): Long = provider.database().postsSchemaQueries.countAll().awaitAsOne()
 
-    /**
-     * Replaces the whole feed in one transaction.
-     *
-     * A delete-then-insert rather than an upsert sweep because the server's feed is authoritative:
-     * a post that has disappeared upstream should disappear locally too, and `position` has to stay
-     * dense for ordering to survive.
-     */
-    suspend fun replaceAll(posts: List<PostEntity>) {
+    /** Replaces feed membership and order in one transaction without deleting entity rows. */
+    suspend fun replaceFeed(posts: List<PostEntity>) {
         val database = provider.database()
+        val distinctPosts = posts.distinctBy { it.id }
         database.transaction {
-            database.postsSchemaQueries.deleteAll()
-            posts.forEachIndexed { index, post ->
+            distinctPosts.forEach { post ->
                 database.postsSchemaQueries.upsert(
                     id = post.id,
                     author_id = post.authorId,
                     title = post.title,
                     body = post.body,
-                    position = index.toLong(),
                 )
+            }
+            database.postsSchemaQueries.deleteFeedEntries()
+            distinctPosts.forEachIndexed { index, post ->
+                database.postsSchemaQueries.insertFeedEntry(post.id, index.toLong())
             }
             database.postsSchemaQueries.markFeedInitialized()
         }
     }
 
-    /**
-     * Writes a single post without disturbing the feed's ordering.
-     *
-     * Used by the details screen, which can be the first thing to load a post -- on a cold deep
-     * link there is no feed to take a position from, so it appends past the current tail.
-     */
+    /** Writes a single post without changing feed membership or order. */
     suspend fun upsert(post: PostEntity) {
-        val database = provider.database()
-        database.transaction {
-            val existing = database.postsSchemaQueries.selectById(post.id).awaitAsOneOrNull()
-            val position = existing?.position ?: database.postsSchemaQueries.countAll().awaitAsOne()
-            database.postsSchemaQueries.upsert(
+        provider
+            .database()
+            .postsSchemaQueries
+            .upsert(
                 id = post.id,
                 author_id = post.authorId,
                 title = post.title,
                 body = post.body,
-                position = position,
             )
-        }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun <T> withDatabase(block: (AppDatabase) -> Flow<T>): Flow<T> =
         flow { emit(provider.database()) }.flatMapLatest(block)
-
-    // `Post` is SQLDelight's generated row type for the `post` table, emitted into this package
-    // by the `.sq` file's directory.
-    private fun Post.toEntity() =
-        PostEntity(id = id, title = title, body = body, authorId = author_id)
 }
 
 /** A durable post, free of both the wire format and SQLDelight's generated row type. */

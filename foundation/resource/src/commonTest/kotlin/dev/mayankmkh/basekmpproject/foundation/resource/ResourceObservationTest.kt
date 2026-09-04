@@ -21,24 +21,12 @@ class ResourceObservationTest {
     }
 
     @Test
-    fun initialIsUnknownRefreshingAndHasNoValue() {
+    fun initialIsRefreshingAndHasNoValue() {
         val observation = ResourceObservation.initial<String>()
 
         assertFalse(observation.hasValue)
         assertTrue(observation.isRefreshing)
-        assertEquals(ResourceFreshness.UNKNOWN, observation.freshness)
         assertNull(observation.failure)
-    }
-
-    @Test
-    fun `null value with fresh freshness is rejected`() {
-        assertFailsWith<IllegalArgumentException> {
-            ResourceObservation<String>(
-                value = null,
-                freshness = ResourceFreshness.FRESH,
-                operation = ResourceOperation.Refreshing,
-            )
-        }
     }
 
     @Test
@@ -46,18 +34,6 @@ class ResourceObservationTest {
         assertFailsWith<IllegalArgumentException> {
             ResourceObservation<String>(
                 value = null,
-                freshness = ResourceFreshness.UNKNOWN,
-                operation = ResourceOperation.Idle,
-            )
-        }
-    }
-
-    @Test
-    fun `non-null value with unknown freshness is rejected`() {
-        assertFailsWith<IllegalArgumentException> {
-            ResourceObservation(
-                value = "cached",
-                freshness = ResourceFreshness.UNKNOWN,
                 operation = ResourceOperation.Idle,
             )
         }
@@ -69,7 +45,6 @@ class ResourceObservationTest {
         val observation =
             ResourceObservation<String>(
                 value = null,
-                freshness = ResourceFreshness.UNKNOWN,
                 operation = ResourceOperation.Failed(problem),
             )
 
@@ -83,7 +58,6 @@ class ResourceObservationTest {
         val observation =
             ResourceObservation(
                 value = "cached",
-                freshness = ResourceFreshness.STALE,
                 operation = ResourceOperation.Failed(problem),
             )
 
@@ -93,11 +67,30 @@ class ResourceObservationTest {
     }
 
     @Test
+    fun `status mapping prefers in-flight then failure then a missing value`() {
+        val problem = ResourceProblem(ResourceProblemCategory.PERMANENT, retryable = false)
+        val failed = SyncStatus(inFlight = false, lastFailure = problem, hasSucceeded = true)
+
+        assertEquals(
+            ResourceOperation.Refreshing,
+            failed.copy(inFlight = true).toOperation(hasValue = true),
+        )
+        assertEquals(ResourceOperation.Failed(problem), failed.toOperation(hasValue = true))
+        assertEquals(
+            ResourceOperation.Refreshing,
+            failed.copy(lastFailure = null).toOperation(hasValue = false),
+        )
+        assertEquals(
+            ResourceOperation.Idle,
+            failed.copy(lastFailure = null).toOperation(hasValue = true),
+        )
+    }
+
+    @Test
     fun `failure is null for non-failed operations`() {
         val idle =
             ResourceObservation(
                 value = "cached",
-                freshness = ResourceFreshness.STALE,
                 operation = ResourceOperation.Idle,
             )
 

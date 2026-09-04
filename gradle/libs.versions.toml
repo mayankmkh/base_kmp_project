@@ -3,7 +3,6 @@
 agp = "9.3.1"
 android-tools = "32.3.1"
 android-compileSdk = "37"
-# Store5's Android artifact declares API 24; keep consumers on its supported platform floor.
 android-minSdk = "24"
 android-targetSdk = "37"
 androidDesugarJdkLibs = "2.1.5"
@@ -48,9 +47,6 @@ spotless = "8.9.0"
 # Room is the Android-recommended option but publishes no wasmJs target, so it cannot back a
 # module built for `bkpTargets { default() }`. SQLDelight covers all four platforms.
 sqldelight = "2.2.1"
-# The docs currently show 5.1.0, but Maven has no stable artifact yet. alpha11 is the latest
-# published release (2026-08-29).
-store5 = "5.1.0-alpha11"
 touchlabKermit = "2.1.0"
 truth = "1.4.5"
 turbine = "1.2.0"
@@ -146,8 +142,6 @@ sqldelight-android-driver = { group = "app.cash.sqldelight", name = "android-dri
 sqldelight-native-driver = { group = "app.cash.sqldelight", name = "native-driver", version.ref = "sqldelight" }
 sqldelight-sqlite-driver = { group = "app.cash.sqldelight", name = "sqlite-driver", version.ref = "sqldelight" }
 sqldelight-web-worker-driver = { group = "app.cash.sqldelight", name = "web-worker-driver", version.ref = "sqldelight" }
-
-store5 = { group = "org.mobilenativefoundation.store", name = "store5", version.ref = "store5" }
 
 michael-bull-kotlin-result = { group = "com.michael-bull.kotlin-result", name = "kotlin-result", version.ref = "kotlinResult" }
 

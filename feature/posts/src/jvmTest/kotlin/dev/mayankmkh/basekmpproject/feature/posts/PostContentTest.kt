@@ -29,7 +29,7 @@ class PostContentTest {
     }
 
     @Test
-    fun `feed shows progress empty failure and stale offline states`() = runComposeUiTest {
+    fun `feed shows progress empty failure and cached offline states`() = runComposeUiTest {
         var state by mutableStateOf(PostFeedState())
         setContent { PostFeedContent(state, {}) }
         onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertIsDisplayed()
@@ -48,7 +48,7 @@ class PostContentTest {
 
         state = PostsFeatureFixtures.offlineFeed
         waitForIdle()
-        onNodeWithText("Offline", substring = true).assertIsDisplayed()
+        onNodeWithText("First post").assertIsDisplayed()
     }
 
     @Test

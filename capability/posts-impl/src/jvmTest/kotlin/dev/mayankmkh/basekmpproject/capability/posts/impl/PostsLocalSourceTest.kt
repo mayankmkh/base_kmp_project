@@ -12,24 +12,43 @@ import kotlinx.coroutines.test.runTest
 class PostsLocalSourceTest {
 
     @Test
-    fun `replaceAll round trips through the database in feed order`() = runTest {
+    fun `replaceFeed round trips through the database in feed order`() = runTest {
         val source = createInMemoryPostsLocalSource()
 
-        source.replaceAll(listOf(entity("10"), entity("2")))
+        source.replaceFeed(listOf(entity("10"), entity("2")))
 
         // "10" before "2" -- the point of storing an explicit position rather than sorting on the
         // text id, which would put "10" second.
-        assertEquals(listOf("10", "2"), source.observeAll().first().map { it.id })
+        assertEquals(listOf("10", "2"), source.observeFeed().first().map { it.id })
     }
 
     @Test
-    fun `replaceAll drops rows the new feed no longer contains`() = runTest {
+    fun `replaceFeed keeps the first occurrence of a duplicate id in feed order`() = runTest {
         val source = createInMemoryPostsLocalSource()
-        source.replaceAll(listOf(entity("1"), entity("2")))
 
-        source.replaceAll(listOf(entity("2")))
+        source.replaceFeed(
+            listOf(
+                entity("1"),
+                entity("2"),
+                entity("1").copy(title = "Duplicate"),
+                entity("3"),
+            )
+        )
 
-        assertEquals(listOf("2"), source.observeAll().first().map { it.id })
+        assertEquals(listOf("1", "2", "3"), source.observeFeed().first().map { it.id })
+        assertEquals("Title 1", source.observeById("1").first()?.title)
+    }
+
+    @Test
+    fun `smaller feed drops membership but retains the out of page entity`() = runTest {
+        val source = createInMemoryPostsLocalSource()
+        source.replaceFeed(listOf(entity("1"), entity("2")))
+
+        source.replaceFeed(listOf(entity("2")))
+
+        assertEquals(listOf("2"), source.observeFeed().first().map { it.id })
+        assertEquals("Title 1", source.observeById("1").first()?.title)
+        assertEquals(2L, source.count())
     }
 
     @Test
@@ -37,7 +56,7 @@ class PostsLocalSourceTest {
         val source = createInMemoryPostsLocalSource()
         assertFalse(source.observeFeedInitialized().first())
 
-        source.replaceAll(emptyList())
+        source.replaceFeed(emptyList())
 
         assertTrue(source.observeFeedInitialized().first())
     }
@@ -52,13 +71,13 @@ class PostsLocalSourceTest {
     }
 
     @Test
-    fun `observeAll re-emits when the table is written`() = runTest {
+    fun `observeFeed re-emits when membership is written`() = runTest {
         val source = createInMemoryPostsLocalSource()
 
-        source.observeAll().test {
+        source.observeFeed().test {
             assertEquals(emptyList(), awaitItem())
 
-            source.replaceAll(listOf(entity("1")))
+            source.replaceFeed(listOf(entity("1")))
 
             assertEquals(listOf("1"), awaitItem().map { it.id })
             cancelAndIgnoreRemainingEvents()
@@ -75,22 +94,23 @@ class PostsLocalSourceTest {
     @Test
     fun `upsert of a cached post keeps its position`() = runTest {
         val source = createInMemoryPostsLocalSource()
-        source.replaceAll(listOf(entity("1"), entity("2"), entity("3")))
+        source.replaceFeed(listOf(entity("1"), entity("2"), entity("3")))
 
         source.upsert(PostEntity("1", "changed", "changed body"))
 
-        assertEquals(listOf("1", "2", "3"), source.observeAll().first().map { it.id })
+        assertEquals(listOf("1", "2", "3"), source.observeFeed().first().map { it.id })
         assertEquals("changed", source.observeById("1").first()?.title)
     }
 
     @Test
-    fun `upsert of an unseen post appends it past the tail`() = runTest {
+    fun `upsert of an unseen post does not add feed membership`() = runTest {
         val source = createInMemoryPostsLocalSource()
-        source.replaceAll(listOf(entity("1"), entity("2")))
+        source.replaceFeed(listOf(entity("1"), entity("2")))
 
         source.upsert(entity("99"))
 
-        assertEquals(listOf("1", "2", "99"), source.observeAll().first().map { it.id })
+        assertEquals(listOf("1", "2"), source.observeFeed().first().map { it.id })
+        assertEquals("Title 99", source.observeById("99").first()?.title)
     }
 
     @Test
@@ -98,7 +118,7 @@ class PostsLocalSourceTest {
         val source = createInMemoryPostsLocalSource()
         assertEquals(0L, source.count())
 
-        source.replaceAll(listOf(entity("1"), entity("2")))
+        source.replaceFeed(listOf(entity("1"), entity("2")))
 
         assertEquals(2L, source.count())
     }

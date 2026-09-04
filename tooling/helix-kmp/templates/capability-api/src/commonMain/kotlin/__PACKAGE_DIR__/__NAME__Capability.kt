@@ -1,21 +1,26 @@
 package __PACKAGE__
 
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
+import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import kotlinx.coroutines.flow.Flow
 
 // Queries observe and never mutate. One Capability exposes one grouped Queries interface rather
-// than a per-screen method bag.
+// than a per-screen method bag. A remotely synchronized read is a `ResourceObservation`: the
+// durable value plus the current operation (idle, refreshing, or failed). Collecting it is what
+// tells the Capability that the value is on screen, so the Capability can synchronize on
+// appearance and on reconnect. A purely local read may stay a plain `Flow<T>`.
 /** The __name__ Capability's read surface. */
 public interface __NAME__Queries {
-    public fun observeAll(): Flow<List<__NAME__Record>>
+    public fun observeAll(): Flow<ResourceObservation<List<__NAME__Record>>>
 
-    public fun observe(id: __NAME__Id): Flow<__NAME__Record?>
+    public fun observe(id: __NAME__Id): Flow<ResourceObservation<__NAME__Record>>
 }
 
 // A refresh Command returns the outcome of one attempt for transient caller feedback. Observers
-// above remain the source of truth for persistent state. See `:capability:posts-api` for the
-// `RefreshQos`-carrying form once this Capability owns a network or database resource.
+// above remain the source of truth for persistent state, and a failure never clears a value. The
+// QoS is domain-blind: it says how urgent the work is, never what the product means by fresh.
 /** The __name__ Capability's explicit synchronization intents. */
 public interface __NAME__Commands {
-    public suspend fun refresh(): RefreshOutcome
+    public suspend fun refresh(qos: RefreshQos = RefreshQos.visible()): RefreshOutcome
 }

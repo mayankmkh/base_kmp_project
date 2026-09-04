@@ -20,13 +20,13 @@ The path and the role must agree; `./gradlew checkModuleGraph` enforces both.
 | `:capability:identity-api` | capability_api | Session state and sign-in/sign-out commands; credentials never cross the API |
 | `:capability:identity-impl` | capability_impl | Credential persistence and session ownership; supplies `CredentialProvider` |
 | `:capability:posts-api` | capability_api | `PostsQueries`, `PostsCommands`, and the `Post` / `PostFeed` product models |
-| `:capability:posts-impl` | capability_impl | Store5/network implementation and the posts-owned SQLDelight schema; `internal` but for its Koin module |
+| `:capability:posts-impl` | capability_impl | Snapshot/network implementation and the posts-owned SQLDelight schema; `internal` but for its Koin module |
 | `:feature:posts` | feature | The posts Screens, Cells, ViewModels and Outputs |
 | `:foundation:network` | foundation_runtime | Ktor client setup, opt-in auth/retry, request IDs and `NetworkFailure` mapping |
 | `:foundation:preferences` | foundation_runtime | Typed preferences and JSON document stores over DataStore |
 | `:foundation:presentation` | foundation_api | `FeatureInstanceKey`, `CellPlacementId`, `CellSpec` |
-| `:foundation:resource` | foundation_api | `ResourceObservation`, freshness, refresh QoS, problem taxonomy |
-| `:foundation:resource-store5` | foundation_runtime | shared Store5-to-resource adapter |
+| `:foundation:resource` | foundation_api | `ResourceObservation`, `RefreshOutcome`, refresh QoS, problem taxonomy |
+| `:foundation:resource-runtime` | foundation_runtime | `SyncCoordinator`, the domain-blind per-key sync scheduler |
 | `:foundation:runtime` | foundation_runtime | Application scope, dispatchers, logging |
 | `:platform:connectivity` | platform | Network-reachability seam, per platform |
 | `:platform:secure-storage` | platform | Keystore, Keychain, OS-vaulted desktop and in-memory web secret stores |

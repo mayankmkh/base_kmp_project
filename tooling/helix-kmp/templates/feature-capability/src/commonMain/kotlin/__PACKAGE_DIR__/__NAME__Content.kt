@@ -24,11 +24,13 @@ internal fun __NAME__Content(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
-        if (state.isBusy) {
+        if (state.isInitialLoading || state.isRefreshing) {
             CircularProgressIndicator()
         }
         Text(state.id)
-        Text(state.label)
+        Text(state.label.orEmpty())
+        // Product code should map the stable category to a localized string resource.
+        state.problem?.let { problem -> Text(problem.category.name) }
         Button(onClick = { onAction(__NAME__Action.Refresh) }) { Text("Refresh") }
         Button(onClick = { onAction(__NAME__Action.Select) }) { Text("Select") }
     }

@@ -5,6 +5,64 @@ decisions: [helix-adoption-plan.md](helix-adoption-plan.md) §5–§6. Date: 202
 The adoption was committed on 2026-09-02 as seven commits on `main`; those commits remain
 unpushed. This report now also records the subsequent P1 control-plane working-tree change.
 
+## Sync coordinator replaces the owned Snapshot runtime (2026-09-05)
+
+The owned `SnapshotResource` ledger (below) was reviewed against the Store5 baseline at 0240602 and
+against a minimal coordinator design. Both value-owning runtimes duplicated what SQLDelight already
+holds and forced a second consistency argument (confirmed value versus durable row) onto every
+Capability. The replacement keeps `:foundation:resource-runtime` but changes what it owns:
+
+- `SyncCoordinator<Key>` schedules at most one sync per key, joins concurrent callers, isolates
+  caller cancellation from the shared worker, applies `minInterval` for `syncIfDue`, counts
+  observers per key through `observing(key, upstream)`, restarts only observed keys whose last
+  attempt failed offline on `retryOffline` without awaiting them, evicts idle entries beyond
+  `maxEntries`, and exposes
+  `status(key)` as `Flow<SyncStatus>` (`inFlight`, `lastFailure`, `hasSucceeded`). It never sees a
+  value. `observations(key, values)` wraps a durable value flow in `observing` and applies the
+  contract's `SyncStatus.toOperation` mapping.
+- `:capability:posts-impl` owns the value: `postFeedEntry` (migration `4.sqm`) records feed
+  membership and order, while `postFeedState` carries the initialised marker row. An empty
+  synchronised feed is `Idle` with an empty list while a never-synchronised feed is `Refreshing`
+  with `null`.
+  `replaceFeed` is one transaction (upsert rows, replace entries, set marker). Each Query hands its
+  durable value flow (the feed combined with its marker, or the detail row) to
+  `coordinator.observations(key, values)`.
+- `:foundation:resource` lost `ResourceFreshness`; `ResourceObservation(value, operation)` is the
+  whole contract. `:feature:posts` needed only the removal of the freshness read.
+- Templates (`capability-impl`, `feature-capability`) ship an in-memory local source,
+  `observations`, reconnect wiring and `close()` as generated code. They point to
+  `:capability:posts-impl` as the SQLDelight and transactional durable example, and the feature
+  fixtures follow the new state shape.
+- Master doc: ADR-43 supersedes the 2026-09-04 note under ADR-05; §13.7, §14.2, §14.3, §14.5,
+  §15.1 to §15.3, §18.4, §26 and §27.6 describe the coordinator contract.
+
+Verification for this replacement:
+
+| Command | Result |
+|---|---|
+| `./gradlew spotlessApply -q` | PASS, exit 0 |
+| `./gradlew :foundation:resource:check :foundation:resource-runtime:check :capability:posts-impl:check :feature:posts:check -q` | PASS, exit 0; resource 6 tests x 4 targets, resource-runtime 22 tests x 4 targets, posts-impl 16 JVM tests, feature:posts 9 JVM + 3 x 3 other targets, 0 failures |
+| `./gradlew :storage:database:check -q` | PASS, exit 0; `verifyMigrations` accepted `4.sqm`, 2 JVM + 1 wasm tests |
+| `./gradlew :app:shared:jvmTest :app:desktop:compileKotlin :app:web:compileKotlinWasmJs :app:shared:compileTestKotlinIosSimulatorArm64 -q` | PASS, exit 0, 4 JVM tests |
+| `./gradlew :app:android:assembleDemoDebug -q` | PASS, exit 0 |
+| `./gradlew verifyFast -q` | PASS, exit 0, 0 failures across every module |
+| `tooling/helix-kmp/tests/run-tests.sh` | see redesign report; rerun after template fixes |
+| grep for `SnapshotResource`, `ResourceFreshness`, `revalidate` in Kotlin and Gradle Kotlin sources | PASS, no matches |
+| added-line em dash check | PASS, no matches |
+
+### Historical note: owned Snapshot runtime (2026-09-04) and its release-gate repairs (2026-09-05)
+
+`:foundation:resource-store5` was first replaced by an owned `SnapshotResource<Key, Value>` that
+kept a process-bounded per-key ledger (confirmed value, freshness inferred from read origin,
+first-observer bootstrap, coalesced refresh, reconnect revalidation). Six release-gate repairs
+followed on 2026-09-05 (durable re-read before labelling fresh, self-healing of a vanished confirmed
+value, identity-guarded in-flight clearing, mutex-serialised ledger mutation with an invalidation
+generation, retryable failure for an alive caller of a cancelled worker, and deterministic
+interleaving tests). All of those verification chains passed (135 target test executions, 0
+failures). The design was nevertheless retired the same day because the ledger duplicated the
+database's value and every Capability had to reason about two owners; the sync coordinator above
+is the replacement, and 0240602 remains the Store5 reference point.
+
 ## Storage assembly (2026-09-02)
 
 The posts Capability implementation now owns its SQLDelight schema, migrations, local store, and
@@ -56,7 +114,7 @@ The now-unused JVM in-memory assembly helpers were removed.
 |---|---|
 | `:shared:app`, `:androidApp`, `:desktopApp`, `:webApp` | `:app:shared`, `:app:android`, `:app:desktop`, `:app:web` |
 | `:shared:features:list`, `:shared:features:details` (FeatureBundle, `UiState`/`FlowUseCase`) | `:feature:posts` (public entries only under `…feature.posts.api`) |
-| `:shared:libs:posts` (repository + Store5) | `:capability:posts-api` + `:capability:posts-impl` |
+| `:shared:libs:posts` (historical repository + Store5 implementation) | `:capability:posts-api` + `:capability:posts-impl` |
 | `:shared:libs:arch:core` | removed (patterns replaced by `:foundation:resource` / `:foundation:presentation`) |
 | `:shared:libs:coroutines-x` | `:foundation:runtime` (+ `ApplicationRuntimeScope`) |
 | `:shared:libs:networking` | `:foundation:network` |
@@ -128,8 +186,9 @@ verification tier is `check` plus debug assembles).
   registry. The host constructs the provider directly instead of using
   `rememberViewModelStoreProvider`, which clears every key when its call site leaves composition
   (a hidden host must keep its Cells; `hostLeavingCompositionWhileParentStoreLivesRetainsChildStores`).
-- `:capability:posts-impl` `PostsCapabilityImplTest` (Store5 → `ResourceObservation` mapping,
-  reconnect refresh, per-post memoisation).
+- `:capability:posts-impl` `PostsCapabilityImplTest` (first-observer sync, reconnect retry of
+  observed offline failures only, coalesced capability-scope work, transactional feed replacement, marker-based
+  empty versus never-synchronised feeds, offline cold start).
 - `:feature:posts` `PostViewModelTest` (3 common cases), `PostContentTest` (3 JVM cases), and
   `PostDetailCellTest` (3 JVM cases, including lazy-list composition and instance-key/post-id drift
   rejection); `PostContentPreviews.kt` provides 6 stateless detail/feed state previews.
@@ -165,7 +224,7 @@ module/file/type reverse-dependency slice; this narrative remains the adoption-t
 
 ## Public API/ABI changes
 
-- **New public surfaces**: `ResourceObservation`, `ResourceFreshness`, `ResourceOperation`,
+- **New public surfaces**: `ResourceObservation`, `ResourceFreshness` (removed 2026-09-05), `ResourceOperation`,
   `ResourceProblem`, `ResourceProblemCategory`, `RefreshQos`, `RefreshPriority`,
   `NetworkPreference` (`:foundation:resource`); `ApplicationRuntimeScope`
   (`:foundation:runtime`); `FeatureInstanceKey`, `CellPlacementId`, `CellSpec`,
@@ -219,7 +278,7 @@ iOS simulator framework link.
 A read-only review of the whole diff (Fable 5.1) returned 18 findings and a list of confirmed
 properties (policy JSON verbatim, Feature public surface only under `.api`, Cell signature,
 no `Dispatchers.*`/`GlobalScope` in Feature or Capability main sources, no Koin outside app and
-Capability impl, Store5 freshness mapping, keyed-owner regression, DI graph test, every command
+Capability impl, sync status to operation mapping, keyed-owner regression, DI graph test, every command
 named in `AGENTS.md`/`README.md`/Skills exists, no live `:shared:` references).
 
 Fixed in phase 6 (details in the plan §6 phase 6 row):
@@ -250,7 +309,7 @@ Fixed in phase 6 (details in the plan §6 phase 6 row):
   invalid intermediate state cannot exist. Found by the Simulator smoke test, not by the JVM/wasmJs
   unit tests (single-threaded test dispatcher).
 
-Resource design-review follow-up (2026-09-03):
+Historical resource design-review follow-up (2026-09-03, superseded 2026-09-04):
 
 - Commands now return `RefreshOutcome`; `StoreResource` moved to
   `:foundation:resource-store5`; transport classification is typed in `:foundation:network`; and

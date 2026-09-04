@@ -30,12 +30,10 @@ import androidx.compose.ui.unit.dp
 import base_kmp_project.feature.posts.generated.resources.Res
 import base_kmp_project.feature.posts.generated.resources.could_not_refresh_posts
 import base_kmp_project.feature.posts.generated.resources.nothing_here_yet
-import base_kmp_project.feature.posts.generated.resources.offline_showing_saved_posts
 import base_kmp_project.feature.posts.generated.resources.post_unavailable
 import base_kmp_project.feature.posts.generated.resources.posts
 import base_kmp_project.feature.posts.generated.resources.posts_temporarily_unavailable
 import base_kmp_project.feature.posts.generated.resources.retry
-import base_kmp_project.feature.posts.generated.resources.showing_saved_posts
 import base_kmp_project.feature.posts.generated.resources.you_are_offline
 import base_kmp_project.feature.posts.generated.resources.you_do_not_have_access
 import dev.mayankmkh.basekmpproject.capability.posts.api.Post
@@ -74,9 +72,6 @@ internal fun PostFeedContent(
             },
         ) {
             Column(Modifier.fillMaxSize()) {
-                if (state.isStale) {
-                    StaleBanner(state.problem)
-                }
                 when {
                     state.isInitialLoading ->
                         Centred(Modifier.fillMaxSize()) { CircularProgressIndicator() }
@@ -120,9 +115,6 @@ internal fun PostDetailContent(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth()) {
-        if (state.isStale) {
-            StaleBanner(state.problem)
-        }
         when {
             state.isInitialLoading -> Centred { CircularProgressIndicator() }
             state.post != null ->
@@ -133,21 +125,6 @@ internal fun PostDetailContent(
             state.problem != null -> Failure(state.problem, { onAction(PostDetailAction.Retry) })
         }
     }
-}
-
-@Composable
-private fun StaleBanner(problem: ResourceProblem?) {
-    val message =
-        if (problem?.category == ResourceProblemCategory.OFFLINE) {
-            stringResource(Res.string.offline_showing_saved_posts)
-        } else {
-            stringResource(Res.string.showing_saved_posts)
-        }
-    Text(
-        text = message,
-        color = MaterialTheme.colorScheme.onSecondaryContainer,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-    )
 }
 
 @Composable

@@ -6,12 +6,15 @@ plugins {
 // 1. Apply `alias(libs.plugins.sqldelight)` and create AppDatabase with packageName
 //    `<pkg>.db` and `generateAsync = true`.
 // 2. Put .sq/.sqm in `src/commonMain/sqldelight/<pkg dir>/db/` with repo-wide-unique
-//    migration numbers.
+//    migration numbers. Keep membership or ordering in its own table next to the entity rows, and
+//    write the synchronized marker in the same transaction as the rows.
 // 3. Expose `fun interface <X>DatabaseSource { suspend fun database(): AppDatabase }`.
 // 4. Add the module as both a SQLDelight `dependency(project(...))` and normal `implementation`
 //    in `:storage:database`, then bridge the source in `:app:shared`'s `databaseModule`.
 // 5. Keep `.sq` equal to the migrated shape; verification runs in `:storage:database`. Run
 //    `./gradlew :storage:database:verifyCommonMainAppDatabaseMigration`.
+// When it calls a backend, add `implementation(projects.foundation.network)` and map the typed
+// `NetworkFailure` with `toResourceProblem()` from `:foundation:resource-runtime`.
 
 kotlin {
     bkpTargets { default() }
@@ -20,6 +23,10 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(projects.capability.__API_ACCESSOR__)
+                implementation(projects.foundation.resource)
+                implementation(projects.foundation.resourceRuntime)
+                implementation(projects.foundation.runtime)
+                implementation(projects.platform.connectivity)
             }
         }
     }

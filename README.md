@@ -23,12 +23,13 @@ The path and the role must agree; `./gradlew checkModuleGraph` enforces both.
 | `:capability:posts-impl` | capability_impl | Store5/network implementation and the posts-owned SQLDelight schema; `internal` but for its Koin module |
 | `:feature:posts` | feature | The posts Screens, Cells, ViewModels and Outputs |
 | `:foundation:network` | foundation_runtime | Ktor client setup, opt-in auth/retry, request IDs and `NetworkFailure` mapping |
-| `:foundation:preferences` | foundation_runtime | DataStore-backed key-value preference stores |
+| `:foundation:preferences` | foundation_runtime | Typed preferences and JSON document stores over DataStore |
 | `:foundation:presentation` | foundation_api | `FeatureInstanceKey`, `CellPlacementId`, `CellSpec` |
 | `:foundation:resource` | foundation_api | `ResourceObservation`, freshness, refresh QoS, problem taxonomy |
 | `:foundation:resource-store5` | foundation_runtime | shared Store5-to-resource adapter |
 | `:foundation:runtime` | foundation_runtime | Application scope, dispatchers, logging |
 | `:platform:connectivity` | platform | Network-reachability seam, per platform |
+| `:platform:secure-storage` | platform | Keystore, Keychain, OS-vaulted desktop and in-memory web secret stores |
 | `:storage:database` | storage | Assembles capability schemas, drivers, merged migrations, and the product cache `app.db` |
 | `:testkit:common` | testkit | `runMainTest`, fakes and fixtures -- test code only |
 | `:ui:design-system` | ui | Theme and stateless rendering; no ViewModel, no Koin, no navigation |
@@ -138,6 +139,8 @@ simulator framework.
 | [`docs/architecture/helix-adoption-plan.md`](docs/architecture/helix-adoption-plan.md) | How this repository adopted it, phase by phase, with status |
 | [`docs/architecture/adr/0001-helix-adoption.md`](docs/architecture/adr/0001-helix-adoption.md) | Why Helix, what was rejected, and what it costs |
 | [`docs/architecture/exceptions.md`](docs/architecture/exceptions.md) | How to add, expire and remove a rule exception |
+| [`docs/architecture/network.md`](docs/architecture/network.md) | How the shared HTTP client, authentication and retries are assembled |
+| [`docs/architecture/preferences.md`](docs/architecture/preferences.md) | How preferences, documents and secrets are stored on every target |
 | [`build-logic/README.md`](build-logic/README.md) | The convention plugins, the DSL and the enforcement tasks |
 | [`config/helix/dependency-policy.json`](config/helix/dependency-policy.json) | The dependency matrix itself -- the single source |
 

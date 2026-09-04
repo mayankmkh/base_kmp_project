@@ -28,7 +28,7 @@ mechanics inside the module.
 | Base URL, timeouts, log level | `:app:*` supplies a `NetworkConfig` |
 | Values of changing headers | `:app:*` supplies a `DynamicHeaders` snapshot |
 | Current credential and refresh | `:capability:identity-impl` implements `CredentialProvider` |
-| Credential persistence | Identity impl over `:foundation:preferences` today; Platform secure storage when a real backend exists |
+| Credential persistence | `:capability:identity-impl` over `:platform:secure-storage` |
 | Endpoints, DTOs, error-body decoding | Capability implementations |
 | Caching, connectivity, request scheduling | `:foundation:resource*`, `:platform:connectivity`; never this module |
 

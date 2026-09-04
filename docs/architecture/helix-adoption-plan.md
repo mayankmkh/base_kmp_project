@@ -28,6 +28,7 @@ Principle (29.2): inspect first, keep compatible setup, reshape ownership, repla
 | `:androidApp`, `:desktopApp`, `:webApp`, `iosApp/` | MOVE | `:app:android`, `:app:desktop`, `:app:web`, `app/ios/` (Xcode project, moved in phase 6); Xcode script path updated |
 | (new) | ADD | `:foundation:resource` (`ResourceObservation`, 13.7) |
 | (new) | ADD | `:foundation:presentation` (`FeatureInstanceKey`, `CellPlacementId`, `CellSpec`, `StatefulLazyItem`, 12.5–12.8) |
+| (new) | ADD | `:platform:secure-storage` (cohesive platform secret-store mechanism, 7.17 and 17.4) |
 | (new) | ADD | `:testkit:common` (test dispatcher helpers, shared fakes) |
 | (new) | ADD | `config/helix/` policy + exception registry; `tooling/helix-kmp` CLI (`create`, `verify`); phase-aware `AGENTS.md`; four Skill templates |
 

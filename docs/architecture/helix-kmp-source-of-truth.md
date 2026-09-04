@@ -3933,6 +3933,8 @@ Generic preferences mechanism belongs in Foundation; product-specific settings b
 
 Do not scatter raw preference keys through Features.
 
+[`preferences.md`](preferences.md) owns the preferences, document and secure-storage mechanics.
+
 ## 18.11 Platform services
 
 | Mechanism | Platform home | Product meaning |
@@ -3941,7 +3943,7 @@ Do not scatter raw preference keys through Features.
 | Notifications | `:platform:notifications-api/impl` | notification Capability/inbox/preferences/routing |
 | Permissions | `:platform:permissions-api/impl` | Feature/Capability policy |
 | File picker | `:platform:file-picker-api/impl` | upload/import behavior |
-| Secure storage | `:platform:secure-storage-api/impl` | Identity/session Capability |
+| Secure storage | `:platform:secure-storage` (single module, §7.17) | Identity/session Capability |
 | Background work | `:platform:background-work-api/impl` | sync/download/reminder Capability |
 
 ## 18.11.1 Product configuration, flags, experiments, design system, and localization

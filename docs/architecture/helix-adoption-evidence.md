@@ -280,6 +280,17 @@ Network ground-up redesign (2026-09-04):
 - The app and client share strict JSON semantics: unknown keys are ignored, lenient parsing and
   explicit nulls/defaults are disabled, and input values are coerced.
 
+Preferences and secure-storage redesign (2026-09-04):
+
+- `:foundation:preferences` now owns typed DataStore preferences, lenient JSON document stores,
+  corruption recovery, stable platform paths and early process-wide file collision detection.
+- The new cohesive `:platform:secure-storage` module uses Android Keystore-wrapped Tink, iOS
+  Keychain items, a desktop DataStore encrypted with Tink under an OS-held keyset and process-memory storage on web.
+- Identity moved its `token` from plain preferences to `SecretStore`; App supplies the stable
+  application identifier and both platform-shaped storage contexts through Koin.
+- Common store contracts, JVM corruption recovery, serializer round trips, Tink encryption and
+  ciphertext tamper recovery have dedicated regression tests.
+
 Recorded, not fixed (follow-ups, none blocks Feature development):
 
 - Validator hard-codes the `app → app` allowance instead of reading it from policy data

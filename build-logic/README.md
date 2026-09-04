@@ -33,11 +33,12 @@ module that stops at the base — rather than applying a role plugin on top — 
 |---|---|---|
 | `:foundation:runtime` | `bkp.kmp.foundation.runtime` | dispatchers and application runtime scope |
 | `:foundation:network` | `bkp.kmp.foundation.runtime` | Ktor client construction, auth/retry mechanics and failures |
-| `:foundation:preferences` | `bkp.kmp.foundation.runtime` | DataStore-backed key-value preference stores |
+| `:foundation:preferences` | `bkp.kmp.foundation.runtime` | typed preferences and JSON document stores over DataStore |
 | `:foundation:resource` | `bkp.kmp.foundation.api` | resource observation and refresh QoS contracts |
 | `:foundation:resource-store5` | `bkp.kmp.foundation.runtime` | shared Store5-to-resource adapter |
 | `:foundation:presentation` | `bkp.kmp.foundation.api` + Compose opt-in | keyed presentation identity/ownership |
 | `:platform:connectivity` | `bkp.kmp.platform` | cohesive connectivity expect/actual mechanism |
+| `:platform:secure-storage` | `bkp.kmp.platform` | cohesive secure-storage expect/actual mechanism |
 | `:storage:database` | `bkp.kmp.storage` | Capability-schema assembly, SQLDelight drivers, and merged migrations |
 | `:ui:design-system` | `bkp.kmp.ui` | public application theme |
 | `:capability:identity-api` | `bkp.kmp.capability.api` | observable session state and sign-in/sign-out commands |

@@ -18,6 +18,7 @@ Every architecture fact has exactly one owner, and this file is not it:
 | Role -> plugin -> path mapping, rule IDs, tiers | [`docs/architecture/helix-adoption-plan.md`](docs/architecture/helix-adoption-plan.md) |
 | Convention-plugin behaviour and the `bkpModule`/`bkpTargets` DSL | [`build-logic/README.md`](build-logic/README.md) |
 | How the HTTP client is assembled | [`docs/architecture/network.md`](docs/architecture/network.md) |
+| How preferences, documents and secrets are stored | [`docs/architecture/preferences.md`](docs/architecture/preferences.md) |
 | The architecture itself, in full | [`docs/architecture/helix-kmp-source-of-truth.md`](docs/architecture/helix-kmp-source-of-truth.md) |
 | Why Helix, and what was rejected | [`docs/architecture/adr/0001-helix-adoption.md`](docs/architecture/adr/0001-helix-adoption.md) |
 

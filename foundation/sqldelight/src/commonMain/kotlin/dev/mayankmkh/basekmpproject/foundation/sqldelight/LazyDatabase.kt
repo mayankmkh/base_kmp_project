@@ -2,9 +2,8 @@ package dev.mayankmkh.basekmpproject.foundation.sqldelight
 
 import app.cash.sqldelight.db.SqlDriver
 import kotlin.concurrent.Volatile
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -42,8 +41,9 @@ public class LazyDatabase<D : Any>(
 
 /**
  * Observes a query over the memoised database, opening it on first collection. Building the flow
- * never suspends, so a coordinator-backed observation stays cold until somebody collects it.
+ * never suspends, so a coordinator-backed observation stays cold until somebody collects it. The
+ * database is obtained once, so rows flow straight to the collector with no intermediate channel.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
-public fun <D : Any, T> LazyDatabase<D>.observe(query: (D) -> Flow<T>): Flow<T> =
-    flow { emit(get()) }.flatMapLatest(query)
+public fun <D : Any, T> LazyDatabase<D>.observe(query: (D) -> Flow<T>): Flow<T> = flow {
+    emitAll(query(get()))
+}

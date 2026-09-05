@@ -1,6 +1,5 @@
 package dev.mayankmkh.basekmpproject.capability.posts.impl
 
-import com.github.michaelbull.result.fold
 import dev.mayankmkh.basekmpproject.capability.posts.api.Post
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostFeed
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
@@ -10,8 +9,8 @@ import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.runtime.SyncCoordinator
+import dev.mayankmkh.basekmpproject.foundation.resource.runtime.commit
 import dev.mayankmkh.basekmpproject.foundation.resource.runtime.observations
-import dev.mayankmkh.basekmpproject.foundation.resource.runtime.toResourceProblem
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.reconnects
@@ -59,26 +58,12 @@ internal class PostsCapabilityImpl(
         postSync.sync(id, qos)
 
     private suspend fun syncFeed(): RefreshOutcome =
-        remoteSource
-            .getPosts()
-            .fold(
-                success = { posts ->
-                    localSource.replaceFeed(posts.map(PostDto::toPostEntity))
-                    RefreshOutcome.Succeeded
-                },
-                failure = { RefreshOutcome.Failed(it.toResourceProblem()) },
-            )
+        remoteSource.getPosts().commit { posts ->
+            localSource.replaceFeed(posts.map(PostDto::toPostEntity))
+        }
 
     private suspend fun syncPost(id: PostId): RefreshOutcome =
-        remoteSource
-            .getPost(id.value)
-            .fold(
-                success = { post ->
-                    localSource.upsert(post.toPostEntity())
-                    RefreshOutcome.Succeeded
-                },
-                failure = { RefreshOutcome.Failed(it.toResourceProblem()) },
-            )
+        remoteSource.getPost(id.value).commit { localSource.upsert(it.toPostEntity()) }
 
     override fun close() {
         scope.cancel()

@@ -15,10 +15,10 @@ kotlin {
                 implementation(projects.foundation.resource)
                 implementation(projects.foundation.resourceRuntime)
                 implementation(projects.foundation.runtime)
+                implementation(projects.foundation.sqldelight)
                 implementation(projects.platform.connectivity)
                 api(libs.sqldelight.runtime)
                 api(libs.sqldelight.async.extensions)
-                implementation(libs.sqldelight.coroutines.extensions)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.michael.bull.kotlin.result)
             }

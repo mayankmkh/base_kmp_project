@@ -7,6 +7,11 @@ unpushed. This report now also records the subsequent P1 control-plane working-t
 
 ## Sync coordinator replaces the owned Snapshot runtime (2026-09-05)
 
+On 2026-09-05, phase 1 of Capability boilerplate reduction extracted the reusable asynchronous
+SQLDelight observation shapes into `:foundation:sqldelight` and added `commit` to
+`:foundation:resource-runtime`; `:capability:posts-impl` adopted both. The current graph therefore
+increases by one node, from 20 to 21, without changing value ownership or adding an exception.
+
 The owned `SnapshotResource` ledger (below) was reviewed against the Store5 baseline at 0240602 and
 against a minimal coordinator design. Both value-owning runtimes duplicated what SQLDelight already
 holds and forced a second consistency argument (confirmed value versus durable row) onto every

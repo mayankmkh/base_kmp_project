@@ -190,7 +190,7 @@ GALLERY_TEXT="$WORK_DIR/gallery.txt"
 GALLERY_JSON="$WORK_DIR/gallery.json"
 
 "$CLI" graph --json --no-refresh > "$GRAPH_JSON" || fail "graph --json"
-python3 -c 'import json,sys; value=json.load(open(sys.argv[1])); assert value["schema"] == 2; assert len(value["nodes"]) == 20; assert "reverseEdges" in value' "$GRAPH_JSON" || fail "graph JSON shape or node count"
+python3 -c 'import json,sys; value=json.load(open(sys.argv[1])); assert value["schema"] == 2; assert len(value["nodes"]) == 21; assert "reverseEdges" in value' "$GRAPH_JSON" || fail "graph JSON shape or node count"
 
 "$CLI" impact :capability:posts-api --json --no-refresh > "$IMPACT_JSON" || fail "impact module"
 python3 -c 'import json,sys; value=json.load(open(sys.argv[1])); assert ":feature:posts" in value["directReverseDependents"]; assert ":app:shared" in value["directReverseDependents"]' "$IMPACT_JSON" || fail "impact module reverse dependents"
@@ -334,7 +334,7 @@ cp "$SAMPLE_BUILD_BACKUP" "$SAMPLE_BUILD"
 # 5. removal must restore the tree exactly
 # --------------------------------------------------------------------------
 cleanup
-(cd "$REPO_ROOT" && ./gradlew checkModuleGraph -q) || fail "could not restore the 19-node graph report"
+(cd "$REPO_ROOT" && ./gradlew checkModuleGraph -q) || fail "could not restore the 21-node graph report"
 git -C "$REPO_ROOT" status --short > "$STATUS_AFTER"
 if diff -u "$STATUS_BEFORE" "$STATUS_AFTER"; then
     log "  ok: git status --short is unchanged"

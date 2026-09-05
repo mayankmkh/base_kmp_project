@@ -80,7 +80,8 @@ internal class __NAME__CapabilityImpl(
     }
 }
 
-// Placeholder for the typed mapping a network-backed source gets from `toResourceProblem()`. Only
-// an `OFFLINE` failure is retried when connectivity returns, so a real mapping must report offline
-// transport failures as such.
+// A network-backed source returns `Result<T, NetworkFailure>`, and its sync function is one call to
+// `commit { localSource.write(it) }` from `:foundation:resource-runtime`; `commit` maps failures
+// with `toResourceProblem()`. Only an `OFFLINE` failure is retried when connectivity returns, so a
+// real mapping must report offline transport failures as such.
 private val FetchFailed = ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true)

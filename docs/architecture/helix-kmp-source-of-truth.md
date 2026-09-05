@@ -1887,12 +1887,13 @@ Physical paths remain `:foundation:*`; this is a validator classification, not a
 Examples:
 
 ```text
-:foundation:presentation -> foundation_api
-:foundation:resource     -> foundation_api
+:foundation:presentation     -> foundation_api
+:foundation:resource         -> foundation_api
 :foundation:resource-runtime -> foundation_runtime
-:foundation:time         -> foundation_api
-:foundation:network      -> foundation_runtime
-:foundation:runtime      -> foundation_runtime
+:foundation:sqldelight       -> foundation_runtime
+:foundation:time             -> foundation_api
+:foundation:network          -> foundation_runtime
+:foundation:runtime          -> foundation_runtime
 ```
 
 ### `:platform:*` and optional `:platform:*-api` / `:platform:*-impl`
@@ -3201,6 +3202,9 @@ drops unchanged emissions and wraps the result in `observing` for the same key, 
 hands over its value flow and never repeats the mapping. A confirmed detail 404 maps to
 `Failed(PERMANENT, retryable = false)` through `lastFailure`. A clean ledger with a `null` value
 remains `Refreshing` while the durable query catches up or until a later attempt confirms a result.
+A Capability's sync function is `remoteResult.commit { persist(it) }`. Its local source observes
+SQLDelight through `:foundation:sqldelight`'s `observeList`, `observeOneOrNull`, `observeOne`, and
+`observeDatabase` helpers.
 
 **RefreshQos semantics:** `CRITICAL_VISIBLE` means the user is blocked on the resource; `VISIBLE`
 means the user is looking at it; `BACKGROUND` is maintenance/reconnect work that must not compete
@@ -5696,8 +5700,9 @@ problem in project code; see ADR-43.
 
 ## ADR-43 - Sync coordination is domain-blind and the database owns the value
 
-**Decision:** `:foundation:resource-runtime` ships `SyncCoordinator<Key>` and nothing else. It
-starts or joins one worker per key, skips keys attempted within `minInterval`, counts observers
+**Decision:** `:foundation:resource-runtime` ships `SyncCoordinator<Key>` plus the small helpers
+that connect it to a Capability (`observations`, `toResourceProblem`, `commit`); it owns no value.
+It starts or joins one worker per key, skips keys attempted within `minInterval`, counts observers
 around a Capability-supplied upstream flow, retries observed keys whose last attempt failed offline
 whenever its `retryTriggers` flow emits, and exposes a per-key `SyncStatus` ledger bounded by
 `maxEntries`. It never reads, caches, compares, or re-reads values.

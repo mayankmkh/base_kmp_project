@@ -35,7 +35,8 @@ module that stops at the base — rather than applying a role plugin on top — 
 | `:foundation:network` | `bkp.kmp.foundation.runtime` | Ktor client construction, auth/retry mechanics and failures |
 | `:foundation:preferences` | `bkp.kmp.foundation.runtime` | typed preferences and JSON document stores over DataStore |
 | `:foundation:resource` | `bkp.kmp.foundation.api` | resource observation and refresh QoS contracts |
-| `:foundation:resource-runtime` | `bkp.kmp.foundation.runtime` | `SyncCoordinator`, per-key sync scheduling and status |
+| `:foundation:resource-runtime` | `bkp.kmp.foundation.runtime` | sync scheduling, status and network-result outcome helpers |
+| `:foundation:sqldelight` | `bkp.kmp.foundation.runtime` | asynchronous SQLDelight query and database flow helpers |
 | `:foundation:presentation` | `bkp.kmp.foundation.api` + Compose opt-in | keyed presentation identity/ownership |
 | `:platform:connectivity` | `bkp.kmp.platform` | cohesive connectivity expect/actual mechanism |
 | `:platform:secure-storage` | `bkp.kmp.platform` | cohesive secure-storage expect/actual mechanism |

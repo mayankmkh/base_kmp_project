@@ -1,9 +1,29 @@
 package dev.mayankmkh.basekmpproject.foundation.resource.runtime
 
+import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.fold
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkFailure
 import dev.mayankmkh.basekmpproject.foundation.network.TransportFailureKind
+import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
+
+/**
+ * Turns a network result into the outcome of a sync attempt. A success is committed to the durable
+ * store by [persist] and reported as [RefreshOutcome.Succeeded]; a failure is mapped with
+ * [toResourceProblem] and reported as [RefreshOutcome.Failed]. A throw from [persist] propagates,
+ * because a value that failed to land is a bug rather than a refresh problem.
+ */
+public suspend fun <T> Result<T, NetworkFailure>.commit(
+    persist: suspend (T) -> Unit
+): RefreshOutcome =
+    fold(
+        success = {
+            persist(it)
+            RefreshOutcome.Succeeded
+        },
+        failure = { RefreshOutcome.Failed(it.toResourceProblem()) },
+    )
 
 public fun NetworkFailure.toResourceProblem(): ResourceProblem =
     when (this) {

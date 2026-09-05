@@ -26,8 +26,9 @@ The path and the role must agree; `./gradlew checkModuleGraph` enforces both.
 | `:foundation:preferences` | foundation_runtime | Typed preferences and JSON document stores over DataStore |
 | `:foundation:presentation` | foundation_api | `FeatureInstanceKey`, `CellPlacementId`, `CellSpec` |
 | `:foundation:resource` | foundation_api | `ResourceObservation`, `RefreshOutcome`, refresh QoS, problem taxonomy |
-| `:foundation:resource-runtime` | foundation_runtime | `SyncCoordinator`, the domain-blind per-key sync scheduler |
+| `:foundation:resource-runtime` | foundation_runtime | Domain-blind sync coordination plus network-result outcome helpers |
 | `:foundation:runtime` | foundation_runtime | Application scope, dispatchers, logging |
+| `:foundation:sqldelight` | foundation_runtime | Cold-flow helpers for asynchronous SQLDelight queries and databases |
 | `:platform:connectivity` | platform | Network-reachability seam, per platform |
 | `:platform:secure-storage` | platform | Keystore, Keychain, OS-vaulted desktop and in-memory web secret stores |
 | `:storage:database` | storage | Assembles capability schemas, drivers, merged migrations, and the product cache `app.db` |

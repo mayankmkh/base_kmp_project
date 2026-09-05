@@ -7,8 +7,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mayankmkh.basekmpproject.feature.posts.PostFeedContent
-import dev.mayankmkh.basekmpproject.feature.posts.PostFeedUiCommand
 import dev.mayankmkh.basekmpproject.feature.posts.PostFeedViewModel
+import dev.mayankmkh.basekmpproject.feature.posts.PostsUiCommand
 import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
@@ -33,7 +33,7 @@ public fun PostFeedScreen(
     CollectWhileStarted(viewModel.outputs, onOutput)
     CollectWhileStarted(viewModel.uiCommands) { command ->
         when (command) {
-            is PostFeedUiCommand.ShowRefreshFailed ->
+            is PostsUiCommand.ShowRefreshFailed ->
                 snackbarHostState.showSnackbar(getString(command.kind.messageResource()))
         }
     }

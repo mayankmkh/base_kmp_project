@@ -312,10 +312,8 @@ which would write every header to whatever the app logs to. `Authorization`, `Co
 `Set-Cookie` are sanitised at every level. Body logging is a debug-only choice because the plugin
 buffers bodies to print them. Output goes through Ktor's `Logger` interface to the app's logger.
 
-Command-failure classification is separate from Ktor request logging. The bridge in
-`:foundation:resource-runtime` maps a `NetworkFailure` to `Problem`, writes exactly one structured
-warning or error with its request id and diagnostics, and returns `Outcome.Failed`. Endpoint
-refusals and successful commands do not use that failure log path.
+Command-failure classification is separate from Ktor request logging; the master document §13.7
+owns that rule and `:foundation:resource-runtime` owns the bridge that applies it.
 
 The app sets `HEADERS` for debug builds and `NONE` otherwise, deciding per target from a runtime
 signal rather than a generated `BuildConfig`: the debuggable flag on Android, the debug binary on

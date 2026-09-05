@@ -15,11 +15,10 @@ import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceOperation
 import dev.mayankmkh.basekmpproject.foundation.resource.Violation
 import dev.mayankmkh.basekmpproject.testkit.FakeTodosCommands
 import dev.mayankmkh.basekmpproject.testkit.FakeTodosQueries
+import dev.mayankmkh.basekmpproject.testkit.ResourceObservationFixtures
 import dev.mayankmkh.basekmpproject.testkit.runMainTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -76,7 +75,7 @@ class TodosViewModelTest {
     }
 
     @Test
-    fun `list mutation invalid input and not found surface as transient failures`() = runMainTest {
+    fun `list mutation refusals surface with their own messages`() = runMainTest {
         val commands =
             FakeTodosCommands().apply {
                 onSetCompleted = { _, _ ->
@@ -85,14 +84,13 @@ class TodosViewModelTest {
                 onDelete = { Outcome.Completed(DeleteTodoResult.NotFound) }
             }
         val viewModel = TodoListViewModel(listKey(), FakeTodosQueries(), commands)
-        val permanent = TodosUiCommand.ShowFailure(ProblemKind.UNEXPECTED)
 
         viewModel.uiCommands.test {
             viewModel.onAction(TodoListAction.SetCompleted(TodoId(1), true))
-            assertEquals(permanent, awaitItem())
+            assertEquals(TodosUiCommand.ShowInputRejected, awaitItem())
             viewModel.onAction(TodoListAction.RequestDelete(TodoId(1)))
             viewModel.onAction(TodoListAction.ConfirmDelete)
-            assertEquals(permanent, awaitItem())
+            assertEquals(TodosUiCommand.ShowTodoMissing, awaitItem())
         }
     }
 
@@ -193,8 +191,7 @@ class TodosViewModelTest {
         // The resource is observed only while the screen collects state, as the real Screen does.
         viewModel.state.test {
             viewModel.outputs.test {
-                queries.todoFlows.getValue(TodoId(99)).value =
-                    ResourceObservation(value = null, operation = ResourceOperation.Idle)
+                queries.todoFlows.getValue(TodoId(99)).value = ResourceObservationFixtures.absent()
                 assertEquals(TodoDetailOutput.NotFound(TodoId(99)), awaitItem())
             }
             cancelAndIgnoreRemainingEvents()

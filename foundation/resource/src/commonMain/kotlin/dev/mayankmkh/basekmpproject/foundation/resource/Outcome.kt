@@ -27,5 +27,8 @@ public enum class ProblemKind {
     UNEXPECTED,
 }
 
-/** One rejected input, with display-ready server text when the server supplied it. */
+/**
+ * One rejected input. [field] is null when the violation applies to the whole submission rather
+ * than to one input; [message] is display-ready server text when the server supplied it.
+ */
 public data class Violation<out F>(val field: F?, val code: String, val message: String? = null)

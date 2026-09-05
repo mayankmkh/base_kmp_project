@@ -13,8 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.feature.posts.PostDetailContent
-import dev.mayankmkh.basekmpproject.feature.posts.PostDetailUiCommand
 import dev.mayankmkh.basekmpproject.feature.posts.PostDetailViewModel
+import dev.mayankmkh.basekmpproject.feature.posts.PostsUiCommand
 import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
@@ -55,7 +55,7 @@ public fun PostDetailCell(
     CollectWhileStarted(viewModel.outputs, onOutput)
     CollectWhileStarted(viewModel.uiCommands) { command ->
         when (command) {
-            is PostDetailUiCommand.ShowRefreshFailed ->
+            is PostsUiCommand.ShowRefreshFailed ->
                 snackbarHost.showSnackbar(getString(command.kind.messageResource()))
         }
     }

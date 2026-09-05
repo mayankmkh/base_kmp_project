@@ -8,8 +8,8 @@ unpushed. This report now also records the subsequent P1 control-plane working-t
 ## Command results (2026-09-06)
 
 - `foundation/resource/.../Outcome.kt` owns the library-free `Outcome<T>`, `Problem`,
-  `ProblemKind` and `Violation<F>` contracts. Its exhaustiveness test covers both sealed/enum
-  branches without `else`.
+  `ProblemKind` and `Violation<F>` contracts; the `when` expressions in the bridge and in
+  `ui/design-system` are exhaustive without `else`.
 - `capability/posts-api/.../PostsCapability.kt` and
   `capability/todos-api/.../TodosCapability.kt` demonstrate that every command returns one
   `Outcome<T>`, including `Outcome<Unit>` for commands with no domain result.
@@ -20,9 +20,8 @@ unpushed. This report now also records the subsequent P1 control-plane working-t
   before the bridge. `PostsRemoteSource.kt` maps a detail 404 the same way. Unmapped statuses stay
   `NetworkFailure` values.
 - `foundation/resource-runtime/.../NetworkFailureProblems.kt` is the sole generic classification
-  and logging bridge. It maps every `NetworkFailure` kind to `Problem`, preserves the request id,
-  logs exactly once, uses error severity only for `UNEXPECTED`, and emits no log for completion or
-  refusal. `NetworkFailureProblemsTest` proves the mapping, severity and structured fields.
+  and logging bridge; `NetworkFailureProblemsTest` pins the mapping, the severity rule and the
+  structured fields the master document §13.7 requires.
 - `foundation/network/.../SafeCall.kt` and `Client.kt` keep kotlin-result and transport details
   inside implementations while attaching the final attempt's `X-Request-Id` to every failure
   kind. `SafeCallTest` covers HTTP, transport, decoding and unexpected request ids plus

@@ -67,11 +67,9 @@ internal class PostsCapabilityImpl(
         }
 
     private suspend fun syncPost(id: PostId): Outcome<Unit> =
-        remoteSource.getPost(id.value).commit(logger, "posts.detail.refresh") { answer ->
-            when (answer) {
-                is PostRemoteAnswer.Found -> localSource.upsert(answer.post.toPostEntity())
-                PostRemoteAnswer.NotFound -> localSource.delete(id.value.toString())
-            }
+        remoteSource.getPost(id.value).commit(logger, "posts.detail.refresh") { post ->
+            if (post == null) localSource.delete(id.value.toString())
+            else localSource.upsert(post.toPostEntity())
         }
 
     override fun close() {

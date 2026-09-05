@@ -52,7 +52,7 @@ class PostViewModelTest {
                     viewModel.onAction(PostFeedAction.Refresh)
                     assertEquals(
                         ProblemKind.OFFLINE,
-                        assertIs<PostFeedUiCommand.ShowRefreshFailed>(awaitItem()).kind,
+                        assertIs<PostsUiCommand.ShowRefreshFailed>(awaitItem()).kind,
                     )
                     assertEquals(1, commands.feedRefreshCount)
 
@@ -89,7 +89,7 @@ class PostViewModelTest {
             viewModel.uiCommands.test {
                 assertEquals(
                     ProblemKind.SERVER,
-                    assertIs<PostDetailUiCommand.ShowRefreshFailed>(awaitItem()).kind,
+                    assertIs<PostsUiCommand.ShowRefreshFailed>(awaitItem()).kind,
                 )
             }
             assertEquals(listOf(post.id), commands.postRefreshes)

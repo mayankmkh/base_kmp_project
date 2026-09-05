@@ -7,17 +7,20 @@ import dev.mayankmkh.basekmpproject.foundation.preferences.booleanPrefKey
 import dev.mayankmkh.basekmpproject.foundation.preferences.stringPrefKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 internal class TodosSettingsSource(private val store: PreferenceStore) {
+    // One edit that sets both keys wakes both key flows; dedup here so no consumer has to.
     fun observe(): Flow<TodoSettings> =
         combine(store.observe(HideCompletedKey), store.observe(SortKey)) { hideCompleted, sort ->
-            TodoSettings(
-                hideCompleted = hideCompleted ?: false,
-                sort =
-                    sort?.let { stored -> TodoSort.entries.find { it.name == stored } }
-                        ?: TodoSort.ID,
-            )
-        }
+                TodoSettings(
+                    hideCompleted = hideCompleted ?: false,
+                    sort =
+                        sort?.let { stored -> TodoSort.entries.find { it.name == stored } }
+                            ?: TodoSort.ID,
+                )
+            }
+            .distinctUntilChanged()
 
     suspend fun update(settings: TodoSettings) {
         store.edit {

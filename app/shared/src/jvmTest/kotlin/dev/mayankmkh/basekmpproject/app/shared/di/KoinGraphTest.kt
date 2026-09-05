@@ -1,6 +1,5 @@
 package dev.mayankmkh.basekmpproject.app.shared.di
 
-import co.touchlab.kermit.Logger
 import co.touchlab.kermit.LoggerConfig
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoId
@@ -16,7 +15,6 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.http.Url
 import kotlin.test.Test
 import kotlin.test.assertFalse
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlinx.coroutines.CoroutineDispatcher
@@ -55,15 +53,6 @@ class KoinGraphTest {
         koin.close()
 
         assertFalse(client.isActive)
-    }
-
-    @Test
-    fun `the outcome bridge receives the app logger singleton`() {
-        val koin = koinApplication { modules(loggerModule) }.koin
-
-        assertSame(koin.get<Logger>(), koin.get<Logger>())
-
-        koin.close()
     }
 
     private companion object {

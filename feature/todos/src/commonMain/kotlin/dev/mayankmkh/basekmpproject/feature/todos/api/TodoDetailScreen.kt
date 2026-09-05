@@ -14,7 +14,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import base_kmp_project.feature.todos.generated.resources.Res
+import base_kmp_project.feature.todos.generated.resources.input_invalid
 import base_kmp_project.feature.todos.generated.resources.todo_detail
+import base_kmp_project.feature.todos.generated.resources.todo_unavailable
 import base_kmp_project.ui.design_system.generated.resources.Res as DesignRes
 import base_kmp_project.ui.design_system.generated.resources.back
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoId
@@ -53,6 +55,10 @@ public fun TodoDetailScreen(
         when (command) {
             is TodosUiCommand.ShowFailure ->
                 snackbarHostState.showSnackbar(getString(command.kind.messageResource()))
+            TodosUiCommand.ShowTodoMissing ->
+                snackbarHostState.showSnackbar(getString(Res.string.todo_unavailable))
+            TodosUiCommand.ShowInputRejected ->
+                snackbarHostState.showSnackbar(getString(Res.string.input_invalid))
         }
     }
 

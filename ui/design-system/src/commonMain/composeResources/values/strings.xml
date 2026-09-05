@@ -6,4 +6,5 @@
     <string name="temporarily_unavailable">Temporarily unavailable</string>
     <string name="you_do_not_have_access">You don't have access</string>
     <string name="something_went_wrong">Something went wrong</string>
+    <string name="support_reference">Reference %1$s</string>
 </resources>

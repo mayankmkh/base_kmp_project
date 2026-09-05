@@ -72,6 +72,12 @@ internal sealed interface TodoListAction {
 
 internal sealed interface TodosUiCommand {
     data class ShowFailure(val kind: ProblemKind) : TodosUiCommand
+
+    /** The server no longer has the row the user acted on. */
+    data object ShowTodoMissing : TodosUiCommand
+
+    /** The server refused a change to a row that has no form to pin violations to. */
+    data object ShowInputRejected : TodosUiCommand
 }
 
 internal class TodoListViewModel(
@@ -131,30 +137,21 @@ internal class TodoListViewModel(
         val id = pendingDelete.value ?: return
         pendingDelete.value = null
         mutate(id) {
-            when (val outcome = commands.deleteTodo(id)) {
-                is Outcome.Completed ->
-                    when (outcome.value) {
-                        DeleteTodoResult.Deleted -> Unit
-                        DeleteTodoResult.NotFound -> show(ProblemKind.UNEXPECTED)
-                    }
-                is Outcome.Failed -> show(outcome.problem.kind)
+            when (commands.deleteTodo(id).valueOrShow { show(it) }) {
+                DeleteTodoResult.Deleted,
+                null -> Unit
+                DeleteTodoResult.NotFound -> send(TodosUiCommand.ShowTodoMissing)
             }
         }
     }
 
-    /**
-     * A list row has no form to pin violations to and nowhere to navigate when the server no longer
-     * knows the row, so both read as a transient failure; the durable list reconciles on its own.
-     */
+    /** A refusal on a list row is transient feedback; the durable list reconciles on its own. */
     private suspend fun handleUpdate(outcome: Outcome<UpdateTodoResult>) {
-        when (outcome) {
-            is Outcome.Completed ->
-                when (outcome.value) {
-                    UpdateTodoResult.Updated -> Unit
-                    UpdateTodoResult.NotFound,
-                    is UpdateTodoResult.InvalidInput -> show(ProblemKind.UNEXPECTED)
-                }
-            is Outcome.Failed -> show(outcome.problem.kind)
+        when (outcome.valueOrShow { show(it) }) {
+            UpdateTodoResult.Updated,
+            null -> Unit
+            UpdateTodoResult.NotFound -> send(TodosUiCommand.ShowTodoMissing)
+            is UpdateTodoResult.InvalidInput -> send(TodosUiCommand.ShowInputRejected)
         }
     }
 
@@ -177,8 +174,10 @@ internal class TodoListViewModel(
         viewModelScope.launch { outputChannel.send(output) }
     }
 
-    private suspend fun show(kind: ProblemKind) {
-        uiCommandChannel.send(TodosUiCommand.ShowFailure(kind))
+    private suspend fun show(kind: ProblemKind) = send(TodosUiCommand.ShowFailure(kind))
+
+    private suspend fun send(command: TodosUiCommand) {
+        uiCommandChannel.send(command)
     }
 }
 
@@ -266,7 +265,7 @@ internal class TodoDetailViewModel(
     private fun refresh() {
         viewModelScope.launch {
             val outcome = commands.refreshTodo(todoId)
-            if (outcome is Outcome.Failed) show(outcome.problem)
+            if (outcome is Outcome.Failed) show(outcome.problem.kind)
         }
     }
 
@@ -282,29 +281,30 @@ internal class TodoDetailViewModel(
     }
 
     /** Applies one update result to the screen; true when the todo was updated. */
-    private suspend fun handleUpdate(outcome: Outcome<UpdateTodoResult>): Boolean {
-        when (outcome) {
-            is Outcome.Completed ->
-                when (val result = outcome.value) {
-                    UpdateTodoResult.Updated -> violations.value = emptyList()
-                    UpdateTodoResult.NotFound -> emitNow(TodoDetailOutput.NotFound(todoId))
-                    is UpdateTodoResult.InvalidInput -> violations.value = result.violations
-                }
-            is Outcome.Failed -> show(outcome.problem)
+    private suspend fun handleUpdate(outcome: Outcome<UpdateTodoResult>): Boolean =
+        when (val result = outcome.valueOrShow { show(it) }) {
+            UpdateTodoResult.Updated -> {
+                violations.value = emptyList()
+                true
+            }
+            UpdateTodoResult.NotFound -> {
+                emitNow(TodoDetailOutput.NotFound(todoId))
+                false
+            }
+            is UpdateTodoResult.InvalidInput -> {
+                violations.value = result.violations
+                false
+            }
+            null -> false
         }
-        return outcome is Outcome.Completed && outcome.value == UpdateTodoResult.Updated
-    }
 
     private fun delete() {
         confirmDelete.value = false
         submit {
-            when (val outcome = commands.deleteTodo(todoId)) {
-                is Outcome.Completed ->
-                    when (outcome.value) {
-                        DeleteTodoResult.Deleted -> emitNow(TodoDetailOutput.Deleted(todoId))
-                        DeleteTodoResult.NotFound -> emitNow(TodoDetailOutput.NotFound(todoId))
-                    }
-                is Outcome.Failed -> show(outcome.problem)
+            when (commands.deleteTodo(todoId).valueOrShow { show(it) }) {
+                DeleteTodoResult.Deleted -> emitNow(TodoDetailOutput.Deleted(todoId))
+                DeleteTodoResult.NotFound -> emitNow(TodoDetailOutput.NotFound(todoId))
+                null -> Unit
             }
         }
     }
@@ -328,8 +328,8 @@ internal class TodoDetailViewModel(
         outputChannel.send(output)
     }
 
-    private suspend fun show(problem: Problem) {
-        uiCommandChannel.send(TodosUiCommand.ShowFailure(problem.kind))
+    private suspend fun show(kind: ProblemKind) {
+        uiCommandChannel.send(TodosUiCommand.ShowFailure(kind))
     }
 }
 
@@ -382,20 +382,12 @@ internal class TodoEditorViewModel(
         viewModelScope.launch {
             mutableState.value = mutableState.value.copy(isSubmitting = true)
             val current = mutableState.value
-            when (
-                val outcome =
-                    commands.createTodo(
-                        TodoDraft(current.title, current.ownerId.toLongOrNull() ?: 0)
-                    )
-            ) {
-                is Outcome.Completed ->
-                    when (val result = outcome.value) {
-                        is CreateTodoResult.Created -> emitNow(TodoEditorOutput.Created(result.id))
-                        is CreateTodoResult.InvalidInput ->
-                            mutableState.value =
-                                mutableState.value.copy(violations = result.violations)
-                    }
-                is Outcome.Failed -> show(outcome.problem)
+            val draft = TodoDraft(current.title, current.ownerId.toLongOrNull() ?: 0)
+            when (val result = commands.createTodo(draft).valueOrShow { show(it) }) {
+                is CreateTodoResult.Created -> emitNow(TodoEditorOutput.Created(result.id))
+                is CreateTodoResult.InvalidInput ->
+                    mutableState.value = mutableState.value.copy(violations = result.violations)
+                null -> Unit
             }
             mutableState.value = mutableState.value.copy(isSubmitting = false)
         }
@@ -409,8 +401,8 @@ internal class TodoEditorViewModel(
         outputChannel.send(output)
     }
 
-    private suspend fun show(problem: Problem) {
-        uiCommandChannel.send(TodosUiCommand.ShowFailure(problem.kind))
+    private suspend fun show(kind: ProblemKind) {
+        uiCommandChannel.send(TodosUiCommand.ShowFailure(kind))
     }
 }
 
@@ -486,3 +478,13 @@ private fun ResourceObservation<Todo>.toDetailState(
         violations = violations,
         confirmDelete = confirmDelete,
     )
+
+/** The completed decision, or null after reporting the failure through [show]. */
+private inline fun <T> Outcome<T>.valueOrShow(show: (ProblemKind) -> Unit): T? =
+    when (this) {
+        is Outcome.Completed -> value
+        is Outcome.Failed -> {
+            show(problem.kind)
+            null
+        }
+    }

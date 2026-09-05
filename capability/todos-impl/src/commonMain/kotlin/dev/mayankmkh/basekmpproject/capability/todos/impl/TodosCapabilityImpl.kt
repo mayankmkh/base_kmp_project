@@ -96,7 +96,7 @@ internal class TodosCapabilityImpl(
         localSource.upsert(optimistic)
         return remoteSource.createTodo(draft.copy(title = optimistic.title)).toOutcome(
             logger = logger,
-            operation = CreateOperation,
+            operation = "todos.create",
             onFailure = { localSource.delete(id) },
         ) { answer ->
             when (answer) {
@@ -119,7 +119,7 @@ internal class TodosCapabilityImpl(
     ): Outcome<UpdateTodoResult> =
         localSource.updateTodo(
             id,
-            CompleteOperation,
+            "todos.complete",
             logger,
             transform = { it.copy(completed = completed.toLong()) },
         ) {
@@ -134,7 +134,7 @@ internal class TodosCapabilityImpl(
         val trimmed = title.trim()
         return localSource.updateTodo(
             id,
-            RenameOperation,
+            "todos.rename",
             logger,
             transform = { it.copy(title = trimmed) },
         ) {
@@ -147,7 +147,7 @@ internal class TodosCapabilityImpl(
         localSource.delete(id)
         return remoteSource.deleteTodo(id.value).toOutcome(
             logger = logger,
-            operation = DeleteOperation,
+            operation = "todos.delete",
             onFailure = { localSource.upsert(previous) },
         ) { answer ->
             when (answer) {
@@ -205,7 +205,7 @@ private suspend fun syncTodos(
     localSource: TodosLocalSource,
     logger: Logger,
 ): Outcome<Unit> =
-    remoteSource.getTodos().commit(logger, ListRefreshOperation) { todos ->
+    remoteSource.getTodos().commit(logger, "todos.list.refresh") { todos ->
         localSource.replaceFromServer(todos.map { it.toEntity(localCreated = 0) })
     }
 
@@ -215,13 +215,12 @@ private suspend fun syncTodo(
     logger: Logger,
     id: TodoId,
 ): Outcome<Unit> =
-    remoteSource.getTodo(id.value).commit(logger, DetailRefreshOperation) { answer ->
-        when (answer) {
-            is TodoReadAnswer.Found -> {
-                val localCreated = localSource.find(id)?.localCreated ?: 0
-                localSource.upsert(answer.todo.toEntity(id, localCreated))
-            }
-            TodoReadAnswer.NotFound -> localSource.delete(id)
+    remoteSource.getTodo(id.value).commit(logger, "todos.detail.refresh") { todo ->
+        if (todo == null) {
+            localSource.delete(id)
+        } else {
+            val localCreated = localSource.find(id)?.localCreated ?: 0
+            localSource.upsert(todo.toEntity(id, localCreated))
         }
     }
 
@@ -247,10 +246,4 @@ private fun TodoDto.toEntity(
 
 private fun TodoEntity.toTodo() = Todo(TodoId(id), ownerId, title, completed != 0L)
 
-private const val ListRefreshOperation = "todos.list.refresh"
-private const val DetailRefreshOperation = "todos.detail.refresh"
-private const val CreateOperation = "todos.create"
-private const val CompleteOperation = "todos.complete"
-private const val RenameOperation = "todos.rename"
-private const val DeleteOperation = "todos.delete"
 private const val MaxTitleLength = 200

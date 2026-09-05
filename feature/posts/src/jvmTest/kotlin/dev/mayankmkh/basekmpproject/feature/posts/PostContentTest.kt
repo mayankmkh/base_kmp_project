@@ -41,7 +41,7 @@ class PostContentTest {
         state =
             PostFeedState(
                 isInitialLoading = false,
-                problem = Problem(ProblemKind.UNEXPECTED),
+                problem = Problem(ProblemKind.SERVER),
             )
         waitForIdle()
         onNodeWithText("Retry").assertIsDisplayed()
@@ -61,7 +61,7 @@ class PostContentTest {
         state =
             PostDetailState(
                 isInitialLoading = false,
-                problem = Problem(ProblemKind.UNEXPECTED),
+                problem = Problem(ProblemKind.SERVER),
             )
         waitForIdle()
         onNodeWithText("Retry").performClick()

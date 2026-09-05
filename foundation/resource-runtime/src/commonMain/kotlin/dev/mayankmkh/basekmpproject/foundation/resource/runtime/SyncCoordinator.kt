@@ -51,10 +51,10 @@ import kotlinx.coroutines.withContext
  * | failure             | clear in-flight, set failure, preserve succeeded             |
  * | worker cancellation | non-cancellable clear of in-flight; preserve ledger history  |
  * | caller cancellation | none; the shared worker keeps running                        |
- * | sync throws         | treated as failure with an unknown, non-retryable problem    |
+ * | sync throws         | treated as an `UNEXPECTED` failure                           |
  *
- * A caller whose worker was cancelled receives a retryable unknown failure unless the caller itself
- * was cancelled, in which case its own cancellation propagates.
+ * A caller whose worker was cancelled receives an `UNEXPECTED` failure unless the caller itself was
+ * cancelled, in which case its own cancellation propagates.
  */
 @Suppress("TooManyFunctions")
 public class SyncCoordinator<Key : Any>(
@@ -162,7 +162,7 @@ public class SyncCoordinator<Key : Any>(
             worker.await()
         } catch (_: CancellationException) {
             currentCoroutineContext().ensureActive()
-            Outcome.Failed(CancelledWorkerProblem)
+            Outcome.Failed(WorkerProblem)
         }
 
     private suspend fun runSync(key: Key, qos: RefreshQos): Outcome<Unit> =
@@ -171,7 +171,7 @@ public class SyncCoordinator<Key : Any>(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Throwable) {
-            Outcome.Failed(UnexpectedWorkerProblem)
+            Outcome.Failed(WorkerProblem)
         }
 
     private fun entryLocked(key: Key): Entry =
@@ -227,5 +227,4 @@ public class SyncCoordinator<Key : Any>(
     }
 }
 
-private val CancelledWorkerProblem = Problem(ProblemKind.UNEXPECTED)
-private val UnexpectedWorkerProblem = Problem(ProblemKind.UNEXPECTED)
+private val WorkerProblem = Problem(ProblemKind.UNEXPECTED)

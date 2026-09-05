@@ -134,12 +134,12 @@ class NetworkFailureProblemsTest {
         )
     }
 
-    private fun assertProblem(
-        kind: ProblemKind,
-        failure: NetworkFailure,
-        reference: String? = failure.toProblem().reference,
-    ) {
+    private fun assertProblem(kind: ProblemKind, failure: NetworkFailure, reference: String) {
         assertEquals(Problem(kind, reference), failure.toProblem())
+    }
+
+    private fun assertProblem(kind: ProblemKind, failure: NetworkFailure) {
+        assertEquals(kind, failure.toProblem().kind)
     }
 
     private suspend fun networkFailure(status: HttpStatusCode): NetworkFailure {

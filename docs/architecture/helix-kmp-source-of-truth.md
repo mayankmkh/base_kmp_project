@@ -3140,11 +3140,9 @@ sealed interface Outcome<out T> {
 data class Problem(val kind: ProblemKind, val reference: String? = null) {
     /** A retry without changing anything may succeed. */
     val retryable: Boolean
-        get() = kind == OFFLINE || kind == TIMEOUT || kind == SERVER
 
     /** The request may have reached the server; a command's effect is unknown. */
     val mayHaveApplied: Boolean
-        get() = kind == TIMEOUT
 }
 
 enum class ProblemKind { OFFLINE, TIMEOUT, SERVER, FORBIDDEN, UNEXPECTED }
@@ -3230,9 +3228,9 @@ helpers, and builds its generated database once with `LazyDatabase` over the app
 The `NetworkFailure` to `Problem` mapping is fixed: offline and timeout transport failures become
 `OFFLINE` and `TIMEOUT`; HTTP 401 or 403 becomes `FORBIDDEN`; HTTP 408, 429 and 5xx become `SERVER`;
 any other unmapped HTTP status, decoding failure or unexpected failure becomes `UNEXPECTED`.
-`Problem.reference` is the failure's request id. The bridge logs the operation name, kind, HTTP
-status when present, transport kind when present, request id, exception class and exception
-message. `UNEXPECTED` is error severity; every other kind is warning severity.
+`Problem.reference` is the failure's request id. `UNEXPECTED` logs at error severity and every
+other kind at warning; the log record itself is owned by the bridge in
+`:foundation:resource-runtime` and pinned by `NetworkFailureProblemsTest`.
 
 **RefreshQos semantics:** `CRITICAL_VISIBLE` means the user is blocked on the resource; `VISIBLE`
 means the user is looking at it; `BACKGROUND` is maintenance/reconnect work that must not compete

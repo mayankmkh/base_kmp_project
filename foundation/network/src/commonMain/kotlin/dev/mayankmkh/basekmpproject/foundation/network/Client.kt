@@ -117,7 +117,7 @@ private fun HttpClientConfig<*>.installRetry() {
         retryIf { request, response ->
             request.attributes.contains(Retryable) &&
                 request.method in IdempotentMethods &&
-                (response.status.value in ServerErrorRange ||
+                (response.status.value in ServerErrorStatuses ||
                     response.status == HttpStatusCode.TooManyRequests)
         }
         retryOnExceptionIf { request, cause ->
@@ -241,11 +241,15 @@ private val RequestId =
         }
     }
 
-internal class RequestIdContext(var latest: String? = null) : AbstractCoroutineContextElement(Key) {
+internal class RequestIdContext(var latest: String) : AbstractCoroutineContextElement(Key) {
     internal companion object Key : CoroutineContext.Key<RequestIdContext>
 }
 
 private const val MaximumRetries = 2
 private const val BearerPrefix = "Bearer "
-private val ServerErrorRange = 500..599
+/**
+ * Statuses that mean the server itself failed: the client retries idempotent requests on them and
+ * `:foundation:resource-runtime` classifies them as `SERVER`.
+ */
+public val ServerErrorStatuses: IntRange = 500..599
 private val IdempotentMethods = setOf(HttpMethod.Get, HttpMethod.Head, HttpMethod.Options)

@@ -6,6 +6,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import base_kmp_project.feature.todos.generated.resources.Res
+import base_kmp_project.feature.todos.generated.resources.input_invalid
+import base_kmp_project.feature.todos.generated.resources.todo_unavailable
 import dev.mayankmkh.basekmpproject.feature.todos.TodoListContent
 import dev.mayankmkh.basekmpproject.feature.todos.TodoListViewModel
 import dev.mayankmkh.basekmpproject.feature.todos.TodosUiCommand
@@ -33,6 +36,10 @@ public fun TodoListScreen(
         when (command) {
             is TodosUiCommand.ShowFailure ->
                 snackbarHostState.showSnackbar(getString(command.kind.messageResource()))
+            TodosUiCommand.ShowTodoMissing ->
+                snackbarHostState.showSnackbar(getString(Res.string.todo_unavailable))
+            TodosUiCommand.ShowInputRejected ->
+                snackbarHostState.showSnackbar(getString(Res.string.input_invalid))
         }
     }
 

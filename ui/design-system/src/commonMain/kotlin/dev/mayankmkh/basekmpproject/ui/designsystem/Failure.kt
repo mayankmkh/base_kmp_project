@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import base_kmp_project.ui.design_system.generated.resources.Res
 import base_kmp_project.ui.design_system.generated.resources.retry
 import base_kmp_project.ui.design_system.generated.resources.something_went_wrong
+import base_kmp_project.ui.design_system.generated.resources.support_reference
 import base_kmp_project.ui.design_system.generated.resources.temporarily_unavailable
 import base_kmp_project.ui.design_system.generated.resources.took_too_long
 import base_kmp_project.ui.design_system.generated.resources.you_are_offline
@@ -33,6 +34,10 @@ public fun ProblemKind.messageResource(): StringResource =
         ProblemKind.UNEXPECTED -> Res.string.something_went_wrong
     }
 
+/**
+ * Renders a [Problem]: its message, the support reference when a server-side or unexpected failure
+ * carries one, and a retry action only when [Problem.retryable] says a retry can help.
+ */
 @Composable
 public fun Failure(
     problem: Problem,
@@ -45,9 +50,20 @@ public fun Failure(
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )
-        Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
+        val reference = problem.reference
+        if (reference != null && problem.kind in ReferencedKinds) {
+            Text(
+                text = stringResource(Res.string.support_reference, reference),
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
+            )
+        }
+        if (problem.retryable) Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
     }
 }
+
+/** The kinds a support conversation can act on with a request id. */
+private val ReferencedKinds = setOf(ProblemKind.SERVER, ProblemKind.UNEXPECTED)
 
 @Composable
 public fun Centred(modifier: Modifier = Modifier, content: @Composable () -> Unit) {

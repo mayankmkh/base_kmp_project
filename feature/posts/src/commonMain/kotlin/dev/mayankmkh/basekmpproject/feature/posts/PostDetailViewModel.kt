@@ -10,7 +10,6 @@ import dev.mayankmkh.basekmpproject.feature.posts.api.PostDetailOutput
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.Problem
-import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.failure
 import dev.mayankmkh.basekmpproject.foundation.resource.hasValue
@@ -39,20 +38,16 @@ internal sealed interface PostDetailAction {
     data object Back : PostDetailAction
 }
 
-internal sealed interface PostDetailUiCommand {
-    data class ShowRefreshFailed(val kind: ProblemKind) : PostDetailUiCommand
-}
-
 internal class PostDetailViewModel(
     val postId: PostId,
     instanceKey: FeatureInstanceKey,
     queries: PostsQueries,
     private val commands: PostsCommands,
 ) : ViewModel() {
-    private val uiCommandChannel = Channel<PostDetailUiCommand>(Channel.BUFFERED)
+    private val uiCommandChannel = Channel<PostsUiCommand>(Channel.BUFFERED)
     private val outputChannel = Channel<PostDetailOutput>(Channel.BUFFERED)
 
-    val uiCommands: Flow<PostDetailUiCommand> = uiCommandChannel.receiveAsFlow()
+    val uiCommands: Flow<PostsUiCommand> = uiCommandChannel.receiveAsFlow()
     val outputs: Flow<PostDetailOutput> = outputChannel.receiveAsFlow()
     val state: StateFlow<PostDetailState> =
         queries
@@ -75,7 +70,7 @@ internal class PostDetailViewModel(
                     val outcome = commands.refreshPost(postId)
                     if (outcome is Outcome.Failed) {
                         uiCommandChannel.send(
-                            PostDetailUiCommand.ShowRefreshFailed(outcome.problem.kind)
+                            PostsUiCommand.ShowRefreshFailed(outcome.problem.kind)
                         )
                     }
                 }

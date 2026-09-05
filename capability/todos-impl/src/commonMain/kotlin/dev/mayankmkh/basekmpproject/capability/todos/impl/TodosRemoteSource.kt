@@ -1,12 +1,11 @@
 package dev.mayankmkh.basekmpproject.capability.todos.impl
 
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
-import com.github.michaelbull.result.fold
+import com.github.michaelbull.result.map
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoDraft
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoField
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkFailure
+import dev.mayankmkh.basekmpproject.foundation.network.answerOn
 import dev.mayankmkh.basekmpproject.foundation.network.bodyOrNull
 import dev.mayankmkh.basekmpproject.foundation.network.jsonBody
 import dev.mayankmkh.basekmpproject.foundation.network.tryCatching
@@ -51,12 +50,6 @@ private data class ErrorDto(
     val message: String? = null,
 )
 
-internal sealed interface TodoReadAnswer {
-    data class Found(val todo: TodoDto) : TodoReadAnswer
-
-    data object NotFound : TodoReadAnswer
-}
-
 internal sealed interface CreateTodoRemoteAnswer {
     data class Created(val todo: TodoDto) : CreateTodoRemoteAnswer
 
@@ -86,15 +79,13 @@ internal class TodosRemoteSource(private val client: HttpClient, private val jso
             .body()
     }
 
-    suspend fun getTodo(id: Long): Result<TodoReadAnswer, NetworkFailure> =
+    /** The todo, or null when the server answers that it no longer exists. */
+    suspend fun getTodo(id: Long): Result<TodoDto?, NetworkFailure> =
         client
-            .tryCatching<TodoDto> {
-                get { url { appendPathSegments(TODOS_PATH, id.toString()) } }.body()
+            .tryCatching<TodoDto?> {
+                get { url { appendPathSegments(TODOS_PATH, id.toString()) } }.body<TodoDto>()
             }
-            .mapAnswer(
-                success = { TodoReadAnswer.Found(it) },
-                notFound = { TodoReadAnswer.NotFound },
-            )
+            .answerOn(HttpStatusCode.NotFound) { null }
 
     suspend fun createTodo(draft: TodoDraft): Result<CreateTodoRemoteAnswer, NetworkFailure> =
         client
@@ -105,16 +96,12 @@ internal class TodosRemoteSource(private val client: HttpClient, private val jso
                     }
                     .body()
             }
-            .fold(
-                success = { Ok(CreateTodoRemoteAnswer.Created(it)) },
-                failure = { failure ->
-                    if (failure.status == HttpStatusCode.UnprocessableEntity) {
-                        Ok(CreateTodoRemoteAnswer.InvalidInput(failure.violations()))
-                    } else {
-                        Err(failure)
-                    }
-                },
-            )
+            .map<TodoDto, NetworkFailure, CreateTodoRemoteAnswer> {
+                CreateTodoRemoteAnswer.Created(it)
+            }
+            .answerOn(HttpStatusCode.UnprocessableEntity) {
+                CreateTodoRemoteAnswer.InvalidInput(it.violations())
+            }
 
     suspend fun setCompleted(
         id: Long,
@@ -150,51 +137,25 @@ internal class TodosRemoteSource(private val client: HttpClient, private val jso
                 delete { url { appendPathSegments(TODOS_PATH, id.toString()) } }
                 Unit
             }
-            .mapAnswer(
-                success = { DeleteTodoRemoteAnswer.Deleted },
-                notFound = { DeleteTodoRemoteAnswer.NotFound },
-            )
+            .map<Unit, NetworkFailure, DeleteTodoRemoteAnswer> { DeleteTodoRemoteAnswer.Deleted }
+            .answerOn(HttpStatusCode.NotFound) { DeleteTodoRemoteAnswer.NotFound }
 
     private fun Result<TodoDto, NetworkFailure>.toUpdateAnswer():
         Result<UpdateTodoRemoteAnswer, NetworkFailure> =
-        fold(
-            success = { Ok(UpdateTodoRemoteAnswer.Updated(it)) },
-            failure = { failure ->
-                when (failure.status) {
-                    HttpStatusCode.NotFound -> Ok(UpdateTodoRemoteAnswer.NotFound)
-                    HttpStatusCode.UnprocessableEntity ->
-                        Ok(UpdateTodoRemoteAnswer.InvalidInput(failure.violations()))
-                    else -> Err(failure)
-                }
-            },
-        )
+        map<TodoDto, NetworkFailure, UpdateTodoRemoteAnswer> { UpdateTodoRemoteAnswer.Updated(it) }
+            .answerOn(HttpStatusCode.NotFound) { UpdateTodoRemoteAnswer.NotFound }
+            .answerOn(HttpStatusCode.UnprocessableEntity) {
+                UpdateTodoRemoteAnswer.InvalidInput(it.violations())
+            }
 
-    private fun NetworkFailure.violations(): List<Violation<TodoField>> =
-        (this as? NetworkFailure.Http)
-            ?.bodyOrNull<ErrorEnvelope>(json)
-            ?.errors
-            .orEmpty()
-            .map(ErrorDto::toViolation)
+    private fun NetworkFailure.Http.violations(): List<Violation<TodoField>> =
+        bodyOrNull<ErrorEnvelope>(json)?.errors.orEmpty().map(ErrorDto::toViolation)
 
     private companion object {
         const val TODOS_PATH = "todos"
         const val DEFAULT_OWNER_ID = 1L
     }
 }
-
-private val NetworkFailure.status: HttpStatusCode?
-    get() = (this as? NetworkFailure.Http)?.status
-
-private inline fun <T, R> Result<T, NetworkFailure>.mapAnswer(
-    success: (T) -> R,
-    notFound: () -> R,
-): Result<R, NetworkFailure> =
-    fold(
-        success = { Ok(success(it)) },
-        failure = { failure ->
-            if (failure.status == HttpStatusCode.NotFound) Ok(notFound()) else Err(failure)
-        },
-    )
 
 private fun ErrorDto.toViolation() =
     Violation(

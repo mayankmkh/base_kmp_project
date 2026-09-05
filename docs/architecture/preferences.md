@@ -178,7 +178,9 @@ never cleared.
 
 The convention that avoids the collision in the first place: a Capability names its files after
 itself, `PrefFile("identity.credentials")` rather than `PrefFile("credentials")`. The registry
-enforces uniqueness; the convention makes uniqueness the default. The registry itself is
+enforces uniqueness at run time, but only when both stores are opened in one process, so
+`StoreNamesRuleTest` in `:app:shared` reads every store name off the Capability implementations'
+sources and fails the fast gate on a duplicate or on a name without its owner's prefix. The registry itself is
 `OpenNameRegistry` in `:foundation:runtime`, a compare-and-set name set that both store modules
 instantiate once; the modules differ only in the noun the failure message uses.
 

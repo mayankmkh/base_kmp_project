@@ -4601,7 +4601,8 @@ Reserve source rules for constraints the stronger layers cannot fully express:
 5. Capability public APIs expose only approved API packages/types;
 6. `foundation_api` modules do not expose/runtime-depend on forbidden lower product/runtime mechanisms in their public surface;
 7. intentionally quarantined framework/runtime imports do not leak outside approved packages;
-8. no hard-coded `Dispatchers.*` or global coroutine-scope construction in Feature/business code where injected policy applies.
+8. no hard-coded `Dispatchers.*` or global coroutine-scope construction in Feature/business code where injected policy applies;
+9. every preferences file and secret store name a Capability opens is unique across the app and prefixed with that Capability's name (`StoreNamesRuleTest`).
 
 Graph/visibility rules remain primary for Feature -> Impl, UI -> Koin/Capability, Capability API -> infrastructure, and Capability Impl -> Feature/UI/other Impl.
 

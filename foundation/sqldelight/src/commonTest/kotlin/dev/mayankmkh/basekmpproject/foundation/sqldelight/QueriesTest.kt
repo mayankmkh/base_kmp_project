@@ -6,11 +6,8 @@ import app.cash.sqldelight.db.SqlCursor
 import app.cash.turbine.test
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 
 class QueriesTest {
@@ -32,23 +29,6 @@ class QueriesTest {
     @Test
     fun `observeOneOrNull emits null when the query is empty`() = runTest {
         assertNull(MutableStringQuery(emptyList()).observeOneOrNull().first())
-    }
-
-    @Test
-    fun `observeDatabase stays cold until collection`() = runTest {
-        var opened = false
-        val observation =
-            observeDatabase(
-                database = {
-                    opened = true
-                    "database"
-                },
-                query = { flowOf(it) },
-            )
-
-        assertFalse(opened)
-        assertEquals("database", observation.first())
-        assertTrue(opened)
     }
 }
 

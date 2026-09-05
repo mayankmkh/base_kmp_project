@@ -8,10 +8,14 @@ import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.db.SqlPreparedStatement
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
@@ -44,6 +48,24 @@ class LazyDatabaseTest {
         assertEquals(1, driverRequests)
         assertEquals(1, creates)
         results.forEach { assertSame(database, it) }
+    }
+
+    @Test
+    fun `observe stays cold until collection`() = runTest {
+        var opened = false
+        val lazyDatabase =
+            LazyDatabase(
+                drivers = {
+                    opened = true
+                    FakeSqlDriver
+                },
+                create = { "database" },
+            )
+        val observation = lazyDatabase.observe { flowOf(it) }
+
+        assertFalse(opened)
+        assertEquals("database", observation.first())
+        assertTrue(opened)
     }
 }
 

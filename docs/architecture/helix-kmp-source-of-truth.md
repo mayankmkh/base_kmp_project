@@ -3203,9 +3203,9 @@ hands over its value flow and never repeats the mapping. A confirmed detail 404 
 `Failed(PERMANENT, retryable = false)` through `lastFailure`. A clean ledger with a `null` value
 remains `Refreshing` while the durable query catches up or until a later attempt confirms a result.
 A Capability's sync function is `remoteResult.commit { persist(it) }`. Its local source observes
-SQLDelight through `:foundation:sqldelight`'s `observeList`, `observeOneOrNull`, `observeOne`, and
-`observeDatabase` helpers, and builds its generated database with `LazyDatabase` over the app's
-shared `SqlDriverProvider`. The app shares its cold platform connectivity monitor once with
+SQLDelight through `:foundation:sqldelight`'s `observeList`, `observeOneOrNull` and `observeOne`
+helpers, and builds its generated database once with `LazyDatabase` over the app's shared
+`SqlDriverProvider`, observing queries through `LazyDatabase.observe`. The app shares its cold platform connectivity monitor once with
 `ConnectivityMonitor.shared(applicationScope)`, so every coordinator takes
 `connectivityMonitor.reconnects()` directly.
 

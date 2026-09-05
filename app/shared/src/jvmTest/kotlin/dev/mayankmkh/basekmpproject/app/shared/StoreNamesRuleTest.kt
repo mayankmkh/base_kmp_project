@@ -11,7 +11,9 @@ import kotlin.test.assertTrue
  *
  * The runtime registry only fails when both colliding stores are opened in one process, and Koin
  * singles are lazy, so a duplicate can pass every other gate. This test reads the names off the
- * source instead.
+ * source instead, and pins them: a store name is a persistence contract, so adding or renaming one
+ * means updating [KnownStores] on purpose and, for a rename, deciding what happens to the data
+ * stored under the old name.
  */
 class StoreNamesRuleTest {
     @Test
@@ -27,6 +29,12 @@ class StoreNamesRuleTest {
 
         val duplicates = names.groupBy { it.second }.filterValues { it.size > 1 }.keys
         assertEquals(emptySet(), duplicates, "store names must be unique across the app")
+
+        assertEquals(
+            KnownStores,
+            names.map { it.second }.toSet(),
+            "store names changed; a rename abandons the data stored under the old name",
+        )
 
         val foreign = names.filterNot { (capability, name, _) -> name.startsWith("$capability.") }
         assertEquals(
@@ -67,6 +75,10 @@ class StoreNamesRuleTest {
     }
 
     private companion object {
+        /**
+         * Every store the app opens today. Add to it deliberately; rename only with a migration.
+         */
+        val KnownStores = setOf("identity.credentials", "todos.settings")
         val PrefFileName = Regex("""PrefFile\("([^"]+)"\)""")
         val SecretOpen = Regex("""\.open\("([^"]+)"\)""")
     }

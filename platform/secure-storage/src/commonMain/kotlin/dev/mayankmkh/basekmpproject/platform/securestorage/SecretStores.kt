@@ -14,6 +14,10 @@ public interface SecretStores {
      *
      * Android keeps the Tink keyset in `<applicationId>.secure-storage`; app backup rules can use
      * this stable name to exclude the keyset alongside the non-backed-up ciphertext.
+     *
+     * [name] is a persistence contract: it is the associated data of the encrypted file on Android
+     * and desktop and part of the Keychain service on iOS, so renaming it makes the stored secrets
+     * unreadable. `StoreNamesRuleTest` pins every name so a rename is a deliberate change.
      */
     public fun open(name: String): SecretStore
 }

@@ -12,6 +12,12 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlin.jvm.JvmInline
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * The name of one stored file. It is a persistence contract: the file on disk is named after it, so
+ * renaming it in code abandons what users have stored under the old name. A rename that must keep
+ * that data needs a DataStore migration (preferences.md section 12.1), and `StoreNamesRuleTest`
+ * pins every name so a rename is a deliberate change.
+ */
 @JvmInline public value class PrefFile(public val name: String)
 
 @JvmInline

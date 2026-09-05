@@ -1468,8 +1468,8 @@ Capability-internal source naming:
 
 - inside `<Name>CapabilityImpl`, raw backends are `<Name>RemoteSource` (one per transport and the
   only class touching the HTTP client) and `<Name>LocalSource` (one per durable store and the only
-  class touching SQLDelight); a `<Name>DatabaseProvider` fun interface hands the local source its
-  database handle;
+  class touching SQLDelight); the local source builds its generated database once with
+  `LazyDatabase` over the app's `SqlDriverProvider`;
 - `<Name>CapabilityImpl` is the only class combining sources and owns DTO/row-to-model mappers;
 - names are role-based and platform-neutral: avoid `Store` (Store5 type, Redux/TCA state
   container), `Service` (Android component, microservice), `Storage` (web `localStorage`), `Cache`
@@ -3204,7 +3204,10 @@ hands over its value flow and never repeats the mapping. A confirmed detail 404 
 remains `Refreshing` while the durable query catches up or until a later attempt confirms a result.
 A Capability's sync function is `remoteResult.commit { persist(it) }`. Its local source observes
 SQLDelight through `:foundation:sqldelight`'s `observeList`, `observeOneOrNull`, `observeOne`, and
-`observeDatabase` helpers.
+`observeDatabase` helpers, and builds its generated database with `LazyDatabase` over the app's
+shared `SqlDriverProvider`. The app shares its cold platform connectivity monitor once with
+`ConnectivityMonitor.shared(applicationScope)`, so every coordinator takes
+`connectivityMonitor.reconnects()` directly.
 
 **RefreshQos semantics:** `CRITICAL_VISIBLE` means the user is blocked on the resource; `VISIBLE`
 means the user is looking at it; `BACKGROUND` is maintenance/reconnect work that must not compete

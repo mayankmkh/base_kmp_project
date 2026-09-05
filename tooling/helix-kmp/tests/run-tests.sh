@@ -21,12 +21,16 @@ TOOL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$TOOL_DIR/../.." && pwd)"
 CLI="$TOOL_DIR/helix-kmp"
 SETTINGS_FILE="$REPO_ROOT/settings.gradle.kts"
+KOIN_APP_FILE="$REPO_ROOT/app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+APP_SHARED_BUILD_FILE="$REPO_ROOT/app/shared/build.gradle.kts"
 AGENTS_FILE="$REPO_ROOT/AGENTS.md"
 
 # The working tree carries in-flight work and settings.gradle.kts is itself modified, so the file
 # is restored from a saved copy. `git checkout -- settings.gradle.kts` would discard that work.
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/helix-kmp-tests.XXXXXX")"
 SETTINGS_BACKUP="$WORK_DIR/settings.gradle.kts"
+KOIN_APP_BACKUP="$WORK_DIR/KoinApp.kt"
+APP_SHARED_BUILD_BACKUP="$WORK_DIR/app-shared-build.gradle.kts"
 AGENTS_BACKUP="$WORK_DIR/AGENTS.md"
 STATUS_BEFORE="$WORK_DIR/status-before.txt"
 STATUS_AFTER="$WORK_DIR/status-after.txt"
@@ -62,6 +66,12 @@ cleanup() {
     rmdir "$REPO_ROOT/feature" 2> /dev/null || true
     if [ -f "$SETTINGS_BACKUP" ]; then
         cp "$SETTINGS_BACKUP" "$SETTINGS_FILE"
+    fi
+    if [ -f "$KOIN_APP_BACKUP" ]; then
+        cp "$KOIN_APP_BACKUP" "$KOIN_APP_FILE"
+    fi
+    if [ -f "$APP_SHARED_BUILD_BACKUP" ]; then
+        cp "$APP_SHARED_BUILD_BACKUP" "$APP_SHARED_BUILD_FILE"
     fi
     if [ -f "$AGENTS_BACKUP" ]; then
         cp "$AGENTS_BACKUP" "$AGENTS_FILE"
@@ -114,6 +124,8 @@ expect_cell_shape() {
 # 0. baseline
 # --------------------------------------------------------------------------
 cp "$SETTINGS_FILE" "$SETTINGS_BACKUP"
+cp "$KOIN_APP_FILE" "$KOIN_APP_BACKUP"
+cp "$APP_SHARED_BUILD_FILE" "$APP_SHARED_BUILD_BACKUP"
 cp "$AGENTS_FILE" "$AGENTS_BACKUP"
 git -C "$REPO_ROOT" status --short > "$STATUS_BEFORE"
 log "baseline recorded ($(wc -l < "$STATUS_BEFORE" | tr -d ' ') entries in git status --short)"
@@ -248,6 +260,9 @@ expect_file "capability/sample-api/build.gradle.kts"
 expect_file "capability/sample-api/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/capability/sample/api/SampleCapability.kt"
 expect_file "capability/sample-impl/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/capability/sample/impl/SampleCapabilityModule.kt"
 expect_file "capability/sample-impl/src/commonTest/kotlin/dev/mayankmkh/basekmpproject/capability/sample/impl/SampleCapabilityImplTest.kt"
+expect_grep "import dev.mayankmkh.basekmpproject.capability.sample.impl.sampleCapabilityModule" "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+expect_grep '^        sampleCapabilityModule,$' "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+expect_grep 'implementation(projects.capability.sampleImpl)' "app/shared/build.gradle.kts"
 
 log "create feature sample"
 "$CLI" create feature sample
@@ -255,6 +270,9 @@ expect_file "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/f
 expect_cell_shape "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/SampleCell.kt" id
 expect_file "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/SampleScreen.kt"
 expect_file "feature/sample/src/jvmTest/kotlin/dev/mayankmkh/basekmpproject/feature/sample/SampleContentTest.kt"
+expect_grep "import dev.mayankmkh.basekmpproject.feature.sample.api.sampleFeatureModule" "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+expect_grep '^        sampleFeatureModule,$' "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+expect_grep 'implementation(projects.feature.sample)' "app/shared/build.gradle.kts"
 
 log "create cell sample Detail"
 "$CLI" create cell sample Detail
@@ -267,6 +285,8 @@ log "create feature sample-linked --capability sample"
 "$CLI" create feature sample-linked --capability sample
 expect_grep "projects.capability.sampleApi" "feature/sample-linked/build.gradle.kts"
 expect_grep "SampleQueries" "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/SampleLinkedViewModel.kt"
+expect_grep "import dev.mayankmkh.basekmpproject.feature.samplelinked.api.sampleLinkedFeatureModule" "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+expect_grep '^        sampleLinkedFeatureModule,$' "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
 
 log "settings.gradle.kts"
 expect_grep '":capability:sample-api",' "settings.gradle.kts"
@@ -292,6 +312,7 @@ GRADLE_TASKS="${HELIX_KMP_TEST_TASKS:-
 :capability:sample-impl:jvmTest
 :feature:sample:jvmTest
 :feature:sample-linked:jvmTest
+:app:shared:jvmTest
 :capability:sample-api:spotlessCheck
 :capability:sample-impl:spotlessCheck
 :feature:sample:spotlessCheck

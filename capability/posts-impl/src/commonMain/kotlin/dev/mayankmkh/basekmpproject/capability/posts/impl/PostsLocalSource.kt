@@ -1,6 +1,9 @@
 package dev.mayankmkh.basekmpproject.capability.posts.impl
 
 import app.cash.sqldelight.async.coroutines.awaitAsOne
+import dev.mayankmkh.basekmpproject.capability.posts.impl.db.AppDatabase
+import dev.mayankmkh.basekmpproject.foundation.sqldelight.LazyDatabase
+import dev.mayankmkh.basekmpproject.foundation.sqldelight.SqlDriverProvider
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.observeDatabase
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.observeList
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.observeOne
@@ -13,22 +16,23 @@ import kotlinx.coroutines.flow.map
  * The posts table in capability-owned terms. Feed and detail writes share each entity row, so the
  * last committed write wins when they overlap. Multi-row feed writes land in one transaction.
  */
-internal class PostsLocalSource(private val provider: PostsDatabaseProvider) {
+internal class PostsLocalSource(drivers: SqlDriverProvider) {
+    private val database = LazyDatabase(drivers, AppDatabase::invoke)
 
     /** Emits the durable feed, then again after every write to `post` or `postFeedEntry`. */
     fun observeFeed(): Flow<List<PostEntity>> =
-        observeDatabase(provider::database) { database ->
+        observeDatabase(database::get) { database ->
             database.postsSchemaQueries.selectFeed(::PostEntity).observeList()
         }
 
     fun observeById(id: String): Flow<PostEntity?> =
-        observeDatabase(provider::database) { database ->
+        observeDatabase(database::get) { database ->
             database.postsSchemaQueries.selectById(id, ::PostEntity).observeOneOrNull()
         }
 
     /** Whether the feed endpoint has completed successfully at least once. */
     fun observeFeedInitialized(): Flow<Boolean> =
-        observeDatabase(provider::database) { database ->
+        observeDatabase(database::get) { database ->
             database.postsSchemaQueries
                 .feedInitializationCount()
                 .observeOne()
@@ -36,11 +40,11 @@ internal class PostsLocalSource(private val provider: PostsDatabaseProvider) {
                 .distinctUntilChanged()
         }
 
-    suspend fun count(): Long = provider.database().postsSchemaQueries.countAll().awaitAsOne()
+    suspend fun count(): Long = database.get().postsSchemaQueries.countAll().awaitAsOne()
 
     /** Replaces feed membership and order in one transaction without deleting entity rows. */
     suspend fun replaceFeed(posts: List<PostEntity>) {
-        val database = provider.database()
+        val database = database.get()
         val distinctPosts = posts.distinctBy { it.id }
         database.transaction {
             distinctPosts.forEach { post ->
@@ -61,8 +65,8 @@ internal class PostsLocalSource(private val provider: PostsDatabaseProvider) {
 
     /** Writes a single post without changing feed membership or order. */
     suspend fun upsert(post: PostEntity) {
-        provider
-            .database()
+        database
+            .get()
             .postsSchemaQueries
             .upsert(
                 id = post.id,

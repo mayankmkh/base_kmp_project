@@ -27,8 +27,9 @@ import kotlinx.coroutines.flow.combine
 // failed offline whenever `retryTriggers` emits, and the `status` behind every observation.
 // `observations` wraps a durable value flow in `observing` and applies the contract's
 // `SyncStatus.toOperation` mapping, so every Query goes through it and the appearance sync and the
-// offline retry know about it. `:capability:posts-impl` is the worked example with SQLDelight,
-// Ktor, and a second keyed coordinator sharing one reconnect subscription.
+// offline retry know about it. The app shares the connectivity monitor once, so each coordinator
+// simply passes `connectivityMonitor.reconnects()`. `:capability:posts-impl` is the worked example
+// with SQLDelight, Ktor, and a second keyed coordinator.
 /** Implementation of the __name__ Capability. */
 internal class __NAME__CapabilityImpl(
     private val remoteSource: __NAME__RemoteSource,

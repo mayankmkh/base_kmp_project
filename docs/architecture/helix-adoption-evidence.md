@@ -11,6 +11,24 @@ On 2026-09-05, phase 1 of Capability boilerplate reduction extracted the reusabl
 SQLDelight observation shapes into `:foundation:sqldelight` and added `commit` to
 `:foundation:resource-runtime`; `:capability:posts-impl` adopted both. The current graph therefore
 increases by one node, from 20 to 21, without changing value ownership or adding an exception.
+Phase 2 centralised the remaining wiring without changing that graph:
+
+- `SqlDriverProvider` and `LazyDatabase` replaced per-Capability database-provider interfaces and
+  app bridges; `:storage:database` now supplies the single open, migrated driver.
+- `ConnectivityMonitor.shared(applicationScope)` moved cold-flow sharing to the app root, so each
+  coordinator passes `reconnects()` directly while all Capabilities share one platform callback.
+- `:testkit:common` now owns the in-memory SQLDelight driver and provider fixtures used by
+  implementation tests.
+- `helix-kmp create` registers generated Capability and Feature modules in the app composition
+  root, while its end-to-end test verifies the resulting real Koin graph. SQLDelight storage-schema
+  contributor wiring remains an explicit post-create step because the default scaffold is
+  in-memory.
+
+A shared sync-marker table and a coordinator factory were considered and skipped. Six lines of
+marker SQL did not justify a cross-module SQLDelight schema dependency and its build coupling;
+sharing connectivity once at the root removed the only repeated coordinator construction concern
+that would have justified a factory. Koin's `binds` form and a recording Ktor mock-engine fixture
+were tried and reverted: each saved a few lines and cost readability.
 
 The owned `SnapshotResource` ledger (below) was reviewed against the Store5 baseline at 0240602 and
 against a minimal coordinator design. Both value-owning runtimes duplicated what SQLDelight already
@@ -74,9 +92,10 @@ The posts Capability implementation now owns its SQLDelight schema, migrations, 
 generated `…capability.posts.impl.db.AppDatabase` interface. `:storage:database` contributes a
 comment-only assembly `.sq`, composes the posts schema into
 `…storage.database.db.AppDatabase`, and owns the platform drivers, opening, the merged migration
-sequence, and `app.db`. App bridges that assembled interface to `PostsDatabaseProvider`. The
-proof-only Identity schema and cross-capability author join were removed, so the composed schema is
-version 4; migration 3 renames the feed-state table without changing its data.
+sequence, and `app.db`. `AppDatabaseDriverProvider` supplies its open, migrated driver through the
+shared `SqlDriverProvider`; each SQLDelight-backed Capability builds its generated database over
+that driver. The proof-only Identity schema and cross-capability author join were removed, so the
+composed schema is version 4; migration 3 renames the feed-state table without changing its data.
 
 The assembly now enables SQLDelight migration verification against the checked-in version-1
 composed snapshot; contributor-local verification is disabled because repo-wide numbering makes

@@ -32,9 +32,10 @@ Screen, Cell, UI component or Capability consumer.
    tooling/helix-kmp/helix-kmp create cell <feature> <CellName>
    ```
 
-   `create` adds the module to `settings.gradle.kts` and, for a Cell, registers its ViewModel in
-   the Feature's Koin module. It never edits the app's composition root: load the new
-   `<name>FeatureModule` or `<name>CapabilityModule` in `:app:shared` yourself.
+   `create` adds the module to `settings.gradle.kts`, adds it as an `:app:shared` dependency, and
+   loads the new `<name>FeatureModule` or `<name>CapabilityModule` in the composition root. For a
+   Cell, it registers the ViewModel in the Feature's Koin module. A SQLDelight-backed Capability
+   still needs registering by hand as a contributor and dependency of `:storage:database`.
 
 4. **Keep presentation on Capability APIs and product models only.** A Feature depends on
    `capability/<name>-api`, never on `-impl`. Cell state is keyed by `FeatureInstanceKey`, so two

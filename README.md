@@ -28,11 +28,11 @@ The path and the role must agree; `./gradlew checkModuleGraph` enforces both.
 | `:foundation:resource` | foundation_api | `ResourceObservation`, `RefreshOutcome`, refresh QoS, problem taxonomy |
 | `:foundation:resource-runtime` | foundation_runtime | Domain-blind sync coordination plus network-result outcome helpers |
 | `:foundation:runtime` | foundation_runtime | Application scope, dispatchers, logging |
-| `:foundation:sqldelight` | foundation_runtime | Cold-flow helpers for asynchronous SQLDelight queries and databases |
+| `:foundation:sqldelight` | foundation_runtime | Async query flows, the shared `SqlDriverProvider`, and lazy generated databases |
 | `:platform:connectivity` | platform | Network-reachability seam, per platform |
 | `:platform:secure-storage` | platform | Keystore, Keychain, OS-vaulted desktop and in-memory web secret stores |
 | `:storage:database` | storage | Assembles capability schemas, drivers, merged migrations, and the product cache `app.db` |
-| `:testkit:common` | testkit | `runMainTest`, fakes and fixtures -- test code only |
+| `:testkit:common` | testkit | Coroutine, in-memory SQLDelight, and product fixtures -- test code only |
 | `:ui:design-system` | ui | Theme and stateless rendering; no ViewModel, no Koin, no navigation |
 
 Plus, outside the runtime graph:
@@ -69,9 +69,9 @@ tooling/helix-kmp/helix-kmp create cell <feature> <CellName>           # a Cell 
 ```
 
 Add `--dry-run` to see the file list without writing anything. Each command writes the module,
-adds it to `settings.gradle.kts`, and -- for a Cell -- registers its ViewModel in the Feature's
-Koin module. What it does not do is load the new `<name>FeatureModule` or `<name>CapabilityModule`
-into the composition root in `:app:shared`; do that yourself.
+adds it to `settings.gradle.kts`, and loads a new `<name>FeatureModule` or
+`<name>CapabilityModule` into the composition root. For a Cell, it registers the ViewModel in the
+Feature's Koin module.
 
 For Cells hosted inside a lazy list, derive `KeyedOwnerHost`'s active keys from the viewport with
 `rememberViewportKeys`, including its bounded prefetch buffer. Gate periodic refresh in the
@@ -87,11 +87,11 @@ template, run `tooling/helix-kmp/tests/run-tests.sh`.
 
 Apply SQLDelight in the Capability implementation, declare `AppDatabase` in its `<package>.db`,
 and keep its `.sq`/`.sqm` files under the matching `src/commonMain/sqldelight/<package>/db/`
-directory. Expose a narrow `<X>DatabaseSource`, then register the implementation as both a
-SQLDelight contributor and a normal dependency of `:storage:database`; `:app:shared` bridges the
-assembled database to that source. Use one physical database by default (hard budget: five), keep
-migration numbers unique repo-wide, and put cross-capability joins/projections in storage-owned
-`.sq` files when they are genuinely assembly-level.
+directory. Build its generated database with `LazyDatabase` over the app's shared
+`SqlDriverProvider`. Register the implementation by hand as both a SQLDelight contributor and a
+normal dependency of `:storage:database`. Use one physical database by default (hard budget: five),
+keep migration numbers unique repo-wide, and put cross-capability joins/projections in
+storage-owned `.sq` files when they are genuinely assembly-level.
 
 The `.sq` schema must describe the exact migrated shape, including column order and defaults. As
 part of `check`, the storage assembly verifies the merged sequence from the checked-in snapshots in

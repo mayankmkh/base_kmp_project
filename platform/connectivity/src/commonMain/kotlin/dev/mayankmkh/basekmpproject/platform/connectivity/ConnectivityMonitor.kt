@@ -1,11 +1,14 @@
 package dev.mayankmkh.basekmpproject.platform.connectivity
 
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 
 /**
  * Whether there is a network worth trying.
@@ -17,6 +20,17 @@ import kotlinx.coroutines.flow.map
 fun interface ConnectivityMonitor {
     /** Emits the current answer as soon as it is collected, then again on every change. */
     fun isOnline(): Flow<Boolean>
+}
+
+/**
+ * One platform registration for every collector. The platform monitors are cold flows that register
+ * a system callback per collector; sharing here lets every Capability pass `reconnects()` straight
+ * to its coordinators. `Lazily` keeps the single registration for the app's lifetime, which is also
+ * what makes a late collector's replayed value the current one rather than a stale one.
+ */
+fun ConnectivityMonitor.shared(scope: CoroutineScope): ConnectivityMonitor {
+    val online = isOnline().shareIn(scope, SharingStarted.Lazily, replay = 1)
+    return ConnectivityMonitor { online }
 }
 
 /**

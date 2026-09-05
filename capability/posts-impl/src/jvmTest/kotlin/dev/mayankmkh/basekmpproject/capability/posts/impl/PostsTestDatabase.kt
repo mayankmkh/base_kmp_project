@@ -1,15 +1,10 @@
 package dev.mayankmkh.basekmpproject.capability.posts.impl
 
-import app.cash.sqldelight.async.coroutines.synchronous
-import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.mayankmkh.basekmpproject.capability.posts.impl.db.AppDatabase
+import dev.mayankmkh.basekmpproject.testkit.asProvider
+import dev.mayankmkh.basekmpproject.testkit.inMemorySqliteDriver
 
 internal fun createInMemoryPostsLocalSource(): PostsLocalSource {
-    val driver =
-        JdbcSqliteDriver(
-            url = JdbcSqliteDriver.IN_MEMORY,
-            schema = AppDatabase.Schema.synchronous(),
-        )
-    val database = AppDatabase(driver)
-    return PostsLocalSource(PostsDatabaseProvider { database })
+    val driver = inMemorySqliteDriver(AppDatabase.Schema)
+    return PostsLocalSource(driver.asProvider())
 }

@@ -14,6 +14,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TEMPLATE_ROOT="$SCRIPT_DIR/templates"
 SETTINGS_FILE="$REPO_ROOT/settings.gradle.kts"
+KOIN_APP_FILE="$REPO_ROOT/app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+APP_SHARED_BUILD_FILE="$REPO_ROOT/app/shared/build.gradle.kts"
 GRADLEW="$REPO_ROOT/gradlew"
 
 PACKAGE_ROOT="dev.mayankmkh.basekmpproject"
@@ -214,6 +216,10 @@ create_feature() {
     else
         add_include ":feature:$name"
     fi
+    register_product_module \
+        "import $package.api.${camel}FeatureModule" \
+        "${camel}FeatureModule"
+    add_app_dependency "projects.feature.$(to_camel "$name")"
     next_steps ":feature:$name"
 }
 
@@ -259,8 +265,11 @@ create_capability() {
         add_include ":capability:$name-api"
         add_include ":capability:$name-impl"
     fi
-    info ""
-    info "Next: register ${camel}CapabilityModule in the :app:shared Koin startup."
+    register_product_module \
+        "import $impl_package.${camel}CapabilityModule" \
+        "${camel}CapabilityModule"
+    add_app_dependency "projects.capability.$(to_camel "$name-api")"
+    add_app_dependency "projects.capability.$(to_camel "$name-impl")"
     next_steps ":capability:$name-impl"
 }
 
@@ -323,6 +332,85 @@ add_import() {
         END { if (!done) print new }
     ' "$file" > "$tmp"
     mv "$tmp" "$file"
+}
+
+# Registers a generated public module in the app composition root. `productModules` deliberately
+# keeps one entry per line so this insertion is stable and idempotent.
+register_product_module() {
+    local import_line="$1" module_name="$2"
+
+    if grep -Fqx "        ${module_name}," "$KOIN_APP_FILE"; then
+        info "  KoinApp.kt already loads $module_name"
+        return 0
+    fi
+    if [ "$DRY_RUN" = "1" ]; then
+        info "  would import and load $module_name in KoinApp.kt"
+        return 0
+    fi
+
+    add_import "$KOIN_APP_FILE" "$import_line"
+
+    local tmp
+    tmp="$(mktemp "${TMPDIR:-/tmp}/helix-product-module.XXXXXX")"
+    if ! awk -v entry="        ${module_name}," '
+        $0 == "private val productModules =" { product_modules = 1 }
+        product_modules && $0 == "    )" {
+            print entry
+            inserted = 1
+            product_modules = 0
+        }
+        { print }
+        END { if (!inserted) exit 1 }
+    ' "$KOIN_APP_FILE" > "$tmp"; then
+        rm -f "$tmp"
+        die "could not find the multiline productModules list in KoinApp.kt"
+    fi
+    mv "$tmp" "$KOIN_APP_FILE"
+    info "  KoinApp.kt += $module_name"
+}
+
+# Makes a generated product module available to KoinApp.kt. Product project dependencies are one
+# sorted contiguous group in app/shared/build.gradle.kts, matching the import insertion above.
+add_app_dependency() {
+    local accessor="$1" dependency_line="                implementation(${1})"
+
+    if grep -Fqx "$dependency_line" "$APP_SHARED_BUILD_FILE"; then
+        info "  app/shared already depends on $accessor"
+        return 0
+    fi
+    if [ "$DRY_RUN" = "1" ]; then
+        info "  would add $accessor to app/shared/build.gradle.kts"
+        return 0
+    fi
+
+    local tmp
+    tmp="$(mktemp "${TMPDIR:-/tmp}/helix-app-dependency.XXXXXX")"
+    if ! awk -v new="$dependency_line" '
+        {
+            lines[NR] = $0
+            if ($0 ~ /^                implementation\(projects\.(capability|feature)\./) {
+                last = NR
+                if (!found && $0 > new) {
+                    pos = NR
+                    found = 1
+                }
+            }
+        }
+        END {
+            if (!last) exit 1
+            if (!found) pos = last + 1
+            for (i = 1; i <= NR; i++) {
+                if (i == pos) print new
+                print lines[i]
+            }
+            if (pos == NR + 1) print new
+        }
+    ' "$APP_SHARED_BUILD_FILE" > "$tmp"; then
+        rm -f "$tmp"
+        die "could not find the product dependency group in app/shared/build.gradle.kts"
+    fi
+    mv "$tmp" "$APP_SHARED_BUILD_FILE"
+    info "  app/shared/build.gradle.kts += $accessor"
 }
 
 # Appends the Cell's keyed `viewModel { }` factory to the Feature's Koin module. The module file is
@@ -579,7 +667,10 @@ Usage:
 
   helix-kmp create capability <name> [--dry-run]
       Scaffolds capability/<name>-api (<Name>Queries, <Name>Commands, models) and
-      capability/<name>-impl (internal implementation, Koin module, test).
+      capability/<name>-impl (internal implementation, Koin module, test), then loads its module
+      from the app composition root. A SQLDelight-backed Capability must still be added by hand as
+      both implementation(projects.capability.<name>Impl) and
+      dependency(project(":capability:<name>-impl")) in storage/database/build.gradle.kts.
 
   helix-kmp create cell <feature> <CellName> [--dry-run]
       Adds a Cell -- (id, instanceKey: FeatureInstanceKey, onOutput) -- with its keyed ViewModel,

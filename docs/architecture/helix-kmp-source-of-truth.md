@@ -3209,6 +3209,12 @@ helpers, and builds its generated database once with `LazyDatabase` over the app
 `ConnectivityMonitor.shared(applicationScope)`, so every coordinator takes
 `connectivityMonitor.reconnects()` directly.
 
+**Result types:** state observed over time is a `ResourceObservation`; a one-shot command that
+crosses the Capability API returns the library-free `RefreshOutcome`; typed failures inside an
+implementation use kotlin-result's `Result<T, E>` with a sealed error type (`NetworkFailure` in
+`:foundation:network`, bridged by `commit`). Stdlib `kotlin.Result` and `runCatching` are not used
+in product code; exceptions are reserved for bugs and cancellation.
+
 **RefreshQos semantics:** `CRITICAL_VISIBLE` means the user is blocked on the resource; `VISIBLE`
 means the user is looking at it; `BACKGROUND` is maintenance/reconnect work that must not compete
 with visible work; and `PREFETCH` is speculative and may be dropped. `ANY_NETWORK` permits any

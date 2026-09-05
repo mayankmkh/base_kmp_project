@@ -1,10 +1,14 @@
 package __PACKAGE__
 
 import app.cash.turbine.test
+import com.github.michaelbull.result.Err
+import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.Result
 import __API_PACKAGE__.__NAME__Id
 import __API_PACKAGE__.__NAME__Record
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceOperation
+import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
@@ -26,12 +30,12 @@ import kotlinx.coroutines.test.runTest
 // coordinator are the real ones. `gate` holds a fetch open so a test can observe the in-flight
 // state before the result lands.
 private class Fake__NAME__RemoteSource : __NAME__RemoteSource {
-    var result: Result<List<__NAME__Record>> = Result.success(RECORDS)
+    var result: Result<List<__NAME__Record>, ResourceProblem> = Ok(RECORDS)
     var gate: CompletableDeferred<Unit>? = null
     var fetchCount: Int = 0
         private set
 
-    override suspend fun fetchAll(): Result<List<__NAME__Record>> {
+    override suspend fun fetchAll(): Result<List<__NAME__Record>, ResourceProblem> {
         fetchCount++
         gate?.await()
         return result
@@ -39,6 +43,7 @@ private class Fake__NAME__RemoteSource : __NAME__RemoteSource {
 }
 
 private val RECORDS = listOf(__NAME__Record(__NAME__Id("1"), "__name__ 1"))
+private val TEMPORARY = ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true)
 
 class __NAME__CapabilityImplTest {
     private val dispatcher = UnconfinedTestDispatcher()
@@ -70,7 +75,7 @@ class __NAME__CapabilityImplTest {
         runTest(dispatcher) {
             val remote = Fake__NAME__RemoteSource()
             remote.gate = CompletableDeferred()
-            remote.result = Result.failure(IllegalStateException())
+            remote.result = Err(TEMPORARY)
             val capability = capability(remote)
 
             capability.observeAll().test {
@@ -82,7 +87,7 @@ class __NAME__CapabilityImplTest {
                 val problem = assertIs<ResourceOperation.Failed>(failed.operation).problem
                 assertEquals(ResourceProblemCategory.TEMPORARY, problem.category)
 
-                remote.result = Result.success(RECORDS)
+                remote.result = Ok(RECORDS)
                 assertSame(RefreshOutcome.Succeeded, capability.refresh())
                 // The rows land while the retry is still in flight, so only the final item matters.
                 val recovered = expectMostRecentItem()

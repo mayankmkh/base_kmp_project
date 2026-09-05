@@ -1,5 +1,6 @@
 package __PACKAGE__
 
+import com.github.michaelbull.result.fold
 import __API_PACKAGE__.__NAME__Commands
 import __API_PACKAGE__.__NAME__Id
 import __API_PACKAGE__.__NAME__Queries
@@ -7,8 +8,6 @@ import __API_PACKAGE__.__NAME__Record
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.foundation.resource.runtime.SyncCoordinator
 import dev.mayankmkh.basekmpproject.foundation.resource.runtime.observations
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
@@ -72,11 +71,11 @@ internal class __NAME__CapabilityImpl(
     private suspend fun synchronize(): RefreshOutcome {
         val fetched = remoteSource.fetchAll()
         return fetched.fold(
-            onSuccess = { records ->
+            success = { records ->
                 localSource.replaceAll(records)
                 RefreshOutcome.Succeeded
             },
-            onFailure = { RefreshOutcome.Failed(FetchFailed) },
+            failure = { RefreshOutcome.Failed(it) },
         )
     }
 }
@@ -85,4 +84,3 @@ internal class __NAME__CapabilityImpl(
 // `commit { localSource.write(it) }` from `:foundation:resource-runtime`; `commit` maps failures
 // with `toResourceProblem()`. Only an `OFFLINE` failure is retried when connectivity returns, so a
 // real mapping must report offline transport failures as such.
-private val FetchFailed = ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true)

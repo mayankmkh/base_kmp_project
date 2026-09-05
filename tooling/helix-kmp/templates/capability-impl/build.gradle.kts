@@ -27,6 +27,7 @@ kotlin {
                 implementation(projects.foundation.resourceRuntime)
                 implementation(projects.foundation.runtime)
                 implementation(projects.platform.connectivity)
+                implementation(libs.michael.bull.kotlin.result)
             }
         }
     }

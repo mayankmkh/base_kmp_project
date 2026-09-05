@@ -6,3 +6,7 @@ import kotlin.jvm.JvmInline
 @JvmInline public value class __NAME__Id(public val value: String)
 
 public data class __NAME__Record(val id: __NAME__Id, val label: String)
+
+public enum class __NAME__Field {
+    LABEL
+}

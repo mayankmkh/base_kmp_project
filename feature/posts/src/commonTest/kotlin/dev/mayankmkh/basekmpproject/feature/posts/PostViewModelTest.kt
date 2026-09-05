@@ -5,9 +5,9 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostDetailOutput
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostFeedOutput
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.testkit.FakePostsCommands
 import dev.mayankmkh.basekmpproject.testkit.FakePostsQueries
 import dev.mayankmkh.basekmpproject.testkit.PostsFixtures
@@ -38,10 +38,10 @@ class PostViewModelTest {
     fun `feed refresh failure emits ui command while stream failure only updates state`() =
         runMainTest {
             val queries = FakePostsQueries()
-            val problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true)
+            val problem = Problem(ProblemKind.OFFLINE)
             val commands =
                 FakePostsCommands().apply {
-                    onRefreshFeed = { RefreshOutcome.Failed(problem) }
+                    onRefreshFeed = { Outcome.Failed(problem) }
                 }
             val viewModel = PostFeedViewModel(feedKey(), queries, commands)
 
@@ -51,16 +51,15 @@ class PostViewModelTest {
                 viewModel.uiCommands.test {
                     viewModel.onAction(PostFeedAction.Refresh)
                     assertEquals(
-                        ResourceProblemCategory.OFFLINE,
-                        assertIs<PostFeedUiCommand.ShowRefreshFailed>(awaitItem()).category,
+                        ProblemKind.OFFLINE,
+                        assertIs<PostFeedUiCommand.ShowRefreshFailed>(awaitItem()).kind,
                     )
                     assertEquals(1, commands.feedRefreshCount)
 
                     queries.feed.value =
                         ResourceObservationFixtures.failed(
                             value = PostsFixtures.feed(),
-                            category = ResourceProblemCategory.OFFLINE,
-                            retryable = true,
+                            kind = ProblemKind.OFFLINE,
                         )
                     val failed = this@state.awaitItem()
                     assertEquals(PostsFixtures.feed().posts, failed.posts)
@@ -77,9 +76,7 @@ class PostViewModelTest {
         val commands =
             FakePostsCommands().apply {
                 onRefreshPost = { _, _ ->
-                    RefreshOutcome.Failed(
-                        ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true)
-                    )
+                    Outcome.Failed(Problem(ProblemKind.SERVER))
                 }
             }
         val post = PostsFixtures.post(2)
@@ -91,13 +88,31 @@ class PostViewModelTest {
             viewModel.onAction(PostDetailAction.Retry)
             viewModel.uiCommands.test {
                 assertEquals(
-                    ResourceProblemCategory.TEMPORARY,
-                    assertIs<PostDetailUiCommand.ShowRefreshFailed>(awaitItem()).category,
+                    ProblemKind.SERVER,
+                    assertIs<PostDetailUiCommand.ShowRefreshFailed>(awaitItem()).kind,
                 )
             }
             assertEquals(listOf(post.id), commands.postRefreshes)
             viewModel.onAction(PostDetailAction.Back)
             viewModel.outputs.test { assertEquals(PostDetailOutput.Back, awaitItem()) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `detail maps confirmed absence without treating it as a failure`() = runMainTest {
+        val queries = FakePostsQueries()
+        val post = PostsFixtures.post(2)
+        val viewModel = PostDetailViewModel(post.id, detailKey(), queries, FakePostsCommands())
+
+        viewModel.state.test {
+            awaitItem()
+            awaitItem()
+            queries.emitPost(post.id, ResourceObservationFixtures.absent())
+
+            val absent = awaitItem()
+            assertEquals(true, absent.isAbsent)
+            assertEquals(null, absent.problem)
             cancelAndIgnoreRemainingEvents()
         }
     }

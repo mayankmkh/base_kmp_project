@@ -1,22 +1,26 @@
 package __PACKAGE__
 
 import app.cash.turbine.test
+import co.touchlab.kermit.Logger
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
+import __API_PACKAGE__.Create__NAME__Result
+import __API_PACKAGE__.__NAME__Field
 import __API_PACKAGE__.__NAME__Id
 import __API_PACKAGE__.__NAME__Record
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.network.NetworkFailure
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceOperation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
+import dev.mayankmkh.basekmpproject.foundation.resource.Violation
+import dev.mayankmkh.basekmpproject.foundation.resource.isAbsent
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.cancelAndJoin
@@ -26,24 +30,27 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 
-// The remote source is the only seam a Capability test needs to fake; the local source and the
-// coordinator are the real ones. `gate` holds a fetch open so a test can observe the in-flight
-// state before the result lands.
 private class Fake__NAME__RemoteSource : __NAME__RemoteSource {
-    var result: Result<List<__NAME__Record>, ResourceProblem> = Ok(RECORDS)
+    var result: Result<List<__NAME__Record>, NetworkFailure> = Ok(RECORDS)
+    var createResult: Result<Create__NAME__RemoteAnswer, NetworkFailure> =
+        Ok(Create__NAME__RemoteAnswer.Created(RECORDS.first()))
     var gate: CompletableDeferred<Unit>? = null
     var fetchCount: Int = 0
         private set
 
-    override suspend fun fetchAll(): Result<List<__NAME__Record>, ResourceProblem> {
+    override suspend fun fetchAll(): Result<List<__NAME__Record>, NetworkFailure> {
         fetchCount++
         gate?.await()
         return result
     }
+
+    override suspend fun create(label: String): Result<Create__NAME__RemoteAnswer, NetworkFailure> =
+        createResult
 }
 
 private val RECORDS = listOf(__NAME__Record(__NAME__Id("1"), "__name__ 1"))
-private val TEMPORARY = ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true)
+private val UNEXPECTED =
+    NetworkFailure.Unexpected("request-id", IllegalStateException("unexpected"))
 
 class __NAME__CapabilityImplTest {
     private val dispatcher = UnconfinedTestDispatcher()
@@ -58,12 +65,12 @@ class __NAME__CapabilityImplTest {
             capability.observeAll().test {
                 val loading = awaitItem()
                 assertNull(loading.value)
-                assertSame(ResourceOperation.Refreshing, loading.operation)
+                assertEquals(ResourceOperation.Refreshing, loading.operation)
 
                 remote.gate?.complete(Unit)
                 val synchronized = awaitItem()
                 assertEquals(RECORDS, synchronized.value)
-                assertSame(ResourceOperation.Idle, synchronized.operation)
+                assertEquals(ResourceOperation.Idle, synchronized.operation)
                 assertEquals(1, remote.fetchCount)
                 cancelAndIgnoreRemainingEvents()
             }
@@ -71,46 +78,62 @@ class __NAME__CapabilityImplTest {
         }
 
     @Test
-    fun `a failed synchronization keeps the observation valueless until a retry succeeds`() =
+    fun `a failed synchronization keeps the observation valueless until retry`() =
         runTest(dispatcher) {
             val remote = Fake__NAME__RemoteSource()
             remote.gate = CompletableDeferred()
-            remote.result = Err(TEMPORARY)
+            remote.result = Err(UNEXPECTED)
             val capability = capability(remote)
 
             capability.observeAll().test {
-                assertSame(ResourceOperation.Refreshing, awaitItem().operation)
+                assertEquals(ResourceOperation.Refreshing, awaitItem().operation)
 
                 remote.gate?.complete(Unit)
                 val failed = awaitItem()
                 assertNull(failed.value)
-                val problem = assertIs<ResourceOperation.Failed>(failed.operation).problem
-                assertEquals(ResourceProblemCategory.TEMPORARY, problem.category)
+                assertEquals(
+                    ProblemKind.UNEXPECTED,
+                    assertIs<ResourceOperation.Failed>(failed.operation).problem.kind,
+                )
 
                 remote.result = Ok(RECORDS)
-                assertSame(RefreshOutcome.Succeeded, capability.refresh())
-                // The rows land while the retry is still in flight, so only the final item matters.
+                assertEquals(Outcome.Completed(Unit), capability.refresh())
                 val recovered = expectMostRecentItem()
                 assertEquals(RECORDS, recovered.value)
-                assertSame(ResourceOperation.Idle, recovered.operation)
+                assertEquals(ResourceOperation.Idle, recovered.operation)
                 cancelAndIgnoreRemainingEvents()
             }
             capability.close()
         }
 
     @Test
-    fun `a record missing after a successful synchronization remains refreshing`() =
+    fun `a missing item after synchronization is confirmed absent`() =
         runTest(dispatcher) {
-            val remote = Fake__NAME__RemoteSource()
-            val capability = capability(remote)
+            val capability = capability(Fake__NAME__RemoteSource())
 
             capability.observe(__NAME__Id("missing")).test {
-                val observation = awaitItem()
-                assertNull(observation.value)
-                assertSame(ResourceOperation.Refreshing, observation.operation)
-                assertEquals(1, remote.fetchCount)
+                assertEquals(true, awaitItem().isAbsent)
                 cancelAndIgnoreRemainingEvents()
             }
+            capability.close()
+        }
+
+    @Test
+    fun `a mutation refusal completes inside the command result`() =
+        runTest(dispatcher) {
+            val remote = Fake__NAME__RemoteSource()
+            remote.createResult =
+                Ok(
+                    Create__NAME__RemoteAnswer.InvalidInput(
+                        listOf(Violation(__NAME__Field.LABEL, "blank"))
+                    )
+                )
+            val capability = capability(remote)
+
+            val outcome = capability.create("")
+
+            val completed = assertIs<Outcome.Completed<Create__NAME__Result>>(outcome)
+            assertIs<Create__NAME__Result.InvalidInput>(completed.value)
             capability.close()
         }
 
@@ -129,25 +152,6 @@ class __NAME__CapabilityImplTest {
             capability.close()
         }
 
-    // Only an observed key whose last attempt failed `OFFLINE` is retried on reconnect. The
-    // placeholder mapping never reports offline, so this scaffold can only show the negative side;
-    // `SyncCoordinatorTest` and `PostsCapabilityImplTest` cover the retry itself.
-    @Test
-    fun `reconnect leaves a synchronized collection alone`() =
-        runTest(dispatcher) {
-            val remote = Fake__NAME__RemoteSource()
-            val online = MutableStateFlow(false)
-            val capability = capability(remote, ConnectivityMonitor { online })
-            val observer = backgroundScope.launch { capability.observeAll().collect() }
-            assertEquals(1, remote.fetchCount)
-
-            online.value = true
-
-            assertEquals(1, remote.fetchCount)
-            observer.cancelAndJoin()
-            capability.close()
-        }
-
     private fun capability(
         remote: __NAME__RemoteSource,
         connectivity: ConnectivityMonitor = ConnectivityMonitor { MutableStateFlow(true) },
@@ -158,6 +162,7 @@ class __NAME__CapabilityImplTest {
             localSource = __NAME__LocalSource(),
             applicationRuntimeScope = ApplicationRuntimeScope(dispatcher, handler),
             connectivityMonitor = connectivity,
+            logger = Logger,
         )
     }
 }

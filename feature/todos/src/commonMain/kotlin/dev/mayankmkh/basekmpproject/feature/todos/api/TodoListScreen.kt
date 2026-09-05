@@ -9,10 +9,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mayankmkh.basekmpproject.feature.todos.TodoListContent
 import dev.mayankmkh.basekmpproject.feature.todos.TodoListViewModel
 import dev.mayankmkh.basekmpproject.feature.todos.TodosUiCommand
-import dev.mayankmkh.basekmpproject.feature.todos.messageResource
 import dev.mayankmkh.basekmpproject.foundation.presentation.CellPlacementId
 import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -32,7 +32,7 @@ public fun TodoListScreen(
     CollectWhileStarted(viewModel.uiCommands) { command ->
         when (command) {
             is TodosUiCommand.ShowFailure ->
-                snackbarHostState.showSnackbar(getString(command.category.messageResource()))
+                snackbarHostState.showSnackbar(getString(command.kind.messageResource()))
         }
     }
 

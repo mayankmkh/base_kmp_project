@@ -1,18 +1,19 @@
 package __PACKAGE__
 
 import app.cash.turbine.test
+import __CAP_PACKAGE__.Create__CAP_NAME__Result
 import __CAP_PACKAGE__.__CAP_NAME__Commands
 import __CAP_PACKAGE__.__CAP_NAME__Id
 import __CAP_PACKAGE__.__CAP_NAME__Queries
 import __CAP_PACKAGE__.__CAP_NAME__Record
 import __PACKAGE__.api.__NAME__Output
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind.OFFLINE
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind.SERVER
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory.OFFLINE
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory.TEMPORARY
 import dev.mayankmkh.basekmpproject.testkit.ResourceObservationFixtures
 import dev.mayankmkh.basekmpproject.testkit.runMainTest
 import kotlin.test.Test
@@ -32,7 +33,7 @@ private class Fake__CAP_NAME__ : __CAP_NAME__Queries, __CAP_NAME__Commands {
     var refreshCount: Int = 0
         private set
 
-    var refreshOutcome: RefreshOutcome = RefreshOutcome.Succeeded
+    var refreshOutcome: Outcome<Unit> = Outcome.Completed(Unit)
 
     override fun observeAll(): Flow<ResourceObservation<List<__CAP_NAME__Record>>> = all
 
@@ -40,10 +41,13 @@ private class Fake__CAP_NAME__ : __CAP_NAME__Queries, __CAP_NAME__Commands {
         return one
     }
 
-    override suspend fun refresh(qos: RefreshQos): RefreshOutcome {
+    override suspend fun refresh(qos: RefreshQos): Outcome<Unit> {
         refreshCount++
         return refreshOutcome
     }
+
+    override suspend fun create(label: String): Outcome<Create__CAP_NAME__Result> =
+        error("Unused in this Feature test")
 }
 
 class __NAME__ViewModelTest {
@@ -68,13 +72,13 @@ class __NAME__ViewModelTest {
     @Test
     fun `a failed observation becomes state and not a message`() = runMainTest {
         val capability = Fake__CAP_NAME__()
-        capability.one.value = ResourceObservationFixtures.failed(category = OFFLINE)
+        capability.one.value = ResourceObservationFixtures.failed(kind = OFFLINE)
 
         val viewModel = viewModel(capability)
 
         viewModel.state.test {
             awaitItem()
-            assertEquals(OFFLINE, awaitItem().problem?.category)
+            assertEquals(OFFLINE, awaitItem().problem?.kind)
             cancelAndIgnoreRemainingEvents()
         }
         viewModel.uiCommands.test { expectNoEvents() }
@@ -83,8 +87,7 @@ class __NAME__ViewModelTest {
     @Test
     fun `refresh asks the capability to synchronize`() = runMainTest {
         val capability = Fake__CAP_NAME__()
-        capability.refreshOutcome =
-            RefreshOutcome.Failed(ResourceProblem(TEMPORARY, retryable = true))
+        capability.refreshOutcome = Outcome.Failed(Problem(SERVER))
         val viewModel = viewModel(capability)
 
         viewModel.onAction(__NAME__Action.Refresh)

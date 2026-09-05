@@ -5,6 +5,34 @@ decisions: [helix-adoption-plan.md](helix-adoption-plan.md) §5–§6. Date: 202
 The adoption was committed on 2026-09-02 as seven commits on `main`; those commits remain
 unpushed. This report now also records the subsequent P1 control-plane working-tree change.
 
+## Command results (2026-09-06)
+
+- `foundation/resource/.../Outcome.kt` owns the library-free `Outcome<T>`, `Problem`,
+  `ProblemKind` and `Violation<F>` contracts. Its exhaustiveness test covers both sealed/enum
+  branches without `else`.
+- `capability/posts-api/.../PostsCapability.kt` and
+  `capability/todos-api/.../TodosCapability.kt` demonstrate that every command returns one
+  `Outcome<T>`, including `Outcome<Unit>` for commands with no domain result.
+- `TodosCapability.kt` demonstrates refusals inside command-specific completed result types:
+  create has `Created | InvalidInput`, update has `Updated | NotFound | InvalidInput`, and delete
+  has `Deleted | NotFound`. None has an infrastructure-failure case.
+- `TodosRemoteSource.kt` maps endpoint 404 and 422 answers into implementation-only answer values
+  before the bridge. `PostsRemoteSource.kt` maps a detail 404 the same way. Unmapped statuses stay
+  `NetworkFailure` values.
+- `foundation/resource-runtime/.../NetworkFailureProblems.kt` is the sole generic classification
+  and logging bridge. It maps every `NetworkFailure` kind to `Problem`, preserves the request id,
+  logs exactly once, uses error severity only for `UNEXPECTED`, and emits no log for completion or
+  refusal. `NetworkFailureProblemsTest` proves the mapping, severity and structured fields.
+- `foundation/network/.../SafeCall.kt` and `Client.kt` keep kotlin-result and transport details
+  inside implementations while attaching the final attempt's `X-Request-Id` to every failure
+  kind. `SafeCallTest` covers HTTP, transport, decoding and unexpected request ids plus
+  cancellation.
+- `ui/design-system/.../Failure.kt` owns generic problem strings and maps every `ProblemKind`.
+  Server display text remains on `Violation.message`; feature ViewModels map only stable kinds.
+- `ResourceObservation.kt` defines confirmed absence as a null value with `Idle`. Posts and Todos
+  item syncs delete their durable rows on 404; `TodosCapabilityImplTest`, `PostViewModelTest` and
+  `TodosViewModelTest` prove persistence and presentation behavior.
+
 ## Sync coordinator replaces the owned Snapshot runtime (2026-09-05)
 
 On 2026-09-05, phase 1 of Capability boilerplate reduction extracted the reusable asynchronous
@@ -248,9 +276,9 @@ module/file/type reverse-dependency slice; this narrative remains the adoption-t
 
 ## Public API/ABI changes
 
-- **New public surfaces**: `ResourceObservation`, `ResourceFreshness` (removed 2026-09-05), `ResourceOperation`,
-  `ResourceProblem`, `ResourceProblemCategory`, `RefreshQos`, `RefreshPriority`,
-  `NetworkPreference` (`:foundation:resource`); `ApplicationRuntimeScope`
+- **New public surfaces**: `ResourceObservation`, `ResourceOperation`, `Outcome`, `Problem`,
+  `ProblemKind`, `Violation`, `RefreshQos`, `RefreshPriority`, `NetworkPreference`
+  (`:foundation:resource`); `ApplicationRuntimeScope`
   (`:foundation:runtime`); `FeatureInstanceKey`, `CellPlacementId`, `CellSpec`,
   `StatefulLazyItem`, `KeyedOwnerHost`, `rememberViewportKeys`
   (`:foundation:presentation`); `PostId`, `Post`, `PostFeed`, `PostsQueries`, `PostsCommands`
@@ -335,9 +363,9 @@ Fixed in phase 6 (details in the plan §6 phase 6 row):
 
 Historical resource design-review follow-up (2026-09-03, superseded 2026-09-04):
 
-- Commands now return `RefreshOutcome`; `StoreResource` moved to
-  `:foundation:resource-store5`; transport classification is typed in `:foundation:network`; and
-  `ResourceProblem.message` was removed.
+- Refresh commands gained an explicit attempt result; `StoreResource` moved to
+  `:foundation:resource-store5`; transport classification became typed in `:foundation:network`;
+  and display messages were removed from infrastructure problems.
 - The Store5 adapter records QoS but executes every class immediately because no scheduler exists
   yet, and it always demotes a cached value to `STALE` on failure.
 - The adapter gates source-of-truth collection on subscribers with a grace timeout. Posts detail

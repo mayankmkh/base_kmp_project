@@ -1,7 +1,7 @@
 package dev.mayankmkh.basekmpproject.capability.todos.impl
 
+import co.touchlab.kermit.Logger
 import com.github.michaelbull.result.Result
-import com.github.michaelbull.result.fold
 import dev.mayankmkh.basekmpproject.capability.todos.api.CreateTodoResult
 import dev.mayankmkh.basekmpproject.capability.todos.api.DeleteTodoResult
 import dev.mayankmkh.basekmpproject.capability.todos.api.Todo
@@ -10,22 +10,25 @@ import dev.mayankmkh.basekmpproject.capability.todos.api.TodoField
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoId
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoList
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSettings
-import dev.mayankmkh.basekmpproject.capability.todos.api.TodoViolation
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodosCommands
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodosQueries
 import dev.mayankmkh.basekmpproject.capability.todos.api.UpdateTodoResult
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.network.NetworkFailure
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
+import dev.mayankmkh.basekmpproject.foundation.resource.Violation
 import dev.mayankmkh.basekmpproject.foundation.resource.runtime.SyncCoordinator
 import dev.mayankmkh.basekmpproject.foundation.resource.runtime.commit
 import dev.mayankmkh.basekmpproject.foundation.resource.runtime.observations
+import dev.mayankmkh.basekmpproject.foundation.resource.runtime.toOutcome
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.reconnects
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 
@@ -35,30 +38,33 @@ internal class TodosCapabilityImpl(
     private val settingsSource: TodosSettingsSource,
     applicationRuntimeScope: ApplicationRuntimeScope,
     connectivityMonitor: ConnectivityMonitor,
+    private val logger: Logger,
 ) : TodosQueries, TodosCommands, AutoCloseable {
     private val scope = applicationRuntimeScope.childScope("todos")
     private val listSync =
         SyncCoordinator<Unit>(
             scope,
-            sync = { _, _ -> syncTodos(remoteSource, localSource) },
+            sync = { _, _ -> syncTodos(remoteSource, localSource, logger) },
             retryTriggers = connectivityMonitor.reconnects(),
         )
     private val itemSync =
         SyncCoordinator<TodoId>(
             scope,
-            sync = { id, _ -> syncTodo(remoteSource, localSource, id) },
+            sync = { id, _ -> syncTodo(remoteSource, localSource, logger, id) },
             retryTriggers = connectivityMonitor.reconnects(),
         )
 
     override fun observeTodos(): Flow<ResourceObservation<TodoList>> =
         listSync.observations(
             Unit,
-            settingsSource.observe().flatMapLatest { settings ->
-                combine(localSource.observeTodos(settings), localSource.observeInitialized()) {
-                    todos,
-                    initialized ->
-                    if (initialized) TodoList(todos.map(TodoEntity::toTodo)) else null
-                }
+            combine(
+                settingsSource
+                    .observe()
+                    .distinctUntilChanged()
+                    .flatMapLatest(localSource::observeTodos),
+                localSource.observeInitialized(),
+            ) { todos, initialised ->
+                if (initialised) TodoList(todos.map(TodoEntity::toTodo)) else null
             },
         )
 
@@ -67,14 +73,16 @@ internal class TodosCapabilityImpl(
 
     override fun observeSettings(): Flow<TodoSettings> = settingsSource.observe()
 
-    override suspend fun refreshTodos(qos: RefreshQos): RefreshOutcome = listSync.sync(Unit, qos)
+    override suspend fun refreshTodos(qos: RefreshQos): Outcome<Unit> = listSync.sync(Unit, qos)
 
-    override suspend fun refreshTodo(id: TodoId, qos: RefreshQos): RefreshOutcome =
+    override suspend fun refreshTodo(id: TodoId, qos: RefreshQos): Outcome<Unit> =
         itemSync.sync(id, qos)
 
-    override suspend fun createTodo(draft: TodoDraft): CreateTodoResult {
+    override suspend fun createTodo(draft: TodoDraft): Outcome<CreateTodoResult> {
         val violations = validate(draft.title, draft.ownerId)
-        if (violations.isNotEmpty()) return CreateTodoResult.InvalidInput(violations)
+        if (violations.isNotEmpty()) {
+            return Outcome.Completed(CreateTodoResult.InvalidInput(violations))
+        }
 
         val id = localSource.allocateLocalId()
         val optimistic =
@@ -86,62 +94,72 @@ internal class TodosCapabilityImpl(
                 localCreated = 1,
             )
         localSource.upsert(optimistic)
-        return remoteSource
-            .createTodo(draft.copy(title = optimistic.title))
-            .fold(
-                success = { response ->
-                    val confirmed = response.toEntity(id = id, localCreated = 1)
+        return remoteSource.createTodo(draft.copy(title = optimistic.title)).toOutcome(
+            logger = logger,
+            operation = CreateOperation,
+            onFailure = { localSource.delete(id) },
+        ) { answer ->
+            when (answer) {
+                is CreateTodoRemoteAnswer.Created -> {
+                    val confirmed = answer.todo.toEntity(id = id, localCreated = 1)
                     if (confirmed != optimistic) localSource.upsert(confirmed)
                     CreateTodoResult.Created(id)
-                },
-                failure = { failure ->
+                }
+                is CreateTodoRemoteAnswer.InvalidInput -> {
                     localSource.delete(id)
-                    when (failure) {
-                        is TodoRemoteFailure.InvalidInput ->
-                            CreateTodoResult.InvalidInput(failure.violations)
-                        is TodoRemoteFailure.NotFound,
-                        is TodoRemoteFailure.Infrastructure ->
-                            CreateTodoResult.Failed(failure.problem)
-                    }
-                },
-            )
+                    CreateTodoResult.InvalidInput(answer.violations)
+                }
+            }
+        }
     }
 
-    override suspend fun setCompleted(id: TodoId, completed: Boolean): UpdateTodoResult =
-        updateTodo(localSource, id, transform = { it.copy(completed = completed.toLong()) }) {
+    override suspend fun setCompleted(
+        id: TodoId,
+        completed: Boolean,
+    ): Outcome<UpdateTodoResult> =
+        localSource.updateTodo(
+            id,
+            CompleteOperation,
+            logger,
+            transform = { it.copy(completed = completed.toLong()) },
+        ) {
             remoteSource.setCompleted(id.value, completed)
         }
 
-    override suspend fun renameTodo(id: TodoId, title: String): UpdateTodoResult {
+    override suspend fun renameTodo(id: TodoId, title: String): Outcome<UpdateTodoResult> {
         val violations = validateTitle(title)
-        if (violations.isNotEmpty()) return UpdateTodoResult.InvalidInput(violations)
+        if (violations.isNotEmpty()) {
+            return Outcome.Completed(UpdateTodoResult.InvalidInput(violations))
+        }
         val trimmed = title.trim()
-        return updateTodo(localSource, id, transform = { it.copy(title = trimmed) }) {
+        return localSource.updateTodo(
+            id,
+            RenameOperation,
+            logger,
+            transform = { it.copy(title = trimmed) },
+        ) {
             remoteSource.renameTodo(id.value, trimmed)
         }
     }
 
-    override suspend fun deleteTodo(id: TodoId): DeleteTodoResult {
-        val previous = localSource.find(id) ?: return DeleteTodoResult.NotFound
+    override suspend fun deleteTodo(id: TodoId): Outcome<DeleteTodoResult> {
+        val previous = localSource.find(id) ?: return Outcome.Completed(DeleteTodoResult.NotFound)
         localSource.delete(id)
-        return remoteSource
-            .deleteTodo(id.value)
-            .fold(
-                success = { DeleteTodoResult.Deleted },
-                failure = { failure ->
-                    localSource.upsert(previous)
-                    when (failure) {
-                        is TodoRemoteFailure.NotFound -> DeleteTodoResult.NotFound
-                        is TodoRemoteFailure.InvalidInput,
-                        is TodoRemoteFailure.Infrastructure ->
-                            DeleteTodoResult.Failed(failure.problem)
-                    }
-                },
-            )
+        return remoteSource.deleteTodo(id.value).toOutcome(
+            logger = logger,
+            operation = DeleteOperation,
+            onFailure = { localSource.upsert(previous) },
+        ) { answer ->
+            when (answer) {
+                DeleteTodoRemoteAnswer.Deleted -> DeleteTodoResult.Deleted
+                DeleteTodoRemoteAnswer.NotFound -> DeleteTodoResult.NotFound
+            }
+        }
     }
 
-    override suspend fun updateSettings(settings: TodoSettings) {
+    override suspend fun updateSettings(settings: TodoSettings): Outcome<Unit> {
         settingsSource.update(settings)
+        return Outcome.Completed(Unit)
     }
 
     override fun close() {
@@ -149,19 +167,76 @@ internal class TodosCapabilityImpl(
     }
 }
 
-private fun validate(title: String, ownerId: Long): List<TodoViolation> =
+private suspend fun TodosLocalSource.updateTodo(
+    id: TodoId,
+    operation: String,
+    logger: Logger,
+    transform: (TodoEntity) -> TodoEntity,
+    send: suspend () -> Result<UpdateTodoRemoteAnswer, NetworkFailure>,
+): Outcome<UpdateTodoResult> {
+    val previous = find(id) ?: return Outcome.Completed(UpdateTodoResult.NotFound)
+    val optimistic = transform(previous)
+    upsert(optimistic)
+    return send().toOutcome(
+        logger = logger,
+        operation = operation,
+        onFailure = { upsert(previous) },
+    ) { answer ->
+        when (answer) {
+            is UpdateTodoRemoteAnswer.Updated -> {
+                val confirmed = answer.todo.toEntity(id, previous.localCreated)
+                if (confirmed != optimistic) upsert(confirmed)
+                UpdateTodoResult.Updated
+            }
+            UpdateTodoRemoteAnswer.NotFound -> {
+                delete(id)
+                UpdateTodoResult.NotFound
+            }
+            is UpdateTodoRemoteAnswer.InvalidInput -> {
+                upsert(previous)
+                UpdateTodoResult.InvalidInput(answer.violations)
+            }
+        }
+    }
+}
+
+private suspend fun syncTodos(
+    remoteSource: TodosRemoteSource,
+    localSource: TodosLocalSource,
+    logger: Logger,
+): Outcome<Unit> =
+    remoteSource.getTodos().commit(logger, ListRefreshOperation) { todos ->
+        localSource.replaceFromServer(todos.map { it.toEntity(localCreated = 0) })
+    }
+
+private suspend fun syncTodo(
+    remoteSource: TodosRemoteSource,
+    localSource: TodosLocalSource,
+    logger: Logger,
+    id: TodoId,
+): Outcome<Unit> =
+    remoteSource.getTodo(id.value).commit(logger, DetailRefreshOperation) { answer ->
+        when (answer) {
+            is TodoReadAnswer.Found -> {
+                val localCreated = localSource.find(id)?.localCreated ?: 0
+                localSource.upsert(answer.todo.toEntity(id, localCreated))
+            }
+            TodoReadAnswer.NotFound -> localSource.delete(id)
+        }
+    }
+
+private fun validate(title: String, ownerId: Long): List<Violation<TodoField>> =
     validateTitle(title) +
         if (ownerId <= 0) {
-            listOf(TodoViolation(TodoField.OWNER_ID, "invalid_owner", message = null))
+            listOf(Violation(TodoField.OWNER_ID, "invalid_owner"))
         } else {
             emptyList()
         }
 
-private fun validateTitle(title: String): List<TodoViolation> =
+private fun validateTitle(title: String): List<Violation<TodoField>> =
     when {
-        title.isBlank() -> listOf(TodoViolation(TodoField.TITLE, "blank", message = null))
-        title.length > MaxTitleLength ->
-            listOf(TodoViolation(TodoField.TITLE, "too_long", message = null))
+        title.isBlank() -> listOf(Violation(TodoField.TITLE, "blank"))
+        title.length > MaxTitleLength -> listOf(Violation(TodoField.TITLE, "too_long"))
         else -> emptyList()
     }
 
@@ -172,52 +247,10 @@ private fun TodoDto.toEntity(
 
 private fun TodoEntity.toTodo() = Todo(TodoId(id), ownerId, title, completed != 0L)
 
-private suspend fun updateTodo(
-    localSource: TodosLocalSource,
-    id: TodoId,
-    transform: (TodoEntity) -> TodoEntity,
-    send: suspend () -> Result<TodoDto, TodoRemoteFailure>,
-): UpdateTodoResult {
-    val previous = localSource.find(id) ?: return UpdateTodoResult.NotFound
-    val optimistic = transform(previous)
-    localSource.upsert(optimistic)
-    return send()
-        .fold(
-            success = { response ->
-                // An echoing backend confirms exactly what was written; skip the no-op write and
-                // the query re-runs it would trigger.
-                val confirmed = response.toEntity(id, previous.localCreated)
-                if (confirmed != optimistic) localSource.upsert(confirmed)
-                UpdateTodoResult.Updated
-            },
-            failure = { failure ->
-                localSource.upsert(previous)
-                when (failure) {
-                    is TodoRemoteFailure.NotFound -> UpdateTodoResult.NotFound
-                    is TodoRemoteFailure.InvalidInput ->
-                        UpdateTodoResult.InvalidInput(failure.violations)
-                    is TodoRemoteFailure.Infrastructure -> UpdateTodoResult.Failed(failure.problem)
-                }
-            },
-        )
-}
-
-private suspend fun syncTodos(
-    remoteSource: TodosRemoteSource,
-    localSource: TodosLocalSource,
-): RefreshOutcome =
-    remoteSource.getTodos().commit { todos ->
-        localSource.replaceFromServer(todos.map { it.toEntity(localCreated = 0) })
-    }
-
-private suspend fun syncTodo(
-    remoteSource: TodosRemoteSource,
-    localSource: TodosLocalSource,
-    id: TodoId,
-): RefreshOutcome =
-    remoteSource.getTodo(id.value).commit { remote ->
-        val localCreated = localSource.find(id)?.localCreated ?: 0
-        localSource.upsert(remote.toEntity(id, localCreated))
-    }
-
+private const val ListRefreshOperation = "todos.list.refresh"
+private const val DetailRefreshOperation = "todos.detail.refresh"
+private const val CreateOperation = "todos.create"
+private const val CompleteOperation = "todos.complete"
+private const val RenameOperation = "todos.rename"
+private const val DeleteOperation = "todos.delete"
 private const val MaxTitleLength = 200

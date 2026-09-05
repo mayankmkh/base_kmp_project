@@ -11,6 +11,7 @@ kotlin {
                 api(projects.foundation.resource)
                 api(libs.kotlinx.coroutines.core)
                 api(libs.michael.bull.kotlin.result)
+                api(libs.touchlab.kermit)
                 implementation(projects.foundation.network)
             }
         }

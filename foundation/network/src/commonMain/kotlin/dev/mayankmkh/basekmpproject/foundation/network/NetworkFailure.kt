@@ -19,13 +19,20 @@ public sealed interface NetworkFailure {
     /** Nothing usable came back. */
     public data class Transport(
         public val kind: TransportFailureKind,
+        public val requestId: String?,
         public override val cause: Throwable,
     ) : NetworkFailure
 
     /** A success status whose body did not match the requested type. */
-    public data class Decoding(public override val cause: Throwable) : NetworkFailure
+    public data class Decoding(
+        public val requestId: String?,
+        public override val cause: Throwable,
+    ) : NetworkFailure
 
-    public data class Unexpected(public override val cause: Throwable) : NetworkFailure
+    public data class Unexpected(
+        public val requestId: String?,
+        public override val cause: Throwable,
+    ) : NetworkFailure
 }
 
 public enum class TransportFailureKind {

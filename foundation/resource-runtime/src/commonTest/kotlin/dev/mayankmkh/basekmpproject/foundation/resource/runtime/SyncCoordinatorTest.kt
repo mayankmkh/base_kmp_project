@@ -1,15 +1,14 @@
 package dev.mayankmkh.basekmpproject.foundation.resource.runtime
 
 import app.cash.turbine.test
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.foundation.resource.SyncStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 import kotlinx.coroutines.CompletableDeferred
@@ -38,7 +37,7 @@ class SyncCoordinatorTest {
                 calls++
                 started.complete(Unit)
                 release.await()
-                RefreshOutcome.Succeeded
+                Outcome.Completed(Unit)
             }
 
         coordinator.status("key").test {
@@ -55,8 +54,8 @@ class SyncCoordinatorTest {
             expectNoEvents()
 
             release.complete(Unit)
-            assertSame(RefreshOutcome.Succeeded, first.await())
-            assertSame(RefreshOutcome.Succeeded, joined.await())
+            assertEquals(Outcome.Completed(Unit), first.await())
+            assertEquals(Outcome.Completed(Unit), joined.await())
             assertEquals(IdleStatus.copy(hasSucceeded = true), awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
@@ -64,25 +63,25 @@ class SyncCoordinatorTest {
 
     @Test
     fun `failure is preserved at the next start and success clears it`() = runTest {
-        val problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true)
+        val problem = Problem(ProblemKind.OFFLINE)
         val secondStarted = CompletableDeferred<Unit>()
         val releaseSecond = CompletableDeferred<Unit>()
         var calls = 0
         val coordinator =
             coordinator<String> { _, _ ->
                 calls++
-                if (calls == 1) RefreshOutcome.Failed(problem)
+                if (calls == 1) Outcome.Failed(problem)
                 else {
                     secondStarted.complete(Unit)
                     releaseSecond.await()
-                    RefreshOutcome.Succeeded
+                    Outcome.Completed(Unit)
                 }
             }
 
         coordinator.status("key").test {
             assertEquals(IdleStatus, awaitItem())
             assertEquals(
-                RefreshOutcome.Failed(problem),
+                Outcome.Failed(problem),
                 coordinator.sync("key", RefreshQos.visible()),
             )
             assertEquals(IdleStatus.copy(inFlight = true), awaitItem())
@@ -95,7 +94,7 @@ class SyncCoordinatorTest {
                 awaitItem(),
             )
             releaseSecond.complete(Unit)
-            assertSame(RefreshOutcome.Succeeded, second.await())
+            assertEquals(Outcome.Completed(Unit), second.await())
             assertEquals(IdleStatus.copy(hasSucceeded = true), awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
@@ -103,12 +102,12 @@ class SyncCoordinatorTest {
 
     @Test
     fun `failure preserves a previous success`() = runTest {
-        val problem = ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true)
-        var outcome: RefreshOutcome = RefreshOutcome.Succeeded
+        val problem = Problem(ProblemKind.SERVER)
+        var outcome: Outcome<Unit> = Outcome.Completed(Unit)
         val coordinator = coordinator<String> { _, _ -> outcome }
 
-        assertSame(RefreshOutcome.Succeeded, coordinator.sync("key", RefreshQos.visible()))
-        outcome = RefreshOutcome.Failed(problem)
+        assertEquals(Outcome.Completed(Unit), coordinator.sync("key", RefreshQos.visible()))
+        outcome = Outcome.Failed(problem)
         assertEquals(outcome, coordinator.sync("key", RefreshQos.visible()))
 
         assertEquals(
@@ -124,9 +123,9 @@ class SyncCoordinatorTest {
         val coordinator =
             coordinator<String>(timeSource = time, minIntervalSeconds = 30) { _, _ ->
                 calls++
-                RefreshOutcome.Succeeded
+                Outcome.Completed(Unit)
             }
-        assertSame(RefreshOutcome.Succeeded, coordinator.syncIfDue("key", RefreshQos.background()))
+        assertEquals(Outcome.Completed(Unit), coordinator.syncIfDue("key", RefreshQos.background()))
 
         coordinator.status("key").test {
             assertEquals(IdleStatus.copy(hasSucceeded = true), awaitItem())
@@ -135,8 +134,8 @@ class SyncCoordinatorTest {
             expectNoEvents()
 
             time += 30.seconds
-            assertSame(
-                RefreshOutcome.Succeeded,
+            assertEquals(
+                Outcome.Completed(Unit),
                 coordinator.syncIfDue("key", RefreshQos.background()),
             )
             assertEquals(2, calls)
@@ -150,11 +149,11 @@ class SyncCoordinatorTest {
         val coordinator =
             coordinator<String> { _, _ ->
                 calls++
-                RefreshOutcome.Succeeded
+                Outcome.Completed(Unit)
             }
 
         coordinator.syncIfDue("key", RefreshQos.background())
-        assertSame(RefreshOutcome.Succeeded, coordinator.sync("key", RefreshQos.visible()))
+        assertEquals(Outcome.Completed(Unit), coordinator.sync("key", RefreshQos.visible()))
         assertEquals(2, calls)
     }
 
@@ -166,7 +165,7 @@ class SyncCoordinatorTest {
         val coordinator =
             coordinator<String>(retryTriggers = reconnects) { _, _ ->
                 calls++
-                RefreshOutcome.Failed(Offline)
+                Outcome.Failed(Offline)
             }
         val collector = backgroundScope.launch { coordinator.observing("key", upstream).collect {} }
         runCurrent()
@@ -188,25 +187,22 @@ class SyncCoordinatorTest {
             val reconnects = MutableSharedFlow<Unit>()
             val outcomes =
                 mapOf(
-                    "offline" to RefreshOutcome.Failed(Offline),
-                    "temporary" to
-                        RefreshOutcome.Failed(
-                            ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true)
-                        ),
-                    "succeeded" to RefreshOutcome.Succeeded,
+                    "offline" to Outcome.Failed(Offline),
+                    "temporary" to Outcome.Failed(Problem(ProblemKind.SERVER)),
+                    "succeeded" to Outcome.Completed(Unit),
                 )
             val calls = mutableMapOf<String, Int>()
             val coordinator =
                 coordinator<String>(retryTriggers = reconnects) { key, _ ->
                     calls[key] = calls.getOrElse(key) { 0 } + 1
-                    outcomes[key] ?: RefreshOutcome.Failed(Offline)
+                    outcomes[key] ?: Outcome.Failed(Offline)
                 }
             val observers =
                 outcomes.keys.map { key ->
                     backgroundScope.launch { coordinator.observing(key, upstream).collect {} }
                 }
             assertEquals(
-                RefreshOutcome.Failed(Offline),
+                Outcome.Failed(Offline),
                 coordinator.sync("unobserved", RefreshQos.visible()),
             )
             runCurrent()
@@ -235,7 +231,7 @@ class SyncCoordinatorTest {
             coordinator<String>(retryTriggers = reconnects) { _, _ ->
                 calls++
                 if (calls > 1) release.await()
-                RefreshOutcome.Failed(Offline)
+                Outcome.Failed(Offline)
             }
         val observer = backgroundScope.launch { coordinator.observing("key", upstream).collect {} }
         runCurrent()
@@ -263,7 +259,7 @@ class SyncCoordinatorTest {
                 calls++
                 started.complete(Unit)
                 release.await()
-                RefreshOutcome.Succeeded
+                Outcome.Completed(Unit)
             }
         val cancelledCaller = launch { coordinator.sync("key", RefreshQos.visible()) }
         started.await()
@@ -273,12 +269,12 @@ class SyncCoordinatorTest {
         }
 
         release.complete(Unit)
-        assertSame(RefreshOutcome.Succeeded, remainingCaller.await())
+        assertEquals(Outcome.Completed(Unit), remainingCaller.await())
         assertEquals(1, calls)
     }
 
     @Test
-    fun `worker cancellation clears in-flight and active caller receives retryable unknown`() =
+    fun `worker cancellation clears in-flight and active caller receives unexpected failure`() =
         runTest {
             val workerScope = TestScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
             val started = CompletableDeferred<Unit>()
@@ -289,7 +285,7 @@ class SyncCoordinatorTest {
                     sync = { _, _ ->
                         started.complete(Unit)
                         never.await()
-                        RefreshOutcome.Succeeded
+                        Outcome.Completed(Unit)
                     },
                 )
             val caller = backgroundScope.async { coordinator.sync("key", RefreshQos.visible()) }
@@ -298,9 +294,7 @@ class SyncCoordinatorTest {
             runCurrent()
 
             assertEquals(
-                RefreshOutcome.Failed(
-                    ResourceProblem(ResourceProblemCategory.UNKNOWN, retryable = true)
-                ),
+                Outcome.Failed(Problem(ProblemKind.UNEXPECTED)),
                 caller.await(),
             )
             assertEquals(IdleStatus, coordinator.status("key").first())
@@ -313,9 +307,7 @@ class SyncCoordinatorTest {
         val outcome = coordinator.sync("key", RefreshQos.visible())
 
         assertEquals(
-            RefreshOutcome.Failed(
-                ResourceProblem(ResourceProblemCategory.UNKNOWN, retryable = false)
-            ),
+            Outcome.Failed(Problem(ProblemKind.UNEXPECTED)),
             outcome,
         )
     }
@@ -327,14 +319,14 @@ class SyncCoordinatorTest {
         val coordinator =
             coordinator<String>(timeSource = time, maxEntries = 2) { key, _ ->
                 calls[key] = calls.getOrElse(key) { 0 } + 1
-                RefreshOutcome.Succeeded
+                Outcome.Completed(Unit)
             }
         coordinator.syncIfDue("old", RefreshQos.background())
         time += 1.seconds
         coordinator.syncIfDue("new", RefreshQos.background())
         coordinator.status("third").first()
 
-        assertSame(RefreshOutcome.Succeeded, coordinator.syncIfDue("old", RefreshQos.background()))
+        assertEquals(Outcome.Completed(Unit), coordinator.syncIfDue("old", RefreshQos.background()))
         assertEquals(2, calls["old"])
         assertEquals(1, calls["new"])
     }
@@ -342,7 +334,7 @@ class SyncCoordinatorTest {
     @Test
     fun `releasing observers trims an oversized ledger without another lookup`() = runTest {
         val upstream = MutableSharedFlow<Unit>()
-        val coordinator = coordinator<String>(maxEntries = 2) { _, _ -> RefreshOutcome.Succeeded }
+        val coordinator = coordinator<String>(maxEntries = 2) { _, _ -> Outcome.Completed(Unit) }
         val collectors =
             (1..4).map { key ->
                 backgroundScope.launch {
@@ -362,7 +354,7 @@ class SyncCoordinatorTest {
         minIntervalSeconds: Int = 30,
         maxEntries: Int = 256,
         retryTriggers: Flow<Unit> = emptyFlow(),
-        sync: suspend (Key, RefreshQos) -> RefreshOutcome,
+        sync: suspend (Key, RefreshQos) -> Outcome<Unit>,
     ) =
         SyncCoordinator(
             scope = backgroundScope,
@@ -375,6 +367,6 @@ class SyncCoordinatorTest {
 
     private companion object {
         val IdleStatus = SyncStatus(inFlight = false, lastFailure = null, hasSucceeded = false)
-        val Offline = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true)
+        val Offline = Problem(ProblemKind.OFFLINE)
     }
 }

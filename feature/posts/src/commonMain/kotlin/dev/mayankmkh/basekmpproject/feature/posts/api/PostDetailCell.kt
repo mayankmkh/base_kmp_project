@@ -15,9 +15,9 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.feature.posts.PostDetailContent
 import dev.mayankmkh.basekmpproject.feature.posts.PostDetailUiCommand
 import dev.mayankmkh.basekmpproject.feature.posts.PostDetailViewModel
-import dev.mayankmkh.basekmpproject.feature.posts.messageResource
 import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -56,7 +56,7 @@ public fun PostDetailCell(
     CollectWhileStarted(viewModel.uiCommands) { command ->
         when (command) {
             is PostDetailUiCommand.ShowRefreshFailed ->
-                snackbarHost.showSnackbar(getString(command.category.messageResource()))
+                snackbarHost.showSnackbar(getString(command.kind.messageResource()))
         }
     }
 

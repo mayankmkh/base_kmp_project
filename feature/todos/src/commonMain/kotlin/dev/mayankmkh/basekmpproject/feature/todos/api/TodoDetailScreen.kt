@@ -14,15 +14,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import base_kmp_project.feature.todos.generated.resources.Res
-import base_kmp_project.feature.todos.generated.resources.back
 import base_kmp_project.feature.todos.generated.resources.todo_detail
+import base_kmp_project.ui.design_system.generated.resources.Res as DesignRes
+import base_kmp_project.ui.design_system.generated.resources.back
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoId
 import dev.mayankmkh.basekmpproject.feature.todos.TodoDetailContent
 import dev.mayankmkh.basekmpproject.feature.todos.TodoDetailViewModel
 import dev.mayankmkh.basekmpproject.feature.todos.TodosUiCommand
-import dev.mayankmkh.basekmpproject.feature.todos.messageResource
 import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -51,7 +52,7 @@ public fun TodoDetailScreen(
     CollectWhileStarted(viewModel.uiCommands) { command ->
         when (command) {
             is TodosUiCommand.ShowFailure ->
-                snackbarHostState.showSnackbar(getString(command.category.messageResource()))
+                snackbarHostState.showSnackbar(getString(command.kind.messageResource()))
         }
     }
 
@@ -63,7 +64,7 @@ public fun TodoDetailScreen(
                 title = { Text(stringResource(Res.string.todo_detail, todoId.value)) },
                 navigationIcon = {
                     TextButton(onClick = { onOutput(TodoDetailOutput.Back) }) {
-                        Text(stringResource(Res.string.back))
+                        Text(stringResource(DesignRes.string.back))
                     }
                 },
             )

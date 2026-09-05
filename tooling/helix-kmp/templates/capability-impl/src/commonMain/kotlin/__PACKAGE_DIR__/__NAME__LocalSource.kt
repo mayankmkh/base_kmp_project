@@ -33,6 +33,13 @@ internal class __NAME__LocalSource {
         snapshot.value = Snapshot(records = records, synchronized = true)
     }
 
+    fun upsert(record: __NAME__Record) {
+        snapshot.value =
+            snapshot.value.copy(
+                records = snapshot.value.records.filterNot { it.id == record.id } + record
+            )
+    }
+
     private data class Snapshot(
         val records: List<__NAME__Record> = emptyList(),
         val synchronized: Boolean = false,

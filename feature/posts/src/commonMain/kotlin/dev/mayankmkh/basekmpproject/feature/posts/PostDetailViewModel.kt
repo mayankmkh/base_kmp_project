@@ -8,12 +8,13 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostDetailOutput
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.foundation.resource.failure
 import dev.mayankmkh.basekmpproject.foundation.resource.hasValue
+import dev.mayankmkh.basekmpproject.foundation.resource.isAbsent
 import dev.mayankmkh.basekmpproject.foundation.resource.isRefreshing
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -28,7 +29,8 @@ internal data class PostDetailState(
     val post: Post? = null,
     val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
-    val problem: ResourceProblem? = null,
+    val problem: Problem? = null,
+    val isAbsent: Boolean = false,
 )
 
 internal sealed interface PostDetailAction {
@@ -38,7 +40,7 @@ internal sealed interface PostDetailAction {
 }
 
 internal sealed interface PostDetailUiCommand {
-    data class ShowRefreshFailed(val category: ResourceProblemCategory) : PostDetailUiCommand
+    data class ShowRefreshFailed(val kind: ProblemKind) : PostDetailUiCommand
 }
 
 internal class PostDetailViewModel(
@@ -71,9 +73,9 @@ internal class PostDetailViewModel(
             PostDetailAction.Retry ->
                 viewModelScope.launch {
                     val outcome = commands.refreshPost(postId)
-                    if (outcome is RefreshOutcome.Failed) {
+                    if (outcome is Outcome.Failed) {
                         uiCommandChannel.send(
-                            PostDetailUiCommand.ShowRefreshFailed(outcome.problem.category)
+                            PostDetailUiCommand.ShowRefreshFailed(outcome.problem.kind)
                         )
                     }
                 }
@@ -89,4 +91,5 @@ private fun ResourceObservation<Post>.toDetailState() =
         isInitialLoading = !hasValue && isRefreshing,
         isRefreshing = hasValue && isRefreshing,
         problem = failure,
+        isAbsent = isAbsent,
     )

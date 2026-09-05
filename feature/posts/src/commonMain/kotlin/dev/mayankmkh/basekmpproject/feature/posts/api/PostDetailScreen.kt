@@ -16,8 +16,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import base_kmp_project.feature.posts.generated.resources.Res
 import base_kmp_project.feature.posts.generated.resources.arrow_back_24px
-import base_kmp_project.feature.posts.generated.resources.back
 import base_kmp_project.feature.posts.generated.resources.post_detail_title
+import base_kmp_project.ui.design_system.generated.resources.Res as DesignRes
+import base_kmp_project.ui.design_system.generated.resources.back
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import org.jetbrains.compose.resources.painterResource
@@ -42,7 +43,7 @@ public fun PostDetailScreen(
                     IconButton(onClick = { onOutput(PostDetailOutput.Back) }) {
                         Icon(
                             painter = painterResource(Res.drawable.arrow_back_24px),
-                            contentDescription = stringResource(Res.string.back),
+                            contentDescription = stringResource(DesignRes.string.back),
                         )
                     }
                 },

@@ -37,7 +37,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import base_kmp_project.feature.todos.generated.resources.Res
 import base_kmp_project.feature.todos.generated.resources.cancel
@@ -50,18 +49,19 @@ import base_kmp_project.feature.todos.generated.resources.input_invalid
 import base_kmp_project.feature.todos.generated.resources.nothing_here_yet
 import base_kmp_project.feature.todos.generated.resources.owner
 import base_kmp_project.feature.todos.generated.resources.refresh
-import base_kmp_project.feature.todos.generated.resources.retry
 import base_kmp_project.feature.todos.generated.resources.save
 import base_kmp_project.feature.todos.generated.resources.sort
 import base_kmp_project.feature.todos.generated.resources.sort_by_id
 import base_kmp_project.feature.todos.generated.resources.sort_by_title
 import base_kmp_project.feature.todos.generated.resources.title
+import base_kmp_project.feature.todos.generated.resources.todo_unavailable
 import base_kmp_project.feature.todos.generated.resources.todos
 import dev.mayankmkh.basekmpproject.capability.todos.api.Todo
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoField
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSort
-import dev.mayankmkh.basekmpproject.capability.todos.api.TodoViolation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
+import dev.mayankmkh.basekmpproject.foundation.resource.Violation
+import dev.mayankmkh.basekmpproject.ui.designsystem.Centred
+import dev.mayankmkh.basekmpproject.ui.designsystem.Failure
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -148,9 +148,14 @@ private fun TodoListBody(
         },
     ) {
         when {
-            state.isInitialLoading -> Centred { CircularProgressIndicator() }
+            state.isInitialLoading ->
+                Centred(Modifier.fillMaxSize()) { CircularProgressIndicator() }
             state.problem != null && state.todos.isEmpty() ->
-                Failure(state.problem, { onAction(TodoListAction.Refresh) })
+                Failure(
+                    state.problem,
+                    { onAction(TodoListAction.Refresh) },
+                    Modifier.fillMaxSize(),
+                )
             else ->
                 LazyColumn {
                     item {
@@ -258,6 +263,7 @@ internal fun TodoDetailContent(
                 }
             }
             state.problem != null -> Failure(state.problem, { onAction(TodoDetailAction.Refresh) })
+            state.isAbsent -> Centred { Text(stringResource(Res.string.todo_unavailable)) }
         }
     }
     if (state.confirmDelete) {
@@ -322,7 +328,7 @@ private fun DeleteConfirmation(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun FormViolations(violations: List<TodoViolation>) {
+private fun FormViolations(violations: List<Violation<TodoField>>) {
     violations
         .filter { it.field == null }
         .forEach { violation ->
@@ -334,32 +340,10 @@ private fun FormViolations(violations: List<TodoViolation>) {
 }
 
 @Composable
-private fun FieldViolation(violations: List<TodoViolation>, field: TodoField) {
+private fun FieldViolation(violations: List<Violation<TodoField>>, field: TodoField) {
     violations
         .firstOrNull { it.field == field }
         ?.let { violation ->
             Text(violation.message ?: stringResource(violation.code.messageResource()))
         }
-}
-
-@Composable
-private fun Failure(problem: ResourceProblem, onRetry: () -> Unit) {
-    Centred {
-        Text(
-            stringResource(problem.category.messageResource()),
-            textAlign = TextAlign.Center,
-        )
-        Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
-    }
-}
-
-@Composable
-private fun Centred(content: @Composable () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-    ) {
-        content()
-    }
 }

@@ -87,7 +87,7 @@ public fun createHttpClient(engine: HttpClientEngine, /* same parameters */): Ht
 public fun HttpRequestBuilder.authenticated()
 public fun HttpRequestBuilder.retryable()
 
-public suspend inline fun <reified T> HttpClient.tryCatching(
+public suspend fun <T> HttpClient.tryCatching(
     block: suspend HttpClient.() -> T,
 ): Result<T, NetworkFailure>
 
@@ -247,12 +247,22 @@ public sealed interface NetworkFailure {
     ) : NetworkFailure
 
     /** Nothing usable came back. */
-    public data class Transport(public val kind: TransportFailureKind, override val cause: Throwable) : NetworkFailure
+    public data class Transport(
+        public val kind: TransportFailureKind,
+        public val requestId: String?,
+        override val cause: Throwable,
+    ) : NetworkFailure
 
     /** A success status whose body did not match the requested type. */
-    public data class Decoding(override val cause: Throwable) : NetworkFailure
+    public data class Decoding(
+        public val requestId: String?,
+        override val cause: Throwable,
+    ) : NetworkFailure
 
-    public data class Unexpected(override val cause: Throwable) : NetworkFailure
+    public data class Unexpected(
+        public val requestId: String?,
+        override val cause: Throwable,
+    ) : NetworkFailure
 }
 
 public enum class TransportFailureKind { OFFLINE, TIMEOUT }
@@ -266,6 +276,11 @@ Mapping: `ResponseException` becomes `Http`; `JsonConvertException` and
 a per-platform hook for engine-specific offline types; genuine cancellation is rethrown; everything
 else is `Unexpected`. In Ktor 3.x every non-streaming body is saved and re-readable, so copying the
 error body is safe and the live response is not kept.
+
+`tryCatching` installs one call-local request-id holder in the coroutine context. The sending hook
+updates it for each attempt, so transport, decoding and unexpected failures carry the final
+attempt's request id without wrapping or changing Ktor exception types. `Http` still reads the id
+from its response request. The holder is per call, so concurrent requests cannot exchange ids.
 
 `bodyOrNull` takes the `Json` explicitly because the failure is detached from the client. Callers
 pass the application's shared `Json` single, the same one handed to `createHttpClient`, so error
@@ -297,6 +312,11 @@ which would write every header to whatever the app logs to. `Authorization`, `Co
 `Set-Cookie` are sanitised at every level. Body logging is a debug-only choice because the plugin
 buffers bodies to print them. Output goes through Ktor's `Logger` interface to the app's logger.
 
+Command-failure classification is separate from Ktor request logging. The bridge in
+`:foundation:resource-runtime` maps a `NetworkFailure` to `Problem`, writes exactly one structured
+warning or error with its request id and diagnostics, and returns `Outcome.Failed`. Endpoint
+refusals and successful commands do not use that failure log path.
+
 The app sets `HEADERS` for debug builds and `NONE` otherwise, deciding per target from a runtime
 signal rather than a generated `BuildConfig`: the debuggable flag on Android, the debug binary on
 iOS, and the absence of the `jpackage.app-path` property on desktop. Web stays at `NONE`; the
@@ -321,7 +341,8 @@ Contract tests the module must keep green:
 - `retryable()` retries a GET 503 with a new request id and does not retry a POST or a
   non-`retryable()` GET; `Retry-After` is honoured;
 - failure mapping for 4xx with a body, HTML 503, malformed 2xx JSON, timeout, IO failure,
-  cancellation, unexpected exception; the token never appears in the log;
+  cancellation and unexpected exception; every mapped failure carries a request id and the token
+  never appears in the log;
 - a same-host redirect keeps the token and a cross-host redirect drops it, each hop with its own
   request id; a POST redirect and an HTTPS downgrade are not followed;
 - every target names an engine; closing the Koin context closes the client.

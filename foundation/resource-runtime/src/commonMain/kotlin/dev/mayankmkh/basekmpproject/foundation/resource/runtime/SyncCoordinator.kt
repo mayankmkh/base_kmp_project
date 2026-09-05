@@ -1,9 +1,9 @@
 package dev.mayankmkh.basekmpproject.foundation.resource.runtime
 
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.foundation.resource.SyncStatus
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -59,7 +59,7 @@ import kotlinx.coroutines.withContext
 @Suppress("TooManyFunctions")
 public class SyncCoordinator<Key : Any>(
     private val scope: CoroutineScope,
-    private val sync: suspend (Key, RefreshQos) -> RefreshOutcome,
+    private val sync: suspend (Key, RefreshQos) -> Outcome<Unit>,
     retryTriggers: Flow<Unit> = emptyFlow(),
     private val timeSource: TimeSource = TimeSource.Monotonic,
     private val minInterval: Duration = 30.seconds,
@@ -74,7 +74,7 @@ public class SyncCoordinator<Key : Any>(
         scope.launch { retryTriggers.collect { retryOffline(RefreshQos.background()) } }
     }
 
-    public suspend fun sync(key: Key, qos: RefreshQos): RefreshOutcome =
+    public suspend fun sync(key: Key, qos: RefreshQos): Outcome<Unit> =
         await(
             mutex.withLock {
                 val entry = entryLocked(key)
@@ -82,7 +82,7 @@ public class SyncCoordinator<Key : Any>(
             }
         )
 
-    public suspend fun syncIfDue(key: Key, qos: RefreshQos): RefreshOutcome? =
+    public suspend fun syncIfDue(key: Key, qos: RefreshQos): Outcome<Unit>? =
         mutex.withLock { startIfDueLocked(key, entryLocked(key), qos) }?.let { await(it) }
 
     public fun <T> observing(key: Key, upstream: Flow<T>): Flow<T> = flow {
@@ -106,7 +106,7 @@ public class SyncCoordinator<Key : Any>(
 
     /**
      * Starts a worker for every observed key whose last attempt failed with an
-     * [ResourceProblemCategory.OFFLINE] problem and returns without awaiting them.
+     * [ProblemKind.OFFLINE] problem and returns without awaiting them.
      */
     private suspend fun retryOffline(qos: RefreshQos) {
         mutex.withLock {
@@ -128,7 +128,7 @@ public class SyncCoordinator<Key : Any>(
         key: Key,
         entry: Entry,
         qos: RefreshQos,
-    ): Deferred<RefreshOutcome>? {
+    ): Deferred<Outcome<Unit>>? {
         entry.inFlight?.let {
             return it
         }
@@ -137,9 +137,9 @@ public class SyncCoordinator<Key : Any>(
         else startLocked(key, entry, qos)
     }
 
-    private fun startLocked(key: Key, entry: Entry, qos: RefreshQos): Deferred<RefreshOutcome> {
+    private fun startLocked(key: Key, entry: Entry, qos: RefreshQos): Deferred<Outcome<Unit>> {
         val worker = scope.async {
-            var outcome: RefreshOutcome? = null
+            var outcome: Outcome<Unit>? = null
             try {
                 runSync(key, qos).also { outcome = it }
             } finally {
@@ -157,21 +157,21 @@ public class SyncCoordinator<Key : Any>(
         return worker
     }
 
-    private suspend fun await(worker: Deferred<RefreshOutcome>): RefreshOutcome =
+    private suspend fun await(worker: Deferred<Outcome<Unit>>): Outcome<Unit> =
         try {
             worker.await()
         } catch (_: CancellationException) {
             currentCoroutineContext().ensureActive()
-            RefreshOutcome.Failed(CancelledWorkerProblem)
+            Outcome.Failed(CancelledWorkerProblem)
         }
 
-    private suspend fun runSync(key: Key, qos: RefreshQos): RefreshOutcome =
+    private suspend fun runSync(key: Key, qos: RefreshQos): Outcome<Unit> =
         try {
             sync.invoke(key, qos)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Throwable) {
-            RefreshOutcome.Failed(UnexpectedWorkerProblem)
+            Outcome.Failed(UnexpectedWorkerProblem)
         }
 
     private fun entryLocked(key: Key): Entry =
@@ -199,28 +199,27 @@ public class SyncCoordinator<Key : Any>(
     private class Entry {
         val status =
             MutableStateFlow(SyncStatus(inFlight = false, lastFailure = null, hasSucceeded = false))
-        var inFlight: Deferred<RefreshOutcome>? = null
+        var inFlight: Deferred<Outcome<Unit>>? = null
         var lastAttempt: TimeMark? = null
         var observers = 0
 
-        fun failedOffline(): Boolean =
-            status.value.lastFailure?.category == ResourceProblemCategory.OFFLINE
+        fun failedOffline(): Boolean = status.value.lastFailure?.kind == ProblemKind.OFFLINE
 
-        fun start(worker: Deferred<RefreshOutcome>, at: TimeMark) {
+        fun start(worker: Deferred<Outcome<Unit>>, at: TimeMark) {
             inFlight = worker
             lastAttempt = at
             status.update { it.copy(inFlight = true) }
         }
 
         /** [outcome] is null when the worker was cancelled before it produced one. */
-        fun settle(outcome: RefreshOutcome?) {
+        fun settle(outcome: Outcome<Unit>?) {
             inFlight = null
             status.update { current ->
                 when (outcome) {
                     null -> current.copy(inFlight = false)
-                    RefreshOutcome.Succeeded ->
+                    is Outcome.Completed ->
                         current.copy(inFlight = false, lastFailure = null, hasSucceeded = true)
-                    is RefreshOutcome.Failed ->
+                    is Outcome.Failed ->
                         current.copy(inFlight = false, lastFailure = outcome.problem)
                 }
             }
@@ -228,7 +227,5 @@ public class SyncCoordinator<Key : Any>(
     }
 }
 
-private val CancelledWorkerProblem =
-    ResourceProblem(ResourceProblemCategory.UNKNOWN, retryable = true)
-private val UnexpectedWorkerProblem =
-    ResourceProblem(ResourceProblemCategory.UNKNOWN, retryable = false)
+private val CancelledWorkerProblem = Problem(ProblemKind.UNEXPECTED)
+private val UnexpectedWorkerProblem = Problem(ProblemKind.UNEXPECTED)

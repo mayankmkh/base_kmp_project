@@ -8,9 +8,9 @@ import __CAP_PACKAGE__.__CAP_NAME__Queries
 import __CAP_PACKAGE__.__CAP_NAME__Record
 import __PACKAGE__.api.__NAME__Output
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
 import dev.mayankmkh.basekmpproject.foundation.resource.failure
 import dev.mayankmkh.basekmpproject.foundation.resource.hasValue
 import dev.mayankmkh.basekmpproject.foundation.resource.isRefreshing
@@ -29,7 +29,7 @@ internal data class __NAME__State(
     val label: String? = null,
     val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
-    val problem: ResourceProblem? = null,
+    val problem: Problem? = null,
 )
 
 /** What the user did. Actions travel down; they are never navigation. */
@@ -101,9 +101,9 @@ internal class __NAME__ViewModel(
     private fun refresh() {
         viewModelScope.launch {
             val outcome = commands.refresh()
-            if (outcome is RefreshOutcome.Failed) {
-                // Product code should map this stable category to a localized string resource.
-                val message = outcome.problem.category.name
+            if (outcome is Outcome.Failed) {
+                // Product code should map this stable kind to a localized string resource.
+                val message = outcome.problem.kind.name
                 uiCommandChannel.send(__NAME__UiCommand.ShowMessage(message))
             }
         }

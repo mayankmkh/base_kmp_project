@@ -2,8 +2,8 @@ package dev.mayankmkh.basekmpproject.feature.posts
 
 import dev.mayankmkh.basekmpproject.capability.posts.api.Post
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 
 internal object PostsFeatureFixtures {
     val posts =
@@ -14,13 +14,11 @@ internal object PostsFeatureFixtures {
     val feed = PostFeedState(posts = posts, isInitialLoading = false)
     val detail = PostDetailState(post = posts.first(), isInitialLoading = false)
     val loadingDetail = PostDetailState()
-    val offlineDetail =
-        detail.copy(problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true))
+    val offlineDetail = detail.copy(problem = Problem(ProblemKind.OFFLINE))
     val failedDetail =
         PostDetailState(
             isInitialLoading = false,
-            problem = ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true),
+            problem = Problem(ProblemKind.SERVER),
         )
-    val offlineFeed =
-        feed.copy(problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true))
+    val offlineFeed = feed.copy(problem = Problem(ProblemKind.OFFLINE))
 }

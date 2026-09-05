@@ -14,14 +14,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import base_kmp_project.feature.todos.generated.resources.Res
-import base_kmp_project.feature.todos.generated.resources.back
 import base_kmp_project.feature.todos.generated.resources.new_todo
+import base_kmp_project.ui.design_system.generated.resources.Res as DesignRes
+import base_kmp_project.ui.design_system.generated.resources.back
 import dev.mayankmkh.basekmpproject.feature.todos.TodoEditorContent
 import dev.mayankmkh.basekmpproject.feature.todos.TodoEditorViewModel
 import dev.mayankmkh.basekmpproject.feature.todos.TodosUiCommand
-import dev.mayankmkh.basekmpproject.feature.todos.messageResource
 import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -42,7 +43,7 @@ public fun TodoEditorScreen(
     CollectWhileStarted(viewModel.uiCommands) { command ->
         when (command) {
             is TodosUiCommand.ShowFailure ->
-                snackbarHostState.showSnackbar(getString(command.category.messageResource()))
+                snackbarHostState.showSnackbar(getString(command.kind.messageResource()))
         }
     }
 
@@ -54,7 +55,7 @@ public fun TodoEditorScreen(
                 title = { Text(stringResource(Res.string.new_todo)) },
                 navigationIcon = {
                     TextButton(onClick = { onOutput(TodoEditorOutput.Back) }) {
-                        Text(stringResource(Res.string.back))
+                        Text(stringResource(DesignRes.string.back))
                     }
                 },
             )

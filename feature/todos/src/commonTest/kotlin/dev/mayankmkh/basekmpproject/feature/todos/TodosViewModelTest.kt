@@ -7,17 +7,17 @@ import dev.mayankmkh.basekmpproject.capability.todos.api.TodoField
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoId
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSettings
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSort
-import dev.mayankmkh.basekmpproject.capability.todos.api.TodoViolation
 import dev.mayankmkh.basekmpproject.capability.todos.api.UpdateTodoResult
 import dev.mayankmkh.basekmpproject.feature.todos.api.TodoDetailOutput
 import dev.mayankmkh.basekmpproject.feature.todos.api.TodoEditorOutput
 import dev.mayankmkh.basekmpproject.feature.todos.api.TodoListOutput
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceOperation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
+import dev.mayankmkh.basekmpproject.foundation.resource.Violation
 import dev.mayankmkh.basekmpproject.testkit.FakeTodosCommands
 import dev.mayankmkh.basekmpproject.testkit.FakeTodosQueries
 import dev.mayankmkh.basekmpproject.testkit.runMainTest
@@ -28,8 +28,8 @@ import kotlin.test.assertIs
 import kotlinx.coroutines.test.runCurrent
 
 class TodosViewModelTest {
-    private val problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true)
-    private val invalid = listOf(TodoViolation(TodoField.TITLE, "blank", message = null))
+    private val problem = Problem(ProblemKind.OFFLINE)
+    private val invalid = listOf(Violation(TodoField.TITLE, "blank", message = null))
 
     @Test
     fun `list maps observations opens routes and updates settings`() = runMainTest {
@@ -55,17 +55,17 @@ class TodosViewModelTest {
     fun `list refresh and failed mutations emit transient failures`() = runMainTest {
         val commands =
             FakeTodosCommands().apply {
-                onRefreshTodos = { RefreshOutcome.Failed(problem) }
-                onSetCompleted = { _, _ -> UpdateTodoResult.Failed(problem) }
-                onDelete = { DeleteTodoResult.Failed(problem) }
+                onRefreshTodos = { Outcome.Failed(problem) }
+                onSetCompleted = { _, _ -> Outcome.Failed(problem) }
+                onDelete = { Outcome.Failed(problem) }
             }
         val viewModel = TodoListViewModel(listKey(), FakeTodosQueries(), commands)
 
         viewModel.uiCommands.test {
             viewModel.onAction(TodoListAction.Refresh)
             assertEquals(
-                ResourceProblemCategory.OFFLINE,
-                assertIs<TodosUiCommand.ShowFailure>(awaitItem()).category,
+                ProblemKind.OFFLINE,
+                assertIs<TodosUiCommand.ShowFailure>(awaitItem()).kind,
             )
             viewModel.onAction(TodoListAction.SetCompleted(TodoId(1), true))
             assertIs<TodosUiCommand.ShowFailure>(awaitItem())
@@ -79,11 +79,13 @@ class TodosViewModelTest {
     fun `list mutation invalid input and not found surface as transient failures`() = runMainTest {
         val commands =
             FakeTodosCommands().apply {
-                onSetCompleted = { _, _ -> UpdateTodoResult.InvalidInput(invalid) }
-                onDelete = { DeleteTodoResult.NotFound }
+                onSetCompleted = { _, _ ->
+                    Outcome.Completed(UpdateTodoResult.InvalidInput(invalid))
+                }
+                onDelete = { Outcome.Completed(DeleteTodoResult.NotFound) }
             }
         val viewModel = TodoListViewModel(listKey(), FakeTodosQueries(), commands)
-        val permanent = TodosUiCommand.ShowFailure(ResourceProblemCategory.PERMANENT)
+        val permanent = TodosUiCommand.ShowFailure(ProblemKind.UNEXPECTED)
 
         viewModel.uiCommands.test {
             viewModel.onAction(TodoListAction.SetCompleted(TodoId(1), true))
@@ -122,18 +124,20 @@ class TodosViewModelTest {
             runCurrent()
             assertEquals(TodoId(1) to "Renamed", commands.renames.single())
 
-            commands.onRename = { _, _ -> UpdateTodoResult.InvalidInput(invalid) }
+            commands.onRename = { _, _ ->
+                Outcome.Completed(UpdateTodoResult.InvalidInput(invalid))
+            }
             viewModel.onAction(TodoDetailAction.Rename)
             runCurrent()
             assertEquals(invalid, viewModel.state.value.violations)
 
-            commands.onRename = { _, _ -> UpdateTodoResult.Failed(problem) }
+            commands.onRename = { _, _ -> Outcome.Failed(problem) }
             viewModel.uiCommands.test {
                 viewModel.onAction(TodoDetailAction.Rename)
                 assertIs<TodosUiCommand.ShowFailure>(awaitItem())
             }
 
-            commands.onRename = { _, _ -> UpdateTodoResult.NotFound }
+            commands.onRename = { _, _ -> Outcome.Completed(UpdateTodoResult.NotFound) }
             viewModel.outputs.test {
                 viewModel.onAction(TodoDetailAction.Rename)
                 assertEquals(TodoDetailOutput.NotFound(TodoId(1)), awaitItem())
@@ -152,13 +156,13 @@ class TodosViewModelTest {
             assertEquals(TodoDetailOutput.Deleted(TodoId(1)), awaitItem())
         }
 
-        commands.onDelete = { DeleteTodoResult.Failed(problem) }
+        commands.onDelete = { Outcome.Failed(problem) }
         viewModel.uiCommands.test {
             viewModel.onAction(TodoDetailAction.ConfirmDelete)
             assertIs<TodosUiCommand.ShowFailure>(awaitItem())
         }
 
-        commands.onDelete = { DeleteTodoResult.NotFound }
+        commands.onDelete = { Outcome.Completed(DeleteTodoResult.NotFound) }
         viewModel.outputs.test {
             viewModel.onAction(TodoDetailAction.ConfirmDelete)
             assertEquals(TodoDetailOutput.NotFound(TodoId(1)), awaitItem())
@@ -175,7 +179,7 @@ class TodosViewModelTest {
             runCurrent()
             expectNoEvents()
 
-            commands.onRefreshTodo = { _, _ -> RefreshOutcome.Failed(problem) }
+            commands.onRefreshTodo = { _, _ -> Outcome.Failed(problem) }
             viewModel.onAction(TodoDetailAction.Refresh)
             assertIs<TodosUiCommand.ShowFailure>(awaitItem())
         }
@@ -190,16 +194,7 @@ class TodosViewModelTest {
         viewModel.state.test {
             viewModel.outputs.test {
                 queries.todoFlows.getValue(TodoId(99)).value =
-                    ResourceObservation(
-                        value = null,
-                        operation =
-                            ResourceOperation.Failed(
-                                ResourceProblem(
-                                    ResourceProblemCategory.PERMANENT,
-                                    retryable = false,
-                                )
-                            ),
-                    )
+                    ResourceObservation(value = null, operation = ResourceOperation.Idle)
                 assertEquals(TodoDetailOutput.NotFound(TodoId(99)), awaitItem())
             }
             cancelAndIgnoreRemainingEvents()
@@ -217,13 +212,13 @@ class TodosViewModelTest {
             assertEquals(TodoEditorOutput.Created(TodoId(1_000_000)), awaitItem())
         }
 
-        commands.onCreate = { CreateTodoResult.InvalidInput(invalid) }
+        commands.onCreate = { Outcome.Completed(CreateTodoResult.InvalidInput(invalid)) }
         viewModel.onAction(TodoEditorAction.Submit)
         runCurrent()
         assertEquals(invalid, viewModel.state.value.violations)
         assertFalse(viewModel.state.value.isSubmitting)
 
-        commands.onCreate = { CreateTodoResult.Failed(problem) }
+        commands.onCreate = { Outcome.Failed(problem) }
         viewModel.uiCommands.test {
             viewModel.onAction(TodoEditorAction.Submit)
             assertIs<TodosUiCommand.ShowFailure>(awaitItem())

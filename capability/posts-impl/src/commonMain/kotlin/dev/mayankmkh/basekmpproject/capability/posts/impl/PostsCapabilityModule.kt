@@ -10,7 +10,7 @@ import org.koin.dsl.onClose
 public val postsCapabilityModule: Module = module {
     singleOf(::PostsLocalSource)
     single { PostsRemoteSource(get()) }
-    single { PostsCapabilityImpl(get(), get(), get(), get()) } onClose { it?.close() }
+    single { PostsCapabilityImpl(get(), get(), get(), get(), get()) } onClose { it?.close() }
     single<PostsQueries> { get<PostsCapabilityImpl>() }
     single<PostsCommands> { get<PostsCapabilityImpl>() }
 }

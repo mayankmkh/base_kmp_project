@@ -72,6 +72,10 @@ internal class PostsLocalSource(drivers: SqlDriverProvider) {
                 body = post.body,
             )
     }
+
+    suspend fun delete(id: String) {
+        database.get().postsSchemaQueries.deleteById(id)
+    }
 }
 
 /** A durable post, free of both the wire format and SQLDelight's generated row type. */

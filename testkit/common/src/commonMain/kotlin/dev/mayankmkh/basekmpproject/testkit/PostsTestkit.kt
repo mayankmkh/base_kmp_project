@@ -5,12 +5,12 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostFeed
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceOperation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -31,13 +31,15 @@ object ResourceObservationFixtures {
 
     fun <T : Any> failed(
         value: T? = null,
-        category: ResourceProblemCategory = ResourceProblemCategory.UNKNOWN,
-        retryable: Boolean = false,
+        kind: ProblemKind = ProblemKind.UNEXPECTED,
     ): ResourceObservation<T> =
         ResourceObservation(
             value = value,
-            operation = ResourceOperation.Failed(ResourceProblem(category, retryable)),
+            operation = ResourceOperation.Failed(Problem(kind)),
         )
+
+    fun <T : Any> absent(): ResourceObservation<T> =
+        ResourceObservation(value = null, operation = ResourceOperation.Idle)
 }
 
 class FakePostsQueries(
@@ -72,17 +74,17 @@ class FakePostsCommands : PostsCommands {
         private set
 
     val postRefreshes = mutableListOf<PostId>()
-    var onRefreshFeed: suspend (RefreshQos) -> RefreshOutcome = { RefreshOutcome.Succeeded }
-    var onRefreshPost: suspend (PostId, RefreshQos) -> RefreshOutcome = { _, _ ->
-        RefreshOutcome.Succeeded
+    var onRefreshFeed: suspend (RefreshQos) -> Outcome<Unit> = { Outcome.Completed(Unit) }
+    var onRefreshPost: suspend (PostId, RefreshQos) -> Outcome<Unit> = { _, _ ->
+        Outcome.Completed(Unit)
     }
 
-    override suspend fun refreshFeed(qos: RefreshQos): RefreshOutcome {
+    override suspend fun refreshFeed(qos: RefreshQos): Outcome<Unit> {
         feedRefreshCount++
         return onRefreshFeed(qos)
     }
 
-    override suspend fun refreshPost(id: PostId, qos: RefreshQos): RefreshOutcome {
+    override suspend fun refreshPost(id: PostId, qos: RefreshQos): Outcome<Unit> {
         postRefreshes += id
         return onRefreshPost(id, qos)
     }

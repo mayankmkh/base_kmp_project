@@ -29,9 +29,3 @@ public enum class TodoField {
     TITLE,
     OWNER_ID,
 }
-
-public data class TodoViolation(
-    val field: TodoField?,
-    val code: String,
-    val message: String?,
-)

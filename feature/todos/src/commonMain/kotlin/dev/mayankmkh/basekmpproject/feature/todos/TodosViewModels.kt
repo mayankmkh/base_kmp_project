@@ -6,11 +6,11 @@ import dev.mayankmkh.basekmpproject.capability.todos.api.CreateTodoResult
 import dev.mayankmkh.basekmpproject.capability.todos.api.DeleteTodoResult
 import dev.mayankmkh.basekmpproject.capability.todos.api.Todo
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoDraft
+import dev.mayankmkh.basekmpproject.capability.todos.api.TodoField
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoId
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoList
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSettings
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSort
-import dev.mayankmkh.basekmpproject.capability.todos.api.TodoViolation
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodosCommands
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodosQueries
 import dev.mayankmkh.basekmpproject.capability.todos.api.UpdateTodoResult
@@ -19,12 +19,14 @@ import dev.mayankmkh.basekmpproject.feature.todos.api.TodoEditorOutput
 import dev.mayankmkh.basekmpproject.feature.todos.api.TodoListOutput
 import dev.mayankmkh.basekmpproject.feature.todos.api.TodoSummaryOutput
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
+import dev.mayankmkh.basekmpproject.foundation.resource.Violation
 import dev.mayankmkh.basekmpproject.foundation.resource.failure
 import dev.mayankmkh.basekmpproject.foundation.resource.hasValue
+import dev.mayankmkh.basekmpproject.foundation.resource.isAbsent
 import dev.mayankmkh.basekmpproject.foundation.resource.isRefreshing
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -43,7 +45,7 @@ internal data class TodoListState(
     val settings: TodoSettings = TodoSettings(),
     val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
-    val problem: ResourceProblem? = null,
+    val problem: Problem? = null,
     val pendingDelete: TodoId? = null,
     val mutatingIds: Set<TodoId> = emptySet(),
 )
@@ -69,7 +71,7 @@ internal sealed interface TodoListAction {
 }
 
 internal sealed interface TodosUiCommand {
-    data class ShowFailure(val category: ResourceProblemCategory) : TodosUiCommand
+    data class ShowFailure(val kind: ProblemKind) : TodosUiCommand
 }
 
 internal class TodoListViewModel(
@@ -117,7 +119,7 @@ internal class TodoListViewModel(
     private fun refresh() {
         viewModelScope.launch {
             val outcome = commands.refreshTodos()
-            if (outcome is RefreshOutcome.Failed) show(outcome.problem.category)
+            if (outcome is Outcome.Failed) show(outcome.problem.kind)
         }
     }
 
@@ -129,10 +131,13 @@ internal class TodoListViewModel(
         val id = pendingDelete.value ?: return
         pendingDelete.value = null
         mutate(id) {
-            when (val result = commands.deleteTodo(id)) {
-                DeleteTodoResult.Deleted -> Unit
-                DeleteTodoResult.NotFound -> show(ResourceProblemCategory.PERMANENT)
-                is DeleteTodoResult.Failed -> show(result.problem.category)
+            when (val outcome = commands.deleteTodo(id)) {
+                is Outcome.Completed ->
+                    when (outcome.value) {
+                        DeleteTodoResult.Deleted -> Unit
+                        DeleteTodoResult.NotFound -> show(ProblemKind.UNEXPECTED)
+                    }
+                is Outcome.Failed -> show(outcome.problem.kind)
             }
         }
     }
@@ -141,12 +146,15 @@ internal class TodoListViewModel(
      * A list row has no form to pin violations to and nowhere to navigate when the server no longer
      * knows the row, so both read as a transient failure; the durable list reconciles on its own.
      */
-    private suspend fun handleUpdate(result: UpdateTodoResult) {
-        when (result) {
-            UpdateTodoResult.Updated -> Unit
-            UpdateTodoResult.NotFound,
-            is UpdateTodoResult.InvalidInput -> show(ResourceProblemCategory.PERMANENT)
-            is UpdateTodoResult.Failed -> show(result.problem.category)
+    private suspend fun handleUpdate(outcome: Outcome<UpdateTodoResult>) {
+        when (outcome) {
+            is Outcome.Completed ->
+                when (outcome.value) {
+                    UpdateTodoResult.Updated -> Unit
+                    UpdateTodoResult.NotFound,
+                    is UpdateTodoResult.InvalidInput -> show(ProblemKind.UNEXPECTED)
+                }
+            is Outcome.Failed -> show(outcome.problem.kind)
         }
     }
 
@@ -169,8 +177,8 @@ internal class TodoListViewModel(
         viewModelScope.launch { outputChannel.send(output) }
     }
 
-    private suspend fun show(category: ResourceProblemCategory) {
-        uiCommandChannel.send(TodosUiCommand.ShowFailure(category))
+    private suspend fun show(kind: ProblemKind) {
+        uiCommandChannel.send(TodosUiCommand.ShowFailure(kind))
     }
 }
 
@@ -180,8 +188,9 @@ internal data class TodoDetailState(
     val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val isSubmitting: Boolean = false,
-    val problem: ResourceProblem? = null,
-    val violations: List<TodoViolation> = emptyList(),
+    val problem: Problem? = null,
+    val isAbsent: Boolean = false,
+    val violations: List<Violation<TodoField>> = emptyList(),
     val confirmDelete: Boolean = false,
 )
 
@@ -212,7 +221,7 @@ internal class TodoDetailViewModel(
     /** The user's unsaved title, or null while the field mirrors the stored todo. */
     private val draft = MutableStateFlow<String?>(null)
     private val submitting = MutableStateFlow(false)
-    private val violations = MutableStateFlow(emptyList<TodoViolation>())
+    private val violations = MutableStateFlow(emptyList<Violation<TodoField>>())
     private val confirmDelete = MutableStateFlow(false)
     private val uiCommandChannel = Channel<TodosUiCommand>(Channel.BUFFERED)
     private val outputChannel = Channel<TodoDetailOutput>(Channel.BUFFERED)
@@ -224,10 +233,7 @@ internal class TodoDetailViewModel(
                 // Observed inside the state pipeline so the resource stays subscriber-gated: a
                 // hidden detail entry costs nothing until its screen is shown again.
                 queries.observeTodo(todoId).onEach { current ->
-                    if (
-                        current.value == null &&
-                            current.failure?.category == ResourceProblemCategory.PERMANENT
-                    ) {
+                    if (current.isAbsent) {
                         outputChannel.send(TodoDetailOutput.NotFound(todoId))
                     }
                 },
@@ -260,7 +266,7 @@ internal class TodoDetailViewModel(
     private fun refresh() {
         viewModelScope.launch {
             val outcome = commands.refreshTodo(todoId)
-            if (outcome is RefreshOutcome.Failed) show(outcome.problem)
+            if (outcome is Outcome.Failed) show(outcome.problem)
         }
     }
 
@@ -276,23 +282,29 @@ internal class TodoDetailViewModel(
     }
 
     /** Applies one update result to the screen; true when the todo was updated. */
-    private suspend fun handleUpdate(result: UpdateTodoResult): Boolean {
-        when (result) {
-            UpdateTodoResult.Updated -> violations.value = emptyList()
-            UpdateTodoResult.NotFound -> emitNow(TodoDetailOutput.NotFound(todoId))
-            is UpdateTodoResult.InvalidInput -> violations.value = result.violations
-            is UpdateTodoResult.Failed -> show(result.problem)
+    private suspend fun handleUpdate(outcome: Outcome<UpdateTodoResult>): Boolean {
+        when (outcome) {
+            is Outcome.Completed ->
+                when (val result = outcome.value) {
+                    UpdateTodoResult.Updated -> violations.value = emptyList()
+                    UpdateTodoResult.NotFound -> emitNow(TodoDetailOutput.NotFound(todoId))
+                    is UpdateTodoResult.InvalidInput -> violations.value = result.violations
+                }
+            is Outcome.Failed -> show(outcome.problem)
         }
-        return result == UpdateTodoResult.Updated
+        return outcome is Outcome.Completed && outcome.value == UpdateTodoResult.Updated
     }
 
     private fun delete() {
         confirmDelete.value = false
         submit {
-            when (val result = commands.deleteTodo(todoId)) {
-                DeleteTodoResult.Deleted -> emitNow(TodoDetailOutput.Deleted(todoId))
-                DeleteTodoResult.NotFound -> emitNow(TodoDetailOutput.NotFound(todoId))
-                is DeleteTodoResult.Failed -> show(result.problem)
+            when (val outcome = commands.deleteTodo(todoId)) {
+                is Outcome.Completed ->
+                    when (outcome.value) {
+                        DeleteTodoResult.Deleted -> emitNow(TodoDetailOutput.Deleted(todoId))
+                        DeleteTodoResult.NotFound -> emitNow(TodoDetailOutput.NotFound(todoId))
+                    }
+                is Outcome.Failed -> show(outcome.problem)
             }
         }
     }
@@ -316,8 +328,8 @@ internal class TodoDetailViewModel(
         outputChannel.send(output)
     }
 
-    private suspend fun show(problem: ResourceProblem) {
-        uiCommandChannel.send(TodosUiCommand.ShowFailure(problem.category))
+    private suspend fun show(problem: Problem) {
+        uiCommandChannel.send(TodosUiCommand.ShowFailure(problem.kind))
     }
 }
 
@@ -325,7 +337,7 @@ internal data class TodoEditorState(
     val title: String = "",
     val ownerId: String = "1",
     val isSubmitting: Boolean = false,
-    val violations: List<TodoViolation> = emptyList(),
+    val violations: List<Violation<TodoField>> = emptyList(),
 )
 
 internal sealed interface TodoEditorAction {
@@ -371,15 +383,19 @@ internal class TodoEditorViewModel(
             mutableState.value = mutableState.value.copy(isSubmitting = true)
             val current = mutableState.value
             when (
-                val result =
+                val outcome =
                     commands.createTodo(
                         TodoDraft(current.title, current.ownerId.toLongOrNull() ?: 0)
                     )
             ) {
-                is CreateTodoResult.Created -> emitNow(TodoEditorOutput.Created(result.id))
-                is CreateTodoResult.InvalidInput ->
-                    mutableState.value = mutableState.value.copy(violations = result.violations)
-                is CreateTodoResult.Failed -> show(result.problem)
+                is Outcome.Completed ->
+                    when (val result = outcome.value) {
+                        is CreateTodoResult.Created -> emitNow(TodoEditorOutput.Created(result.id))
+                        is CreateTodoResult.InvalidInput ->
+                            mutableState.value =
+                                mutableState.value.copy(violations = result.violations)
+                    }
+                is Outcome.Failed -> show(outcome.problem)
             }
             mutableState.value = mutableState.value.copy(isSubmitting = false)
         }
@@ -393,8 +409,8 @@ internal class TodoEditorViewModel(
         outputChannel.send(output)
     }
 
-    private suspend fun show(problem: ResourceProblem) {
-        uiCommandChannel.send(TodosUiCommand.ShowFailure(problem.category))
+    private suspend fun show(problem: Problem) {
+        uiCommandChannel.send(TodosUiCommand.ShowFailure(problem.kind))
     }
 }
 
@@ -456,7 +472,7 @@ private fun ResourceObservation<TodoList>.toListState(
 private fun ResourceObservation<Todo>.toDetailState(
     draftTitle: String?,
     isSubmitting: Boolean,
-    violations: List<TodoViolation>,
+    violations: List<Violation<TodoField>>,
     confirmDelete: Boolean,
 ) =
     TodoDetailState(
@@ -466,6 +482,7 @@ private fun ResourceObservation<Todo>.toDetailState(
         isRefreshing = hasValue && isRefreshing,
         isSubmitting = isSubmitting,
         problem = failure,
+        isAbsent = isAbsent,
         violations = violations,
         confirmDelete = confirmDelete,
     )

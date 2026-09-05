@@ -2,7 +2,6 @@ package dev.mayankmkh.basekmpproject.foundation.resource
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -30,18 +29,19 @@ class ResourceObservationTest {
     }
 
     @Test
-    fun `null value with idle operation is rejected`() {
-        assertFailsWith<IllegalArgumentException> {
+    fun `null value with idle operation is confirmed absent`() {
+        val observation =
             ResourceObservation<String>(
                 value = null,
                 operation = ResourceOperation.Idle,
             )
-        }
+
+        assertTrue(observation.isAbsent)
     }
 
     @Test
     fun `failure without a value is legal and exposes its problem`() {
-        val problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true)
+        val problem = Problem(ProblemKind.OFFLINE)
         val observation =
             ResourceObservation<String>(
                 value = null,
@@ -54,7 +54,7 @@ class ResourceObservationTest {
 
     @Test
     fun helpersExposeCachedValueAndFailure() {
-        val problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true)
+        val problem = Problem(ProblemKind.OFFLINE)
         val observation =
             ResourceObservation(
                 value = "cached",
@@ -68,7 +68,7 @@ class ResourceObservationTest {
 
     @Test
     fun `status mapping prefers in-flight then failure then a missing value`() {
-        val problem = ResourceProblem(ResourceProblemCategory.PERMANENT, retryable = false)
+        val problem = Problem(ProblemKind.UNEXPECTED)
         val failed = SyncStatus(inFlight = false, lastFailure = problem, hasSucceeded = true)
 
         assertEquals(
@@ -78,6 +78,10 @@ class ResourceObservationTest {
         assertEquals(ResourceOperation.Failed(problem), failed.toOperation(hasValue = true))
         assertEquals(
             ResourceOperation.Refreshing,
+            failed.copy(lastFailure = null, hasSucceeded = false).toOperation(hasValue = false),
+        )
+        assertEquals(
+            ResourceOperation.Idle,
             failed.copy(lastFailure = null).toOperation(hasValue = false),
         )
         assertEquals(
@@ -95,5 +99,16 @@ class ResourceObservationTest {
             )
 
         assertNull(idle.failure)
+    }
+
+    @Test
+    fun `problem derives retry and ambiguity from its kind`() {
+        assertTrue(Problem(ProblemKind.OFFLINE).retryable)
+        assertTrue(Problem(ProblemKind.TIMEOUT).retryable)
+        assertTrue(Problem(ProblemKind.SERVER).retryable)
+        assertFalse(Problem(ProblemKind.FORBIDDEN).retryable)
+        assertFalse(Problem(ProblemKind.UNEXPECTED).retryable)
+        assertTrue(Problem(ProblemKind.TIMEOUT).mayHaveApplied)
+        assertFalse(Problem(ProblemKind.SERVER).mayHaveApplied)
     }
 }

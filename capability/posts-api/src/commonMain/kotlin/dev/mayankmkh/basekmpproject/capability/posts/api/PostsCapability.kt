@@ -1,6 +1,6 @@
 package dev.mayankmkh.basekmpproject.capability.posts.api
 
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import kotlinx.coroutines.flow.Flow
@@ -17,10 +17,10 @@ public interface PostsQueries {
  * never clear cached values.
  */
 public interface PostsCommands {
-    public suspend fun refreshFeed(qos: RefreshQos = RefreshQos.visible()): RefreshOutcome
+    public suspend fun refreshFeed(qos: RefreshQos = RefreshQos.visible()): Outcome<Unit>
 
     public suspend fun refreshPost(
         id: PostId,
         qos: RefreshQos = RefreshQos.visible(),
-    ): RefreshOutcome
+    ): Outcome<Unit>
 }

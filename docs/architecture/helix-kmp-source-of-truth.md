@@ -1775,9 +1775,12 @@ Do not conflate operational tracing with business analytics.
 
 ## 7.32 ResourceObservation
 
-A transport-neutral observation envelope for synchronized Capability reads when presentation needs current value plus refresh/failure semantics.
+A transport-neutral observation envelope for synchronized Capability reads when presentation needs
+the current durable value plus refresh, failure and confirmed-absence semantics.
 
-It is **not** a universal presentation State and does not expose Snapshot runtime/Ktor/SQLDelight types.
+It is **not** a universal presentation State and does not expose Snapshot runtime, Ktor or
+SQLDelight types. `value = null` with `Idle` means confirmed absent; `initial()` remains
+`Refreshing` so absence is never confused with a key that has not synchronized.
 
 Canonical semantics are defined in Section 13.7.
 
@@ -3129,14 +3132,30 @@ A plain `Flow<T>` is insufficient for a remotely synchronized read when presenta
 Canonical contract:
 
 ```kotlin
+sealed interface Outcome<out T> {
+    data class Completed<T>(val value: T) : Outcome<T>
+    data class Failed(val problem: Problem) : Outcome<Nothing>
+}
+
+data class Problem(val kind: ProblemKind, val reference: String? = null) {
+    /** A retry without changing anything may succeed. */
+    val retryable: Boolean
+        get() = kind == OFFLINE || kind == TIMEOUT || kind == SERVER
+
+    /** The request may have reached the server; a command's effect is unknown. */
+    val mayHaveApplied: Boolean
+        get() = kind == TIMEOUT
+}
+
+enum class ProblemKind { OFFLINE, TIMEOUT, SERVER, FORBIDDEN, UNEXPECTED }
+
+/** One rejected input, with display-ready server text when the server supplied it. */
+data class Violation<out F>(val field: F?, val code: String, val message: String? = null)
+
 data class ResourceObservation<T : Any>(
     val value: T?,
     val operation: ResourceOperation,
 ) {
-    init {
-        if (value == null) require(operation !is ResourceOperation.Idle)
-    }
-
     companion object {
         fun <T : Any> initial(): ResourceObservation<T> =
             ResourceObservation(value = null, operation = ResourceOperation.Refreshing)
@@ -3148,43 +3167,20 @@ sealed interface ResourceOperation {
     data object Refreshing : ResourceOperation
 
     data class Failed(
-        val problem: ResourceProblem,
+        val problem: Problem,
     ) : ResourceOperation
-}
-
-data class ResourceProblem(
-    val category: ResourceProblemCategory,
-    val retryable: Boolean,
-)
-
-enum class ResourceProblemCategory {
-    OFFLINE,
-    TEMPORARY,
-    ACCESS,
-    PERMANENT,
-    UNKNOWN,
 }
 
 data class SyncStatus(
     val inFlight: Boolean,
-    val lastFailure: ResourceProblem?,
+    val lastFailure: Problem?,
     val hasSucceeded: Boolean,
 )
-
-sealed interface RefreshOutcome {
-    data object Succeeded : RefreshOutcome
-
-    data class Failed(
-        val problem: ResourceProblem,
-    ) : RefreshOutcome
-}
 ```
 
-`T : Any` is deliberate. If "no business value" is a valid domain result, model that explicitly in `T`; do not use the outer nullable `value` for both "not loaded" and "domain says absent."
-
-Refresh (synchronization) Commands return `RefreshOutcome` for the caller's transient feedback;
-other Commands return their own domain result. The observation stream carries persistent status;
-the two are never derived from each other.
+`T : Any` is deliberate. The outer nullable value means the durable source currently has no row.
+The operation distinguishes a never-synchronized key (`Refreshing`), a failed attempt (`Failed`),
+and a confirmed absence (`Idle`).
 
 **Value semantics:** `value` is what the durable source currently holds for the key, or `null`
 while the Capability cannot yet vouch for it. A Capability that needs "this collection was
@@ -3196,24 +3192,47 @@ that needs one models the timestamp inside `T`.
 **Status mapping:** `SyncStatus.toOperation(hasValue)` in `:foundation:resource` is the one
 mapping from the durable value and the key's `SyncStatus` to an operation, in this order:
 `Refreshing` while `inFlight`; `Failed(lastFailure)` when the last attempt failed; `Refreshing`
-while the value is still `null`; otherwise `Idle`. `SyncCoordinator.observations(key, values)` in
+while the value is `null` and the key has never succeeded; otherwise `Idle`.
+`SyncCoordinator.observations(key, values)` in
 `:foundation:resource-runtime` applies it: it combines the durable value flow with `status(key)`,
 drops unchanged emissions and wraps the result in `observing` for the same key, so a Capability
-hands over its value flow and never repeats the mapping. A confirmed detail 404 maps to
-`Failed(PERMANENT, retryable = false)` through `lastFailure`. A clean ledger with a `null` value
-remains `Refreshing` while the durable query catches up or until a later attempt confirms a result.
-A Capability's sync function is `remoteResult.commit { persist(it) }`. Its local source observes
+hands over its value flow and never repeats the mapping. A confirmed detail 404 is an endpoint
+answer: the implementation removes the local row and completes the sync. The resulting
+`ResourceObservation(value = null, operation = Idle)` is confirmed absent, exposed by `isAbsent`.
+A clean ledger with a `null` value remains `Refreshing` while the durable query catches up or until
+a later attempt confirms a result. A Capability's sync function uses the logging
+`remoteResult.commit(logger, operation) { persist(it) }` bridge. Its local source observes
 SQLDelight through `:foundation:sqldelight`'s `observeList`, `observeOneOrNull` and `observeOne`
 helpers, and builds its generated database once with `LazyDatabase` over the app's shared
 `SqlDriverProvider`, observing queries through `LazyDatabase.observe`. The app shares its cold platform connectivity monitor once with
 `ConnectivityMonitor.shared(applicationScope)`, so every coordinator takes
 `connectivityMonitor.reconnects()` directly.
 
-**Result types:** state observed over time is a `ResourceObservation`; a one-shot command that
-crosses the Capability API returns the library-free `RefreshOutcome`; typed failures inside an
-implementation use kotlin-result's `Result<T, E>` with a sealed error type (`NetworkFailure` in
-`:foundation:network`, bridged by `commit`). Stdlib `kotlin.Result` and `runCatching` are not used
-in product code; exceptions are reserved for bugs and cancellation.
+**Command results:**
+
+- `Failed` means the system could not reach a decision (offline, timeout, server failure, no
+  access, or a bug such as an undecodable body or an unmapped status). `Completed` means it did,
+  and the decision may be a refusal. Every command returns `Outcome<T>`.
+- Refusals are modelled in `T` as the command's own sealed result type, for example
+  `Outcome<CreateTodoResult>` with `CreateTodoResult = Created(id) | InvalidInput(violations)`.
+  Commands with nothing to say on success return `Outcome<Unit>`. There is no generic rejection
+  type parameter, no marker interface, no nullable `Problem?`, and no `Failed` case inside domain
+  result types.
+- The capability implementation decides, per endpoint, which HTTP statuses are answers and maps
+  them into `T` before the bridge runs; everything unmapped becomes a `Problem`.
+- `Problem` carries no message text. Display-ready server text belongs on refusals (`Violation.message`
+  or a field on the refusal case). Features map `ProblemKind` to their own strings.
+- `Problem.reference` is the request id (`X-Request-Id`) when one exists, for support and logs.
+- Exactly one structured log line per `Failed` classification, none for refusals or success.
+- kotlin-result stays inside implementations (`Result<T, NetworkFailure>` from `tryCatching`); the
+  capability API and features never see it. Exceptions remain for bugs and cancellation only.
+
+The `NetworkFailure` to `Problem` mapping is fixed: offline and timeout transport failures become
+`OFFLINE` and `TIMEOUT`; HTTP 401 or 403 becomes `FORBIDDEN`; HTTP 408, 429 and 5xx become `SERVER`;
+any other unmapped HTTP status, decoding failure or unexpected failure becomes `UNEXPECTED`.
+`Problem.reference` is the failure's request id. The bridge logs the operation name, kind, HTTP
+status when present, transport kind when present, request id, exception class and exception
+message. `UNEXPECTED` is error severity; every other kind is warning severity.
 
 **RefreshQos semantics:** `CRITICAL_VISIBLE` means the user is blocked on the resource; `VISIBLE`
 means the user is looking at it; `BACKGROUND` is maintenance/reconnect work that must not compete
@@ -3229,7 +3248,8 @@ The legal structural combinations are exhaustive:
 | value | operation | meaning/example |
 |---|---|---|
 | `null` | `Refreshing` | initial load, or an unsynchronized key whose sync is in flight |
-| `null` | `Failed(...)` | failure with no value to show, including a detail 404 mapped to `PERMANENT` |
+| `null` | `Failed(...)` | failure with no value to show |
+| `null` | `Idle` | synchronization confirmed that the detail is absent |
 | `T` | `Idle` | durable value, no active sync |
 | `T` | `Refreshing` | durable value shown while a sync runs |
 | `T` | `Failed(...)` | durable value retained after a failed sync, typically offline |
@@ -3239,7 +3259,7 @@ Rules:
 - coordinator/Ktor/SQLDelight exceptions and implementation types never leak through this contract.
 - `ResourceObservation` is not a universal UI State; ViewModels map it to product-specific State.
 - product-specific failure semantics may add stable domain contracts; raw HTTP/errors do not escape.
-- session expiration is primarily an Identity/session transition; `ACCESS` may describe the read attempt while that transition resolves.
+- session expiration is primarily an Identity/session transition; `FORBIDDEN` may describe the read attempt while that transition resolves.
 - purely local reads with no synchronization semantics may remain `Flow<T>`.
 - Projections derive observation status intentionally instead of discarding failure information.
 - Live Resources may use the same envelope; socket diagnostics remain implementation/inspector data unless product-facing.
@@ -5613,7 +5633,11 @@ problem in project code; see ADR-43.
 
 ## ADR-31 - Synchronized reads expose one validatable ResourceObservation contract
 
-**Decision:** remotely synchronized Capability reads use the single `ResourceObservation<T : Any>` contract from `:foundation:resource` (`foundation_api`) when value + refresh/failure semantics matter; simple local reads may remain `Flow<T>`. Constructor invariants reject structurally illegal status combinations.
+**Decision:** remotely synchronized Capability reads use the single `ResourceObservation<T : Any>`
+contract from `:foundation:resource` (`foundation_api`) when value plus refresh/failure semantics
+matter; simple local reads may remain `Flow<T>`. A null value with `Idle` is the deliberate
+confirmed-absence state; `initial()` and `SyncStatus.toOperation` keep never-synchronized keys out
+of that state.
 
 **Why:** a plain domain-value flow cannot consistently express loading, refresh with a retained value, cached-offline, or failed refresh, while per-Capability copies would immediately drift.
 
@@ -5710,7 +5734,8 @@ problem in project code; see ADR-43.
 ## ADR-43 - Sync coordination is domain-blind and the database owns the value
 
 **Decision:** `:foundation:resource-runtime` ships `SyncCoordinator<Key>` plus the small helpers
-that connect it to a Capability (`observations`, `toResourceProblem`, `commit`); it owns no value.
+that connect it to a Capability (`observations`, `toProblem`, `toOutcome`, `commit`); it owns no
+value.
 It starts or joins one worker per key, skips keys attempted within `minInterval`, counts observers
 around a Capability-supplied upstream flow, retries observed keys whose last attempt failed offline
 whenever its `retryTriggers` flow emits, and exposes a per-key `SyncStatus` ledger bounded by
@@ -5741,6 +5766,20 @@ mutex-guarded map with a state table.
 **Revisit when:** a Capability needs a domain-blind age or staleness policy that cannot live in its
 own rows, or a qualified third-party primitive provides per-key joining, due-checking, observer
 counting, and status without owning the value.
+
+## ADR-44 - Two-lane command results: Outcome with refusals in T
+
+**Decision:** every Capability command returns `Outcome<T>`. `Failed(Problem)` means no decision
+was reached. A completed refusal is a command-specific sealed case inside `T`, with validation
+details represented by `Violation<F>`. Capability implementations map endpoint answer statuses
+before the single network-failure bridge classifies and logs everything unmapped.
+
+**Why:** one envelope at every command boundary keeps infrastructure failures separate from
+product decisions, preserves exhaustive domain results, prevents transport and kotlin-result types
+from leaking into Capability APIs, and gives every failed classification one logging path.
+
+**Revisit when:** Kotlin can express a more precise command envelope without dead branches at
+`Unit` commands, or product evidence shows that refusals need a shared cross-capability contract.
 
 ---
 
@@ -6426,9 +6465,9 @@ private fun ResourceObservation<LiveScore>.toLiveScoreState(): LiveScoreState {
         isRefreshing = value != null && operation is ResourceOperation.Refreshing,
         problem = failure?.problem?.let { problem ->
             when {
-                problem.category == ResourceProblemCategory.OFFLINE ->
+                problem.kind == ProblemKind.OFFLINE ->
                     LiveScoreProblemUi.OFFLINE
-                problem.category == ResourceProblemCategory.ACCESS ->
+                problem.kind == ProblemKind.FORBIDDEN ->
                     LiveScoreProblemUi.ACCESS
                 problem.retryable ->
                     LiveScoreProblemUi.RETRYABLE

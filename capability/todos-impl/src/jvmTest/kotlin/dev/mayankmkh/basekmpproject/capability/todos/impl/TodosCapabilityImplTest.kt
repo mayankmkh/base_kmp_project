@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.capability.todos.impl
 
+import co.touchlab.kermit.Logger
 import com.github.michaelbull.result.fold
 import dev.mayankmkh.basekmpproject.capability.todos.api.CreateTodoResult
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoDraft
@@ -11,7 +12,8 @@ import dev.mayankmkh.basekmpproject.capability.todos.api.UpdateTodoResult
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
 import dev.mayankmkh.basekmpproject.foundation.preferences.inMemoryPreferenceStore
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import io.ktor.client.engine.mock.MockEngine
@@ -24,7 +26,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import kotlin.test.fail
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -39,12 +40,12 @@ class TodosCapabilityImplTest {
     fun `remote maps 422 errors before infrastructure failure mapping`() = runTest {
         val remote = remote(HttpStatusCode.UnprocessableEntity, ERROR_JSON)
 
-        val failure =
+        val answer =
             remote
                 .renameTodo(1, "bad")
-                .fold(success = { fail("Expected failure") }, failure = { it })
+                .fold(success = { it }, failure = { error("Expected answer, got $it") })
 
-        val invalid = assertIs<TodoRemoteFailure.InvalidInput>(failure)
+        val invalid = assertIs<UpdateTodoRemoteAnswer.InvalidInput>(answer)
         assertEquals(TodoField.TITLE, invalid.violations.single().field)
         assertEquals("Server says use fewer words.", invalid.violations.single().message)
     }
@@ -53,10 +54,12 @@ class TodosCapabilityImplTest {
     fun `remote maps 404 to domain not found`() = runTest {
         val remote = remote(HttpStatusCode.NotFound, "{}")
 
-        val failure =
-            remote.deleteTodo(404).fold(success = { fail("Expected failure") }, failure = { it })
+        val answer =
+            remote
+                .deleteTodo(404)
+                .fold(success = { it }, failure = { error("Expected answer, got $it") })
 
-        assertIs<TodoRemoteFailure.NotFound>(failure)
+        assertIs<DeleteTodoRemoteAnswer.NotFound>(answer)
     }
 
     @Test
@@ -66,7 +69,8 @@ class TodosCapabilityImplTest {
 
         val result = capability.renameTodo(TodoId(1), " ")
 
-        val invalid = assertIs<UpdateTodoResult.InvalidInput>(result)
+        val invalid =
+            assertIs<UpdateTodoResult.InvalidInput>(assertIs<Outcome.Completed<*>>(result).value)
         assertEquals("blank", invalid.violations.single().code)
         assertEquals(null, invalid.violations.single().message)
         assertTrue(engine.requestHistory.isEmpty())
@@ -86,8 +90,8 @@ class TodosCapabilityImplTest {
 
             val result = capability.setCompleted(TodoId(1), completed = true)
 
-            val failed = assertIs<UpdateTodoResult.Failed>(result)
-            assertEquals(ResourceProblemCategory.TEMPORARY, failed.problem.category)
+            val failed = assertIs<Outcome.Failed>(result)
+            assertEquals(ProblemKind.SERVER, failed.problem.kind)
             assertEquals(0, local.find(TodoId(1))?.completed)
             capability.close()
         }
@@ -109,7 +113,9 @@ class TodosCapabilityImplTest {
 
             val result = capability.createTodo(TodoDraft("Local todo", ownerId = 7))
 
-            assertEquals(TodoId(1_000_000), assertIs<CreateTodoResult.Created>(result).id)
+            val created =
+                assertIs<CreateTodoResult.Created>(assertIs<Outcome.Completed<*>>(result).value)
+            assertEquals(TodoId(1_000_000), created.id)
             val stored = local.find(TodoId(1_000_000))
             assertEquals(7, stored?.ownerId)
             assertEquals(1, stored?.localCreated)
@@ -127,6 +133,21 @@ class TodosCapabilityImplTest {
         assertEquals("server", local.find(TodoId(1))?.title)
         assertEquals("local", local.find(TodoId(1_000_000))?.title)
     }
+
+    @Test
+    fun `a 404 item refresh removes the durable row and completes`() =
+        runTest(dispatcher) {
+            val local = createInMemoryTodosLocalSource()
+            local.upsert(entity(404))
+            val capability =
+                capability(MockEngine { respond("{}", HttpStatusCode.NotFound) }, local)
+
+            val outcome = capability.refreshTodo(TodoId(404))
+
+            assertEquals(Outcome.Completed(Unit), outcome)
+            assertEquals(null, local.find(TodoId(404)))
+            capability.close()
+        }
 
     @Test
     fun `settings are applied by SQL queries`() = runTest {
@@ -169,6 +190,7 @@ class TodosCapabilityImplTest {
                     CoroutineExceptionHandler { _, throwable -> throw throwable },
                 ),
             connectivityMonitor = ConnectivityMonitor { MutableStateFlow(true) },
+            logger = Logger,
         )
 
     private fun remote(status: HttpStatusCode, body: String): TodosRemoteSource =

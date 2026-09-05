@@ -75,7 +75,7 @@ class SafeCallTest {
 
         val error = client.tryCatching { get("thing").body<ErrorBody>() }.getError()
 
-        assertIs<NetworkFailure.Decoding>(error)
+        assertNotNull(assertIs<NetworkFailure.Decoding>(error).requestId)
     }
 
     @Test
@@ -84,26 +84,28 @@ class SafeCallTest {
 
         val error = client.tryCatching { get("thing").body<UnsupportedBody>() }.getError()
 
-        assertIs<NetworkFailure.Decoding>(error)
+        assertNotNull(assertIs<NetworkFailure.Decoding>(error).requestId)
     }
 
     @Test
     fun `maps io failure to offline transport`() = runTest {
-        val client = HttpClient(MockEngine { throw IOException("offline") })
+        val client = requestClient { throw IOException("offline") }
 
         val error = assertIs<NetworkFailure.Transport>(client.textCall().getError())
 
         assertEquals(TransportFailureKind.OFFLINE, error.kind)
+        assertNotNull(error.requestId)
     }
 
     @Test
     fun `unwraps cancellation-wrapped request timeout into timeout transport`() = runTest {
         val timeout = HttpRequestTimeoutException(HttpRequestBuilder())
-        val client = HttpClient(MockEngine { throw CancellationException("wrapped", timeout) })
+        val client = requestClient { throw CancellationException("wrapped", timeout) }
 
         val error = assertIs<NetworkFailure.Transport>(client.textCall().getError())
 
         assertEquals(TransportFailureKind.TIMEOUT, error.kind)
+        assertNotNull(error.requestId)
         assertIs<HttpRequestTimeoutException>(error.cause)
     }
 
@@ -118,12 +120,13 @@ class SafeCallTest {
 
     @Test
     fun `maps an unexpected exception to Unexpected`() = runTest {
-        val client = HttpClient(MockEngine { throw IllegalStateException("unexpected") })
+        val client = requestClient { throw IllegalStateException("unexpected") }
 
         val error = assertIs<NetworkFailure.Unexpected>(client.textCall().getError())
 
         assertIs<IllegalStateException>(error.cause)
         assertEquals("unexpected", error.cause.message)
+        assertNotNull(error.requestId)
     }
 
     private suspend fun HttpClient.textCall() = tryCatching {
@@ -146,6 +149,12 @@ class SafeCallTest {
             NetworkConfig(Url("https://example.com")),
         )
     }
+
+    private fun requestClient(block: suspend () -> Nothing): HttpClient =
+        createHttpClient(
+            MockEngine { block() },
+            NetworkConfig(Url("https://example.com")),
+        )
 
     @Serializable private data class ErrorBody(val message: String)
 

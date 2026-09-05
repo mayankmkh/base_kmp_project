@@ -9,10 +9,10 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostFeedOutput
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.foundation.resource.failure
 import dev.mayankmkh.basekmpproject.foundation.resource.hasValue
 import dev.mayankmkh.basekmpproject.foundation.resource.isRefreshing
@@ -29,7 +29,7 @@ internal data class PostFeedState(
     val posts: List<Post> = emptyList(),
     val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
-    val problem: ResourceProblem? = null,
+    val problem: Problem? = null,
 )
 
 internal sealed interface PostFeedAction {
@@ -39,7 +39,7 @@ internal sealed interface PostFeedAction {
 }
 
 internal sealed interface PostFeedUiCommand {
-    data class ShowRefreshFailed(val category: ResourceProblemCategory) : PostFeedUiCommand
+    data class ShowRefreshFailed(val kind: ProblemKind) : PostFeedUiCommand
 }
 
 internal class PostFeedViewModel(
@@ -71,9 +71,9 @@ internal class PostFeedViewModel(
             PostFeedAction.Refresh ->
                 viewModelScope.launch {
                     val outcome = commands.refreshFeed()
-                    if (outcome is RefreshOutcome.Failed) {
+                    if (outcome is Outcome.Failed) {
                         uiCommandChannel.send(
-                            PostFeedUiCommand.ShowRefreshFailed(outcome.problem.category)
+                            PostFeedUiCommand.ShowRefreshFailed(outcome.problem.kind)
                         )
                     }
                 }

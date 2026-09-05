@@ -1,8 +1,9 @@
 package __PACKAGE__
 
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
+import dev.mayankmkh.basekmpproject.foundation.resource.Violation
 import kotlinx.coroutines.flow.Flow
 
 // Queries observe and never mutate. One Capability exposes one grouped Queries interface rather
@@ -22,5 +23,14 @@ public interface __NAME__Queries {
 // QoS is domain-blind: it says how urgent the work is, never what the product means by fresh.
 /** The __name__ Capability's explicit synchronization intents. */
 public interface __NAME__Commands {
-    public suspend fun refresh(qos: RefreshQos = RefreshQos.visible()): RefreshOutcome
+    public suspend fun refresh(qos: RefreshQos = RefreshQos.visible()): Outcome<Unit>
+
+    public suspend fun create(label: String): Outcome<Create__NAME__Result>
+}
+
+public sealed interface Create__NAME__Result {
+    public data class Created(val id: __NAME__Id) : Create__NAME__Result
+
+    public data class InvalidInput(val violations: List<Violation<__NAME__Field>>) :
+        Create__NAME__Result
 }

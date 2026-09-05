@@ -15,12 +15,17 @@ import io.ktor.client.utils.unwrapCancellationException
 import io.ktor.serialization.JsonConvertException
 import io.ktor.util.network.UnresolvedAddressException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.io.IOException
 import kotlinx.serialization.json.Json
 
-public suspend inline fun <reified T> HttpClient.tryCatching(
+public suspend fun <T> HttpClient.tryCatching(
     block: suspend HttpClient.() -> T
-): Result<T, NetworkFailure> = runCatching { block() }.mapError { it.toNetworkFailure() }
+): Result<T, NetworkFailure> {
+    val requestIds = RequestIdContext()
+    return runCatching { withContext(requestIds) { block() } }
+        .mapError { it.toNetworkFailure(requestIds.latest) }
+}
 
 public inline fun <reified T> NetworkFailure.Http.bodyOrNull(json: Json): T? =
     try {
@@ -30,7 +35,9 @@ public inline fun <reified T> NetworkFailure.Http.bodyOrNull(json: Json): T? =
         else null
     }
 
-public suspend fun Throwable.toNetworkFailure(): NetworkFailure {
+public suspend fun Throwable.toNetworkFailure(): NetworkFailure = toNetworkFailure(requestId = null)
+
+private suspend fun Throwable.toNetworkFailure(requestId: String?): NetworkFailure {
     val unwrapped = unwrapCancellationException()
     if (unwrapped is CancellationException) throw unwrapped
 
@@ -40,21 +47,22 @@ public suspend fun Throwable.toNetworkFailure(): NetworkFailure {
                 status = unwrapped.response.status,
                 headers = unwrapped.response.headers,
                 body = unwrapped.response.bodyAsBytes(),
-                requestId = unwrapped.response.request.headers[RequestIdHeader],
+                requestId = unwrapped.response.request.headers[RequestIdHeader] ?: requestId,
                 cause = unwrapped,
             )
         is JsonConvertException,
-        is NoTransformationFoundException -> NetworkFailure.Decoding(unwrapped)
+        is NoTransformationFoundException -> NetworkFailure.Decoding(requestId, unwrapped)
         is HttpRequestTimeoutException,
         is SocketTimeoutException,
         is ConnectTimeoutException ->
-            NetworkFailure.Transport(TransportFailureKind.TIMEOUT, unwrapped)
+            NetworkFailure.Transport(TransportFailureKind.TIMEOUT, requestId, unwrapped)
         is UnresolvedAddressException,
-        is IOException -> NetworkFailure.Transport(TransportFailureKind.OFFLINE, unwrapped)
+        is IOException ->
+            NetworkFailure.Transport(TransportFailureKind.OFFLINE, requestId, unwrapped)
         else -> {
             val kind = unwrapped.platformTransportFailureKind()
-            if (kind == null) NetworkFailure.Unexpected(unwrapped)
-            else NetworkFailure.Transport(kind, unwrapped)
+            if (kind == null) NetworkFailure.Unexpected(requestId, unwrapped)
+            else NetworkFailure.Transport(kind, requestId, unwrapped)
         }
     }
 }

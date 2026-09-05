@@ -1,13 +1,14 @@
 package dev.mayankmkh.basekmpproject.capability.posts.impl
 
 import app.cash.turbine.test
+import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceOperation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import io.ktor.client.engine.mock.MockEngine
@@ -60,14 +61,14 @@ class PostsCapabilityImplTest {
                 else respondJson(FEED_JSON)
             }
             val capability = capability(engine, local)
-            assertSame(RefreshOutcome.Succeeded, capability.refreshPost(PostId(99)))
+            assertIs<Outcome.Completed<Unit>>(capability.refreshPost(PostId(99)))
 
             capability.observePost(PostId(99)).test {
                 val detail = awaitItem()
                 assertEquals("Outside page", detail.value?.title)
                 assertSame(ResourceOperation.Idle, detail.operation)
 
-                assertSame(RefreshOutcome.Succeeded, capability.refreshFeed())
+                assertIs<Outcome.Completed<Unit>>(capability.refreshFeed())
                 assertEquals("Outside page", local.observeById("99").first()?.title)
                 assertEquals(listOf("10", "2"), local.observeFeed().first().map { it.id })
                 expectNoEvents()
@@ -96,8 +97,8 @@ class PostsCapabilityImplTest {
                 val failed = awaitItem()
                 assertEquals(null, failed.value)
                 assertEquals(
-                    ResourceProblemCategory.OFFLINE,
-                    assertIs<ResourceOperation.Failed>(failed.operation).problem.category,
+                    ProblemKind.OFFLINE,
+                    assertIs<ResourceOperation.Failed>(failed.operation).problem.kind,
                 )
                 expectNoEvents()
                 cancelAndIgnoreRemainingEvents()
@@ -111,7 +112,7 @@ class PostsCapabilityImplTest {
             val local = createInMemoryPostsLocalSource()
             val engine = mockEngine { respondJson("[]") }
             val capability = capability(engine, local)
-            assertSame(RefreshOutcome.Succeeded, capability.refreshFeed())
+            assertIs<Outcome.Completed<Unit>>(capability.refreshFeed())
 
             capability.observeFeed().test {
                 val observation = awaitItem()
@@ -188,10 +189,8 @@ class PostsCapabilityImplTest {
             }
             runCurrent()
             val unobservedFailure =
-                assertIs<RefreshOutcome.Failed>(
-                    capability.refreshPost(PostId(2), RefreshQos.visible())
-                )
-            assertEquals(ResourceProblemCategory.OFFLINE, unobservedFailure.problem.category)
+                assertIs<Outcome.Failed>(capability.refreshPost(PostId(2), RefreshQos.visible()))
+            assertEquals(ProblemKind.OFFLINE, unobservedFailure.problem.kind)
             assertEquals(mapOf("feed" to 1, "1" to 1, "2" to 1), attempts.pathCounts())
 
             online.value = true
@@ -237,6 +236,7 @@ class PostsCapabilityImplTest {
             localSource = local,
             applicationRuntimeScope = runtime,
             connectivityMonitor = connectivity,
+            logger = Logger,
         )
     }
 

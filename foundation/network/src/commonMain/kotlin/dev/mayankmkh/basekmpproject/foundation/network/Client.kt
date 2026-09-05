@@ -30,8 +30,11 @@ import io.ktor.http.takeFrom
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.util.AttributeKey
 import io.ktor.util.Attributes
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.json.Json
 
 internal expect val platformEngineFactory: HttpClientEngineFactory<*>
@@ -232,9 +235,15 @@ public fun HttpRequestBuilder.retryable() {
 private val RequestId =
     createClientPlugin("RequestId") {
         on(SendingRequest) { request, _ ->
-            request.headers[RequestIdHeader] = Uuid.random().toString()
+            val requestId = Uuid.random().toString()
+            currentCoroutineContext()[RequestIdContext]?.latest = requestId
+            request.headers[RequestIdHeader] = requestId
         }
     }
+
+internal class RequestIdContext(var latest: String? = null) : AbstractCoroutineContextElement(Key) {
+    internal companion object Key : CoroutineContext.Key<RequestIdContext>
+}
 
 private const val MaximumRetries = 2
 private const val BearerPrefix = "Bearer "

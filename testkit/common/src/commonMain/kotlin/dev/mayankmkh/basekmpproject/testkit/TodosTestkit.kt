@@ -10,7 +10,7 @@ import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSettings
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodosCommands
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodosQueries
 import dev.mayankmkh.basekmpproject.capability.todos.api.UpdateTodoResult
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import kotlinx.coroutines.flow.Flow
@@ -60,49 +60,52 @@ class FakeTodosQueries(
 }
 
 class FakeTodosCommands : TodosCommands {
-    var onRefreshTodos: suspend (RefreshQos) -> RefreshOutcome = { RefreshOutcome.Succeeded }
-    var onRefreshTodo: suspend (TodoId, RefreshQos) -> RefreshOutcome = { _, _ ->
-        RefreshOutcome.Succeeded
+    var onRefreshTodos: suspend (RefreshQos) -> Outcome<Unit> = { Outcome.Completed(Unit) }
+    var onRefreshTodo: suspend (TodoId, RefreshQos) -> Outcome<Unit> = { _, _ ->
+        Outcome.Completed(Unit)
     }
-    var onCreate: suspend (TodoDraft) -> CreateTodoResult = {
-        CreateTodoResult.Created(TodoId(1_000_000))
+    var onCreate: suspend (TodoDraft) -> Outcome<CreateTodoResult> = {
+        Outcome.Completed(CreateTodoResult.Created(TodoId(1_000_000)))
     }
-    var onSetCompleted: suspend (TodoId, Boolean) -> UpdateTodoResult = { _, _ ->
-        UpdateTodoResult.Updated
+    var onSetCompleted: suspend (TodoId, Boolean) -> Outcome<UpdateTodoResult> = { _, _ ->
+        Outcome.Completed(UpdateTodoResult.Updated)
     }
-    var onRename: suspend (TodoId, String) -> UpdateTodoResult = { _, _ ->
-        UpdateTodoResult.Updated
+    var onRename: suspend (TodoId, String) -> Outcome<UpdateTodoResult> = { _, _ ->
+        Outcome.Completed(UpdateTodoResult.Updated)
     }
-    var onDelete: suspend (TodoId) -> DeleteTodoResult = { DeleteTodoResult.Deleted }
+    var onDelete: suspend (TodoId) -> Outcome<DeleteTodoResult> = {
+        Outcome.Completed(DeleteTodoResult.Deleted)
+    }
 
     val completedChanges = mutableListOf<Pair<TodoId, Boolean>>()
     val renames = mutableListOf<Pair<TodoId, String>>()
     val deletes = mutableListOf<TodoId>()
     val settingsUpdates = mutableListOf<TodoSettings>()
 
-    override suspend fun refreshTodos(qos: RefreshQos): RefreshOutcome = onRefreshTodos(qos)
+    override suspend fun refreshTodos(qos: RefreshQos): Outcome<Unit> = onRefreshTodos(qos)
 
-    override suspend fun refreshTodo(id: TodoId, qos: RefreshQos): RefreshOutcome =
+    override suspend fun refreshTodo(id: TodoId, qos: RefreshQos): Outcome<Unit> =
         onRefreshTodo(id, qos)
 
-    override suspend fun createTodo(draft: TodoDraft): CreateTodoResult = onCreate(draft)
+    override suspend fun createTodo(draft: TodoDraft): Outcome<CreateTodoResult> = onCreate(draft)
 
-    override suspend fun setCompleted(id: TodoId, completed: Boolean): UpdateTodoResult {
+    override suspend fun setCompleted(id: TodoId, completed: Boolean): Outcome<UpdateTodoResult> {
         completedChanges += id to completed
         return onSetCompleted(id, completed)
     }
 
-    override suspend fun renameTodo(id: TodoId, title: String): UpdateTodoResult {
+    override suspend fun renameTodo(id: TodoId, title: String): Outcome<UpdateTodoResult> {
         renames += id to title
         return onRename(id, title)
     }
 
-    override suspend fun deleteTodo(id: TodoId): DeleteTodoResult {
+    override suspend fun deleteTodo(id: TodoId): Outcome<DeleteTodoResult> {
         deletes += id
         return onDelete(id)
     }
 
-    override suspend fun updateSettings(settings: TodoSettings) {
+    override suspend fun updateSettings(settings: TodoSettings): Outcome<Unit> {
         settingsUpdates += settings
+        return Outcome.Completed(Unit)
     }
 }

@@ -21,6 +21,7 @@ kotlin {
                 api(libs.sqldelight.async.extensions)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.michael.bull.kotlin.result)
+                implementation(libs.touchlab.kermit)
             }
         }
         jvmTest {

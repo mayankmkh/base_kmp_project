@@ -1,11 +1,12 @@
 package dev.mayankmkh.basekmpproject.capability.posts.impl
 
+import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.capability.posts.api.Post
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostFeed
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
-import dev.mayankmkh.basekmpproject.foundation.resource.RefreshOutcome
+import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.runtime.SyncCoordinator
@@ -24,6 +25,7 @@ internal class PostsCapabilityImpl(
     private val localSource: PostsLocalSource,
     applicationRuntimeScope: ApplicationRuntimeScope,
     connectivityMonitor: ConnectivityMonitor,
+    private val logger: Logger,
 ) : PostsQueries, PostsCommands, AutoCloseable {
     private val scope = applicationRuntimeScope.childScope("posts")
 
@@ -54,18 +56,23 @@ internal class PostsCapabilityImpl(
     override fun observePost(id: PostId): Flow<ResourceObservation<Post>> =
         postSync.observations(id, localSource.observeById(id.value.toString()).map { it?.toPost() })
 
-    override suspend fun refreshFeed(qos: RefreshQos): RefreshOutcome = feedSync.sync(Unit, qos)
+    override suspend fun refreshFeed(qos: RefreshQos): Outcome<Unit> = feedSync.sync(Unit, qos)
 
-    override suspend fun refreshPost(id: PostId, qos: RefreshQos): RefreshOutcome =
+    override suspend fun refreshPost(id: PostId, qos: RefreshQos): Outcome<Unit> =
         postSync.sync(id, qos)
 
-    private suspend fun syncFeed(): RefreshOutcome =
-        remoteSource.getPosts().commit { posts ->
+    private suspend fun syncFeed(): Outcome<Unit> =
+        remoteSource.getPosts().commit(logger, "posts.feed.refresh") { posts ->
             localSource.replaceFeed(posts.map(PostDto::toPostEntity))
         }
 
-    private suspend fun syncPost(id: PostId): RefreshOutcome =
-        remoteSource.getPost(id.value).commit { localSource.upsert(it.toPostEntity()) }
+    private suspend fun syncPost(id: PostId): Outcome<Unit> =
+        remoteSource.getPost(id.value).commit(logger, "posts.detail.refresh") { answer ->
+            when (answer) {
+                is PostRemoteAnswer.Found -> localSource.upsert(answer.post.toPostEntity())
+                PostRemoteAnswer.NotFound -> localSource.delete(id.value.toString())
+            }
+        }
 
     override fun close() {
         scope.cancel()

@@ -1,0 +1,9 @@
+<resources>
+    <string name="retry">Retry</string>
+    <string name="back">Back</string>
+    <string name="you_are_offline">You're offline</string>
+    <string name="took_too_long">That took too long</string>
+    <string name="temporarily_unavailable">Temporarily unavailable</string>
+    <string name="you_do_not_have_access">You don't have access</string>
+    <string name="something_went_wrong">Something went wrong</string>
+</resources>

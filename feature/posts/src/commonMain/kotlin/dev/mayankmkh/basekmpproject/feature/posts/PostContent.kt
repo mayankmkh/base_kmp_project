@@ -1,18 +1,15 @@
 package dev.mayankmkh.basekmpproject.feature.posts
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -25,21 +22,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import base_kmp_project.feature.posts.generated.resources.Res
-import base_kmp_project.feature.posts.generated.resources.could_not_refresh_posts
 import base_kmp_project.feature.posts.generated.resources.nothing_here_yet
 import base_kmp_project.feature.posts.generated.resources.post_unavailable
 import base_kmp_project.feature.posts.generated.resources.posts
-import base_kmp_project.feature.posts.generated.resources.posts_temporarily_unavailable
-import base_kmp_project.feature.posts.generated.resources.retry
-import base_kmp_project.feature.posts.generated.resources.you_are_offline
-import base_kmp_project.feature.posts.generated.resources.you_do_not_have_access
 import dev.mayankmkh.basekmpproject.capability.posts.api.Post
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
-import org.jetbrains.compose.resources.StringResource
+import dev.mayankmkh.basekmpproject.ui.designsystem.Centred
+import dev.mayankmkh.basekmpproject.ui.designsystem.Failure
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -123,42 +113,7 @@ internal fun PostDetailContent(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                 )
             state.problem != null -> Failure(state.problem, { onAction(PostDetailAction.Retry) })
+            state.isAbsent -> Centred { Text(stringResource(Res.string.post_unavailable)) }
         }
     }
 }
-
-@Composable
-private fun Failure(
-    problem: ResourceProblem,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Centred(modifier) {
-        Text(
-            text = stringResource(problem.category.messageResource()),
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-        )
-        Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
-    }
-}
-
-@Composable
-private fun Centred(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Column(
-        modifier = modifier.fillMaxWidth().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-    ) {
-        content()
-    }
-}
-
-internal fun ResourceProblemCategory.messageResource(): StringResource =
-    when (this) {
-        ResourceProblemCategory.OFFLINE -> Res.string.you_are_offline
-        ResourceProblemCategory.TEMPORARY -> Res.string.posts_temporarily_unavailable
-        ResourceProblemCategory.ACCESS -> Res.string.you_do_not_have_access
-        ResourceProblemCategory.PERMANENT -> Res.string.post_unavailable
-        ResourceProblemCategory.UNKNOWN -> Res.string.could_not_refresh_posts
-    }

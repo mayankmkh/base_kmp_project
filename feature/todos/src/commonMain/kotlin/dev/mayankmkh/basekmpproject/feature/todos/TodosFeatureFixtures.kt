@@ -3,9 +3,9 @@ package dev.mayankmkh.basekmpproject.feature.todos
 import dev.mayankmkh.basekmpproject.capability.todos.api.Todo
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoField
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoId
-import dev.mayankmkh.basekmpproject.capability.todos.api.TodoViolation
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
+import dev.mayankmkh.basekmpproject.foundation.resource.Violation
 
 internal object TodosFeatureFixtures {
     val todos =
@@ -19,13 +19,13 @@ internal object TodosFeatureFixtures {
     val errorList: TodoListState =
         TodoListState(
             isInitialLoading = false,
-            problem = ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true),
+            problem = Problem(ProblemKind.SERVER),
         )
     val offlineList: TodoListState =
         TodoListState(
             todos = todos,
             isInitialLoading = false,
-            problem = ResourceProblem(ResourceProblemCategory.OFFLINE, retryable = true),
+            problem = Problem(ProblemKind.OFFLINE),
         )
     val detail: TodoDetailState =
         TodoDetailState(
@@ -36,19 +36,17 @@ internal object TodosFeatureFixtures {
     val detailNotFound: TodoDetailState =
         TodoDetailState(
             isInitialLoading = false,
-            problem = ResourceProblem(ResourceProblemCategory.PERMANENT, retryable = false),
+            isAbsent = true,
         )
     val editor = TodoEditorState()
     val editorFieldError: TodoEditorState =
-        TodoEditorState(
-            violations = listOf(TodoViolation(TodoField.TITLE, "blank", message = null))
-        )
+        TodoEditorState(violations = listOf(Violation(TodoField.TITLE, "blank")))
     val editorServerMessage: TodoEditorState =
         TodoEditorState(
             title = "A server-rejected title",
             violations =
                 listOf(
-                    TodoViolation(
+                    Violation(
                         field = TodoField.TITLE,
                         code = "too_long",
                         message = "Use the shorter title supplied by your team.",

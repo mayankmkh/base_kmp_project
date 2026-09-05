@@ -10,17 +10,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import base_kmp_project.feature.todos.generated.resources.Res
-import base_kmp_project.feature.todos.generated.resources.could_not_update_todo
 import base_kmp_project.feature.todos.generated.resources.input_invalid
 import base_kmp_project.feature.todos.generated.resources.owner_invalid
 import base_kmp_project.feature.todos.generated.resources.summary
 import base_kmp_project.feature.todos.generated.resources.title_required
 import base_kmp_project.feature.todos.generated.resources.title_too_long
-import base_kmp_project.feature.todos.generated.resources.todo_unavailable
-import base_kmp_project.feature.todos.generated.resources.todos_temporarily_unavailable
-import base_kmp_project.feature.todos.generated.resources.you_are_offline
-import base_kmp_project.feature.todos.generated.resources.you_do_not_have_access
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -44,15 +38,6 @@ internal fun TodoSummaryContent(
         )
     }
 }
-
-internal fun ResourceProblemCategory.messageResource(): StringResource =
-    when (this) {
-        ResourceProblemCategory.OFFLINE -> Res.string.you_are_offline
-        ResourceProblemCategory.TEMPORARY -> Res.string.todos_temporarily_unavailable
-        ResourceProblemCategory.ACCESS -> Res.string.you_do_not_have_access
-        ResourceProblemCategory.PERMANENT -> Res.string.todo_unavailable
-        ResourceProblemCategory.UNKNOWN -> Res.string.could_not_update_todo
-    }
 
 internal fun String.messageResource(): StringResource =
     when (this) {

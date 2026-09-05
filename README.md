@@ -25,7 +25,7 @@ The path and the role must agree; `./gradlew checkModuleGraph` enforces both.
 | `:foundation:network` | foundation_runtime | Ktor client setup, opt-in auth/retry, request IDs and `NetworkFailure` mapping |
 | `:foundation:preferences` | foundation_runtime | Typed preferences and JSON document stores over DataStore |
 | `:foundation:presentation` | foundation_api | `FeatureInstanceKey`, `CellPlacementId`, `CellSpec` |
-| `:foundation:resource` | foundation_api | `ResourceObservation`, `RefreshOutcome`, refresh QoS, problem taxonomy |
+| `:foundation:resource` | foundation_api | `ResourceObservation`, `Outcome`, refresh QoS, `Problem` taxonomy |
 | `:foundation:resource-runtime` | foundation_runtime | Domain-blind sync coordination plus network-result outcome helpers |
 | `:foundation:runtime` | foundation_runtime | Application scope, dispatchers, logging |
 | `:foundation:sqldelight` | foundation_runtime | Async query flows, the shared `SqlDriverProvider`, and lazy generated databases |

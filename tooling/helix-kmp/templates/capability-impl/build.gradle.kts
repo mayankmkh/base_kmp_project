@@ -13,8 +13,7 @@ plugins {
 //    in `:storage:database` by hand.
 // 5. Keep `.sq` equal to the migrated shape; verification runs in `:storage:database`. Run
 //    `./gradlew :storage:database:verifyCommonMainAppDatabaseMigration`.
-// When it calls a backend, add `implementation(projects.foundation.network)` and map the typed
-// `NetworkFailure` with `toResourceProblem()` from `:foundation:resource-runtime`.
+// Network failures cross the logging `toOutcome()` bridge from `:foundation:resource-runtime`.
 
 kotlin {
     bkpTargets { default() }
@@ -23,11 +22,13 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(projects.capability.__API_ACCESSOR__)
+                implementation(projects.foundation.network)
                 implementation(projects.foundation.resource)
                 implementation(projects.foundation.resourceRuntime)
                 implementation(projects.foundation.runtime)
                 implementation(projects.platform.connectivity)
                 implementation(libs.michael.bull.kotlin.result)
+                implementation(libs.touchlab.kermit)
             }
         }
     }

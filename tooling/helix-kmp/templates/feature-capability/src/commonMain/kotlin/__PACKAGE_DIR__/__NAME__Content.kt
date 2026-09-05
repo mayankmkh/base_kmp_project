@@ -29,8 +29,8 @@ internal fun __NAME__Content(
         }
         Text(state.id)
         Text(state.label.orEmpty())
-        // Product code should map the stable category to a localized string resource.
-        state.problem?.let { problem -> Text(problem.category.name) }
+        // Product code should map the stable kind to a localized string resource.
+        state.problem?.let { problem -> Text(problem.kind.name) }
         Button(onClick = { onAction(__NAME__Action.Refresh) }) { Text("Refresh") }
         Button(onClick = { onAction(__NAME__Action.Select) }) { Text("Select") }
     }

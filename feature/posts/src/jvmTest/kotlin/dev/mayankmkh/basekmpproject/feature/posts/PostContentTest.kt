@@ -10,8 +10,8 @@ import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblem
-import dev.mayankmkh.basekmpproject.foundation.resource.ResourceProblemCategory
+import dev.mayankmkh.basekmpproject.foundation.resource.Problem
+import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -41,7 +41,7 @@ class PostContentTest {
         state =
             PostFeedState(
                 isInitialLoading = false,
-                problem = ResourceProblem(ResourceProblemCategory.UNKNOWN, retryable = false),
+                problem = Problem(ProblemKind.UNEXPECTED),
             )
         waitForIdle()
         onNodeWithText("Retry").assertIsDisplayed()
@@ -61,11 +61,7 @@ class PostContentTest {
         state =
             PostDetailState(
                 isInitialLoading = false,
-                problem =
-                    ResourceProblem(
-                        ResourceProblemCategory.PERMANENT,
-                        retryable = false,
-                    ),
+                problem = Problem(ProblemKind.UNEXPECTED),
             )
         waitForIdle()
         onNodeWithText("Retry").performClick()

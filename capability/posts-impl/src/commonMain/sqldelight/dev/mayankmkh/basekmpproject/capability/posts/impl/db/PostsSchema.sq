@@ -42,6 +42,10 @@ upsert:
 INSERT OR REPLACE INTO post(id, author_id, title, body)
 VALUES (?, ?, ?, ?);
 
+deleteById:
+DELETE FROM post
+WHERE id = ?;
+
 deleteFeedEntries:
 DELETE FROM postFeedEntry;
 

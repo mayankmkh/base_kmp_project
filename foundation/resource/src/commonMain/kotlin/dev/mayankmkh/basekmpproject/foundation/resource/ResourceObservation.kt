@@ -4,14 +4,6 @@ public data class ResourceObservation<T : Any>(
     val value: T?,
     val operation: ResourceOperation,
 ) {
-    init {
-        if (value == null) {
-            require(operation !is ResourceOperation.Idle) {
-                "An observation without a value must be refreshing or failed"
-            }
-        }
-    }
-
     public companion object {
         /** The canonical not-yet-loaded observation. */
         public fun <T : Any> initial(): ResourceObservation<T> =
@@ -27,26 +19,13 @@ public sealed interface ResourceOperation {
 
     public data object Refreshing : ResourceOperation
 
-    public data class Failed(val problem: ResourceProblem) : ResourceOperation
-}
-
-public data class ResourceProblem(
-    val category: ResourceProblemCategory,
-    val retryable: Boolean,
-)
-
-public enum class ResourceProblemCategory {
-    OFFLINE,
-    TEMPORARY,
-    ACCESS,
-    PERMANENT,
-    UNKNOWN,
+    public data class Failed(val problem: Problem) : ResourceOperation
 }
 
 /** Process-local synchronization status for one resource key. */
 public data class SyncStatus(
     val inFlight: Boolean,
-    val lastFailure: ResourceProblem?,
+    val lastFailure: Problem?,
     val hasSucceeded: Boolean,
 )
 
@@ -61,7 +40,7 @@ public fun SyncStatus.toOperation(hasValue: Boolean): ResourceOperation =
     when {
         inFlight -> ResourceOperation.Refreshing
         lastFailure != null -> ResourceOperation.Failed(lastFailure)
-        !hasValue -> ResourceOperation.Refreshing
+        !hasValue && !hasSucceeded -> ResourceOperation.Refreshing
         else -> ResourceOperation.Idle
     }
 
@@ -71,5 +50,9 @@ public val ResourceObservation<*>.hasValue: Boolean
 public val ResourceObservation<*>.isRefreshing: Boolean
     get() = operation is ResourceOperation.Refreshing
 
-public val ResourceObservation<*>.failure: ResourceProblem?
+public val ResourceObservation<*>.failure: Problem?
     get() = (operation as? ResourceOperation.Failed)?.problem
+
+/** Whether synchronization confirmed that this resource has no durable value. */
+public val ResourceObservation<*>.isAbsent: Boolean
+    get() = value == null && operation is ResourceOperation.Idle

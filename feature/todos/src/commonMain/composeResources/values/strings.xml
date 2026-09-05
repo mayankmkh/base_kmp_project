@@ -2,9 +2,7 @@
     <string name="todos">Todos</string>
     <string name="todo_detail">Todo %1$d</string>
     <string name="new_todo">New todo</string>
-    <string name="back">Back</string>
     <string name="refresh">Refresh</string>
-    <string name="retry">Retry</string>
     <string name="completed">Completed</string>
     <string name="hide_completed">Hide completed</string>
     <string name="sort">Sort</string>
@@ -23,9 +21,5 @@
     <string name="title_too_long">Title must be 200 characters or fewer</string>
     <string name="owner_invalid">Owner must be a positive number</string>
     <string name="input_invalid">Check the form and try again</string>
-    <string name="you_are_offline">You're offline</string>
-    <string name="todos_temporarily_unavailable">Todos are temporarily unavailable</string>
-    <string name="you_do_not_have_access">You don't have access to these todos</string>
     <string name="todo_unavailable">This todo is unavailable</string>
-    <string name="could_not_update_todo">Could not update todo</string>
 </resources>

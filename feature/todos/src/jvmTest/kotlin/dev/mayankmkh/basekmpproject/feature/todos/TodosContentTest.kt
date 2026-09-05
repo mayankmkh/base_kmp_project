@@ -11,7 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoField
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoId
-import dev.mayankmkh.basekmpproject.capability.todos.api.TodoViolation
+import dev.mayankmkh.basekmpproject.foundation.resource.Violation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -57,7 +57,7 @@ class TodosContentTest {
             TodoEditorState(
                 violations =
                     listOf(
-                        TodoViolation(
+                        Violation(
                             TodoField.TITLE,
                             "server_code",
                             "Exact server message",

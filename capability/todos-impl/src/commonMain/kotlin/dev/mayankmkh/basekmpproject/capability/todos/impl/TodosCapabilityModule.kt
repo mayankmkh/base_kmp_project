@@ -17,7 +17,7 @@ public val todosCapabilityModule: Module = module {
     }
     single { TodosSettingsSource(get(named(TodosSettingsStoreQualifier))) }
     single { TodosRemoteSource(get(), get()) }
-    single { TodosCapabilityImpl(get(), get(), get(), get(), get()) } onClose { it?.close() }
+    single { TodosCapabilityImpl(get(), get(), get(), get(), get(), get()) } onClose { it?.close() }
     single<TodosQueries> { get<TodosCapabilityImpl>() }
     single<TodosCommands> { get<TodosCapabilityImpl>() }
 }

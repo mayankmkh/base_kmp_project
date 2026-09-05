@@ -16,7 +16,7 @@ plugins {
 // 5. Keep `.sq` equal to the migrated shape; verification runs in `:storage:database`. Run
 //    `./gradlew :storage:database:verifyCommonMainAppDatabaseMigration`.
 // When it calls a backend, add `implementation(projects.foundation.network)` and map the typed
-// `NetworkFailure` with `toResourceProblem()` from `:foundation:resource-runtime`.
+// `NetworkFailure` with the logging `toOutcome()` bridge from `:foundation:resource-runtime`.
 
 kotlin {
     bkpTargets { default() }
@@ -36,6 +36,7 @@ kotlin {
                 api(libs.sqldelight.async.extensions)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.michael.bull.kotlin.result)
+                implementation(libs.touchlab.kermit)
             }
         }
         jvmTest {

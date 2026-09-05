@@ -100,6 +100,26 @@ class PostViewModelTest {
     }
 
     @Test
+    fun `a durable detail carried into an unsynchronized process is shown, not loaded`() =
+        runMainTest {
+            val queries = FakePostsQueries()
+            val post = PostsFixtures.post(2)
+            val viewModel = PostDetailViewModel(post.id, detailKey(), queries, FakePostsCommands())
+
+            viewModel.state.test {
+                awaitItem()
+                queries.emitPost(post.id, ResourceObservationFixtures.unsynchronized(post))
+
+                val shown = awaitItem()
+                assertEquals(post, shown.post)
+                assertEquals(false, shown.isInitialLoading)
+                assertEquals(false, shown.isRefreshing)
+                assertEquals(false, shown.isAbsent)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `detail maps confirmed absence without treating it as a failure`() = runMainTest {
         val queries = FakePostsQueries()
         val post = PostsFixtures.post(2)

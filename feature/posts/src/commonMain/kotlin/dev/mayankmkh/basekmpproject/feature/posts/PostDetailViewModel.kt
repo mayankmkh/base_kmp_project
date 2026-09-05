@@ -14,6 +14,7 @@ import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.failure
 import dev.mayankmkh.basekmpproject.foundation.resource.hasValue
 import dev.mayankmkh.basekmpproject.foundation.resource.isAbsent
+import dev.mayankmkh.basekmpproject.foundation.resource.isInitialLoading
 import dev.mayankmkh.basekmpproject.foundation.resource.isRefreshing
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -83,7 +84,7 @@ internal class PostDetailViewModel(
 private fun ResourceObservation<Post>.toDetailState() =
     PostDetailState(
         post = value,
-        isInitialLoading = !hasValue && isRefreshing,
+        isInitialLoading = isInitialLoading,
         isRefreshing = hasValue && isRefreshing,
         problem = failure,
         isAbsent = isAbsent,

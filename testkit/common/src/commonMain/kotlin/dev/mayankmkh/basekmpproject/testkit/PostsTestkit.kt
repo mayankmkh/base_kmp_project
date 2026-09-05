@@ -29,6 +29,10 @@ object ResourceObservationFixtures {
     fun <T : Any> idle(value: T): ResourceObservation<T> =
         ResourceObservation(value, ResourceOperation.Idle)
 
+    /** Nothing has synchronized in this process yet; [value] is whatever the database held. */
+    fun <T : Any> unsynchronized(value: T? = null): ResourceObservation<T> =
+        ResourceObservation(value, ResourceOperation.Unsynchronized)
+
     fun <T : Any> failed(
         value: T? = null,
         kind: ProblemKind = ProblemKind.UNEXPECTED,

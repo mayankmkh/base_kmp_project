@@ -22,7 +22,7 @@ public fun <Key : Any, T : Any> SyncCoordinator<Key>.observations(
     observing(
         key,
         combine(values.distinctUntilChanged(), status(key)) { value, status ->
-                ResourceObservation(value, status.toOperation(hasValue = value != null))
+                ResourceObservation(value, status.toOperation())
             }
             .distinctUntilChanged(),
     )

@@ -18,10 +18,9 @@ import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.Violation
+import dev.mayankmkh.basekmpproject.foundation.resource.runtime.CommandBridge
 import dev.mayankmkh.basekmpproject.foundation.resource.runtime.SyncCoordinator
-import dev.mayankmkh.basekmpproject.foundation.resource.runtime.commit
 import dev.mayankmkh.basekmpproject.foundation.resource.runtime.observations
-import dev.mayankmkh.basekmpproject.foundation.resource.runtime.toOutcome
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.reconnects
@@ -38,20 +37,23 @@ internal class TodosCapabilityImpl(
     private val settingsSource: TodosSettingsSource,
     applicationRuntimeScope: ApplicationRuntimeScope,
     connectivityMonitor: ConnectivityMonitor,
-    private val logger: Logger,
+    logger: Logger,
 ) : TodosQueries, TodosCommands, AutoCloseable {
     private val scope = applicationRuntimeScope.childScope("todos")
+    private val bridge = CommandBridge(logger, "todos")
     private val listSync =
         SyncCoordinator<Unit>(
             scope,
-            sync = { _, _ -> syncTodos(remoteSource, localSource, logger) },
+            sync = { _, _ -> syncTodos(remoteSource, localSource, bridge) },
             retryTriggers = connectivityMonitor.reconnects(),
+            bridge = bridge,
         )
     private val itemSync =
         SyncCoordinator<TodoId>(
             scope,
-            sync = { id, _ -> syncTodo(remoteSource, localSource, logger, id) },
+            sync = { id, _ -> syncTodo(remoteSource, localSource, bridge, id) },
             retryTriggers = connectivityMonitor.reconnects(),
+            bridge = bridge,
         )
 
     override fun observeTodos(): Flow<ResourceObservation<TodoList>> =
@@ -94,9 +96,9 @@ internal class TodosCapabilityImpl(
                 localCreated = 1,
             )
         localSource.upsert(optimistic)
-        return remoteSource.createTodo(draft.copy(title = optimistic.title)).toOutcome(
-            logger = logger,
-            operation = "todos.create",
+        return bridge.toOutcome(
+            remoteSource.createTodo(draft.copy(title = optimistic.title)),
+            operation = "create",
             onFailure = { localSource.delete(id) },
         ) { answer ->
             when (answer) {
@@ -119,8 +121,8 @@ internal class TodosCapabilityImpl(
     ): Outcome<UpdateTodoResult> =
         localSource.updateTodo(
             id,
-            "todos.complete",
-            logger,
+            "complete",
+            bridge,
             transform = { it.copy(completed = completed.toLong()) },
         ) {
             remoteSource.setCompleted(id.value, completed)
@@ -134,8 +136,8 @@ internal class TodosCapabilityImpl(
         val trimmed = title.trim()
         return localSource.updateTodo(
             id,
-            "todos.rename",
-            logger,
+            "rename",
+            bridge,
             transform = { it.copy(title = trimmed) },
         ) {
             remoteSource.renameTodo(id.value, trimmed)
@@ -145,9 +147,9 @@ internal class TodosCapabilityImpl(
     override suspend fun deleteTodo(id: TodoId): Outcome<DeleteTodoResult> {
         val previous = localSource.find(id) ?: return Outcome.Completed(DeleteTodoResult.NotFound)
         localSource.delete(id)
-        return remoteSource.deleteTodo(id.value).toOutcome(
-            logger = logger,
-            operation = "todos.delete",
+        return bridge.toOutcome(
+            remoteSource.deleteTodo(id.value),
+            operation = "delete",
             onFailure = { localSource.upsert(previous) },
         ) { answer ->
             when (answer) {
@@ -170,15 +172,15 @@ internal class TodosCapabilityImpl(
 private suspend fun TodosLocalSource.updateTodo(
     id: TodoId,
     operation: String,
-    logger: Logger,
+    bridge: CommandBridge,
     transform: (TodoEntity) -> TodoEntity,
     send: suspend () -> Result<UpdateTodoRemoteAnswer, NetworkFailure>,
 ): Outcome<UpdateTodoResult> {
     val previous = find(id) ?: return Outcome.Completed(UpdateTodoResult.NotFound)
     val optimistic = transform(previous)
     upsert(optimistic)
-    return send().toOutcome(
-        logger = logger,
+    return bridge.toOutcome(
+        send(),
         operation = operation,
         onFailure = { upsert(previous) },
     ) { answer ->
@@ -203,19 +205,19 @@ private suspend fun TodosLocalSource.updateTodo(
 private suspend fun syncTodos(
     remoteSource: TodosRemoteSource,
     localSource: TodosLocalSource,
-    logger: Logger,
+    bridge: CommandBridge,
 ): Outcome<Unit> =
-    remoteSource.getTodos().commit(logger, "todos.list.refresh") { todos ->
+    bridge.commit(remoteSource.getTodos(), "list.refresh") { todos ->
         localSource.replaceFromServer(todos.map { it.toEntity(localCreated = 0) })
     }
 
 private suspend fun syncTodo(
     remoteSource: TodosRemoteSource,
     localSource: TodosLocalSource,
-    logger: Logger,
+    bridge: CommandBridge,
     id: TodoId,
 ): Outcome<Unit> =
-    remoteSource.getTodo(id.value).commit(logger, "todos.detail.refresh") { todo ->
+    bridge.commit(remoteSource.getTodo(id.value), "detail.refresh") { todo ->
         if (todo == null) {
             localSource.delete(id)
         } else {

@@ -1,6 +1,10 @@
 package dev.mayankmkh.basekmpproject.foundation.resource.runtime
 
 import app.cash.turbine.test
+import co.touchlab.kermit.LogWriter
+import co.touchlab.kermit.Logger
+import co.touchlab.kermit.Severity
+import co.touchlab.kermit.StaticConfig
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
@@ -9,6 +13,7 @@ import dev.mayankmkh.basekmpproject.foundation.resource.SyncStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 import kotlinx.coroutines.CompletableDeferred
@@ -27,6 +32,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
 class SyncCoordinatorTest {
+    private val logs = CoordinatorLogWriter()
+
     @Test
     fun `start join and success follow the state table`() = runTest {
         val started = CompletableDeferred<Unit>()
@@ -114,6 +121,8 @@ class SyncCoordinatorTest {
             SyncStatus(inFlight = false, lastFailure = problem, hasSucceeded = true),
             coordinator.status("key").first(),
         )
+        // The capability's bridge already logged that failure; the coordinator adds nothing.
+        assertTrue(logs.entries.isEmpty())
     }
 
     @Test
@@ -287,6 +296,7 @@ class SyncCoordinatorTest {
                         never.await()
                         Outcome.Completed(Unit)
                     },
+                    bridge = logs.bridge,
                 )
             val caller = backgroundScope.async { coordinator.sync("key", RefreshQos.visible()) }
             started.await()
@@ -298,10 +308,12 @@ class SyncCoordinatorTest {
                 caller.await(),
             )
             assertEquals(IdleStatus, coordinator.status("key").first())
+            // Abandoned work has nothing to diagnose, so it is not logged.
+            assertTrue(logs.entries.isEmpty())
         }
 
     @Test
-    fun `unexpected throwable becomes non-retryable unknown failure`() = runTest {
+    fun `unexpected throwable becomes a logged non-retryable unknown failure`() = runTest {
         val coordinator = coordinator<String> { _, _ -> error("boom") }
 
         val outcome = coordinator.sync("key", RefreshQos.visible())
@@ -310,6 +322,10 @@ class SyncCoordinatorTest {
             Outcome.Failed(Problem(ProblemKind.UNEXPECTED)),
             outcome,
         )
+        val entry = logs.entries.single()
+        assertEquals(Severity.Error, entry.severity)
+        assertTrue(entry.message.contains("operation=sync.sync(key)"))
+        assertTrue(entry.message.contains("exceptionMessage=boom"))
     }
 
     @Test
@@ -360,6 +376,7 @@ class SyncCoordinatorTest {
             scope = backgroundScope,
             sync = sync,
             retryTriggers = retryTriggers,
+            bridge = logs.bridge,
             timeSource = timeSource,
             minInterval = minIntervalSeconds.seconds,
             maxEntries = maxEntries,
@@ -370,3 +387,20 @@ class SyncCoordinatorTest {
         val Offline = Problem(ProblemKind.OFFLINE)
     }
 }
+
+/** Records what the coordinator's own failures log, under a tag no capability would use. */
+private class CoordinatorLogWriter : LogWriter() {
+    val entries = mutableListOf<CoordinatorLogEntry>()
+    val bridge = CommandBridge(Logger(StaticConfig(logWriterList = listOf(this))), "sync")
+
+    override fun log(
+        severity: Severity,
+        message: String,
+        tag: String,
+        throwable: Throwable?,
+    ) {
+        entries += CoordinatorLogEntry(severity, message)
+    }
+}
+
+private data class CoordinatorLogEntry(val severity: Severity, val message: String)

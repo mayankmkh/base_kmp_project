@@ -222,7 +222,24 @@ class TodosViewModelTest {
         }
     }
 
+    @Test
+    fun `the summary loads until the first synchronization answers, failure included`() =
+        runMainTest {
+            val queries = FakeTodosQueries(list = ResourceObservationFixtures.unsynchronized())
+            val viewModel = TodoSummaryViewModel(summaryKey(), queries)
+
+            viewModel.state.test {
+                assertEquals(TodoSummaryState(), awaitItem())
+
+                queries.todos.value = ResourceObservationFixtures.failed(kind = ProblemKind.OFFLINE)
+                assertFalse(awaitItem().isLoading)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
     private fun listKey() = FeatureInstanceKey.forScreen("todos/list", "todo-list")
+
+    private fun summaryKey() = FeatureInstanceKey.forScreen("todos/summary", "todo-summary")
 
     private fun detailKey() = FeatureInstanceKey.forScreen("todos/detail/1", "todo-detail")
 

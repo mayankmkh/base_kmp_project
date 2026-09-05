@@ -20,12 +20,39 @@ class ResourceObservationTest {
     }
 
     @Test
-    fun initialIsRefreshingAndHasNoValue() {
+    fun `initial is unsynchronized, has no value and is loading its first one`() {
         val observation = ResourceObservation.initial<String>()
 
         assertFalse(observation.hasValue)
-        assertTrue(observation.isRefreshing)
+        assertEquals(ResourceOperation.Unsynchronized, observation.operation)
+        assertFalse(observation.isRefreshing)
+        assertTrue(observation.isInitialLoading)
+        assertFalse(observation.isAbsent)
         assertNull(observation.failure)
+    }
+
+    @Test
+    fun `a durable value carried into an unsynchronized process is not initial loading`() {
+        val observation =
+            ResourceObservation(
+                value = "durable",
+                operation = ResourceOperation.Unsynchronized,
+            )
+
+        assertTrue(observation.hasValue)
+        assertFalse(observation.isInitialLoading)
+        assertFalse(observation.isAbsent)
+    }
+
+    @Test
+    fun `a refresh without a value is still initial loading`() {
+        val observation =
+            ResourceObservation<String>(
+                value = null,
+                operation = ResourceOperation.Refreshing,
+            )
+
+        assertTrue(observation.isInitialLoading)
     }
 
     @Test
@@ -37,6 +64,7 @@ class ResourceObservationTest {
             )
 
         assertTrue(observation.isAbsent)
+        assertFalse(observation.isInitialLoading)
     }
 
     @Test
@@ -49,6 +77,7 @@ class ResourceObservationTest {
             )
 
         assertFalse(observation.hasValue)
+        assertFalse(observation.isInitialLoading)
         assertEquals(problem, observation.failure)
     }
 
@@ -67,27 +96,17 @@ class ResourceObservationTest {
     }
 
     @Test
-    fun `status mapping prefers in-flight then failure then a missing value`() {
+    fun `status mapping prefers in-flight then failure then a key that never succeeded`() {
         val problem = Problem(ProblemKind.UNEXPECTED)
         val failed = SyncStatus(inFlight = false, lastFailure = problem, hasSucceeded = true)
 
+        assertEquals(ResourceOperation.Refreshing, failed.copy(inFlight = true).toOperation())
+        assertEquals(ResourceOperation.Failed(problem), failed.toOperation())
         assertEquals(
-            ResourceOperation.Refreshing,
-            failed.copy(inFlight = true).toOperation(hasValue = true),
+            ResourceOperation.Unsynchronized,
+            failed.copy(lastFailure = null, hasSucceeded = false).toOperation(),
         )
-        assertEquals(ResourceOperation.Failed(problem), failed.toOperation(hasValue = true))
-        assertEquals(
-            ResourceOperation.Refreshing,
-            failed.copy(lastFailure = null, hasSucceeded = false).toOperation(hasValue = false),
-        )
-        assertEquals(
-            ResourceOperation.Idle,
-            failed.copy(lastFailure = null).toOperation(hasValue = false),
-        )
-        assertEquals(
-            ResourceOperation.Idle,
-            failed.copy(lastFailure = null).toOperation(hasValue = true),
-        )
+        assertEquals(ResourceOperation.Idle, failed.copy(lastFailure = null).toOperation())
     }
 
     @Test

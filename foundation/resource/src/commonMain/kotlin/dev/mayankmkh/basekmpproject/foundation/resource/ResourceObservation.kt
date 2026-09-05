@@ -9,12 +9,18 @@ public data class ResourceObservation<T : Any>(
         public fun <T : Any> initial(): ResourceObservation<T> =
             ResourceObservation(
                 value = null,
-                operation = ResourceOperation.Refreshing,
+                operation = ResourceOperation.Unsynchronized,
             )
     }
 }
 
 public sealed interface ResourceOperation {
+    /**
+     * No synchronization has completed in this process yet; a durable value, if any, is shown as
+     * is.
+     */
+    public data object Unsynchronized : ResourceOperation
+
     public data object Idle : ResourceOperation
 
     public data object Refreshing : ResourceOperation
@@ -32,15 +38,15 @@ public data class SyncStatus(
 /**
  * The contract's status mapping: the operation a durable value with this status is observed under.
  *
- * `Refreshing` while a sync is in flight, then `Failed` with the last failure, then `Refreshing`
- * while there is no value to show, otherwise `Idle`. A clean ledger without a value therefore stays
- * `Refreshing` while the durable query catches up or until a later attempt confirms a result.
+ * `Refreshing` while a sync is in flight, then `Failed` with the last failure, then
+ * `Unsynchronized` until one has succeeded, otherwise `Idle`. The durable value never takes part:
+ * whether there is something to show is the observation's other half.
  */
-public fun SyncStatus.toOperation(hasValue: Boolean): ResourceOperation =
+public fun SyncStatus.toOperation(): ResourceOperation =
     when {
         inFlight -> ResourceOperation.Refreshing
         lastFailure != null -> ResourceOperation.Failed(lastFailure)
-        !hasValue && !hasSucceeded -> ResourceOperation.Refreshing
+        !hasSucceeded -> ResourceOperation.Unsynchronized
         else -> ResourceOperation.Idle
     }
 
@@ -52,6 +58,13 @@ public val ResourceObservation<*>.isRefreshing: Boolean
 
 public val ResourceObservation<*>.failure: Problem?
     get() = (operation as? ResourceOperation.Failed)?.problem
+
+/** Whether there is nothing to show yet and the resource may still produce a first value. */
+public val ResourceObservation<*>.isInitialLoading: Boolean
+    get() =
+        value == null &&
+            (operation is ResourceOperation.Unsynchronized ||
+                operation is ResourceOperation.Refreshing)
 
 /** Whether synchronization confirmed that this resource has no durable value. */
 public val ResourceObservation<*>.isAbsent: Boolean

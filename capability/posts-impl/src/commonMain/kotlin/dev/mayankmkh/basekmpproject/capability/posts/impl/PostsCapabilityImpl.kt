@@ -9,8 +9,8 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.RefreshQos
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
+import dev.mayankmkh.basekmpproject.foundation.resource.runtime.CommandBridge
 import dev.mayankmkh.basekmpproject.foundation.resource.runtime.SyncCoordinator
-import dev.mayankmkh.basekmpproject.foundation.resource.runtime.commit
 import dev.mayankmkh.basekmpproject.foundation.resource.runtime.observations
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
@@ -25,15 +25,17 @@ internal class PostsCapabilityImpl(
     private val localSource: PostsLocalSource,
     applicationRuntimeScope: ApplicationRuntimeScope,
     connectivityMonitor: ConnectivityMonitor,
-    private val logger: Logger,
+    logger: Logger,
 ) : PostsQueries, PostsCommands, AutoCloseable {
     private val scope = applicationRuntimeScope.childScope("posts")
+    private val bridge = CommandBridge(logger, "posts")
 
     private val feedSync =
         SyncCoordinator<Unit>(
             scope,
             sync = { _, _ -> syncFeed() },
             retryTriggers = connectivityMonitor.reconnects(),
+            bridge = bridge,
         )
 
     private val postSync =
@@ -41,6 +43,7 @@ internal class PostsCapabilityImpl(
             scope,
             sync = { id, _ -> syncPost(id) },
             retryTriggers = connectivityMonitor.reconnects(),
+            bridge = bridge,
         )
 
     override fun observeFeed(): Flow<ResourceObservation<PostFeed>> =
@@ -62,12 +65,12 @@ internal class PostsCapabilityImpl(
         postSync.sync(id, qos)
 
     private suspend fun syncFeed(): Outcome<Unit> =
-        remoteSource.getPosts().commit(logger, "posts.feed.refresh") { posts ->
+        bridge.commit(remoteSource.getPosts(), "feed.refresh") { posts ->
             localSource.replaceFeed(posts.map(PostDto::toPostEntity))
         }
 
     private suspend fun syncPost(id: PostId): Outcome<Unit> =
-        remoteSource.getPost(id.value).commit(logger, "posts.detail.refresh") { post ->
+        bridge.commit(remoteSource.getPost(id.value), "detail.refresh") { post ->
             if (post == null) localSource.delete(id.value.toString())
             else localSource.upsert(post.toPostEntity())
         }

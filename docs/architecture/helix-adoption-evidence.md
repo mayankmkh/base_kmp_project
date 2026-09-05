@@ -19,18 +19,28 @@ unpushed. This report now also records the subsequent P1 control-plane working-t
 - `TodosRemoteSource.kt` maps endpoint 404 and 422 answers into implementation-only answer values
   before the bridge. `PostsRemoteSource.kt` maps a detail 404 the same way. Unmapped statuses stay
   `NetworkFailure` values.
-- `foundation/resource-runtime/.../NetworkFailureProblems.kt` is the sole generic classification
-  and logging bridge; `NetworkFailureProblemsTest` pins the mapping, the severity rule and the
-  structured fields the master document §13.7 requires.
+- `foundation/resource-runtime/.../CommandBridge.kt` is the sole generic classification and
+  logging bridge. A Capability builds one `CommandBridge(logger, "<tag>")` and calls
+  `bridge.commit(...)` / `bridge.toOutcome(...)`, so no call site carries a logger and every
+  logged operation is prefixed with that tag. `CommandBridgeTest` pins the mapping, the severity
+  rule and the structured fields the master document §13.7 requires.
+- `SyncCoordinator` mints two failures of its own. A sync worker that threw is a defect and is
+  reported through `CommandBridge.unexpected` at error severity; a worker abandoned because its
+  scope ended has nothing to diagnose and is not logged. `SyncCoordinatorTest` pins one entry for
+  the former, none for the latter, and none for an outcome the sync function
+  itself produced, which the Capability's own bridge already logged.
 - `foundation/network/.../SafeCall.kt` and `Client.kt` keep kotlin-result and transport details
   inside implementations while attaching the final attempt's `X-Request-Id` to every failure
   kind. `SafeCallTest` covers HTTP, transport, decoding and unexpected request ids plus
   cancellation.
 - `ui/design-system/.../Failure.kt` owns generic problem strings and maps every `ProblemKind`.
   Server display text remains on `Violation.message`; feature ViewModels map only stable kinds.
-- `ResourceObservation.kt` defines confirmed absence as a null value with `Idle`. Posts and Todos
-  item syncs delete their durable rows on 404; `TodosCapabilityImplTest`, `PostViewModelTest` and
-  `TodosViewModelTest` prove persistence and presentation behavior.
+- `ResourceObservation.kt` defines confirmed absence as a null value with `Idle` and "no sync has
+  completed in this process" as `ResourceOperation.Unsynchronized`, which `SyncStatus.toOperation()`
+  reports until an attempt succeeds. `isInitialLoading` is the single derived question the
+  ViewModels ask instead of each re-deriving it. Posts and Todos item syncs delete their durable
+  rows on 404; `TodosCapabilityImplTest`, `PostViewModelTest` and `TodosViewModelTest` prove
+  persistence and presentation behavior.
 
 ## Sync coordinator replaces the owned Snapshot runtime (2026-09-05)
 
@@ -72,8 +82,8 @@ Capability. The replacement keeps `:foundation:resource-runtime` but changes wha
   contract's `SyncStatus.toOperation` mapping.
 - `:capability:posts-impl` owns the value: `postFeedEntry` (migration `4.sqm`) records feed
   membership and order, while `postFeedState` carries the initialised marker row. An empty
-  synchronised feed is `Idle` with an empty list while a never-synchronised feed is `Refreshing`
-  with `null`.
+  synchronised feed is `Idle` with an empty list while a never-synchronised feed is
+  `Unsynchronized` with `null`.
   `replaceFeed` is one transaction (upsert rows, replace entries, set marker). Each Query hands its
   durable value flow (the feed combined with its marker, or the detail row) to
   `coordinator.observations(key, values)`.

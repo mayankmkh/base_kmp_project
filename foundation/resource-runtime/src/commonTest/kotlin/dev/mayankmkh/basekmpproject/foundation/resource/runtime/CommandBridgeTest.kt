@@ -29,14 +29,14 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.IOException
 
-class NetworkFailureProblemsTest {
+class CommandBridgeTest {
     @Test
     fun `commit persists a success without logging`() = runTest {
         val result: Result<String, NetworkFailure> = Ok("value")
         val persisted = mutableListOf<String>()
         val logs = RecordingLogWriter()
 
-        val outcome = result.commit(logs.logger, "posts.refresh", persisted::add)
+        val outcome = logs.bridge("posts").commit(result, "refresh", persisted::add)
 
         assertEquals(Outcome.Completed(Unit), outcome)
         assertEquals(listOf("value"), persisted)
@@ -56,7 +56,7 @@ class NetworkFailureProblemsTest {
         var completionCalls = 0
 
         val outcome =
-            result.toOutcome(logs.logger, "todos.create") {
+            logs.bridge("todos").toOutcome(result, "create") {
                 completionCalls++
                 it
             }
@@ -68,6 +68,7 @@ class NetworkFailureProblemsTest {
         )
         assertEquals(1, logs.entries.size)
         assertEquals(Severity.Warn, logs.entries.single().severity)
+        assertEquals("todos", logs.entries.single().tag)
         assertTrue(logs.entries.single().message.contains("operation=todos.create"))
         assertTrue(logs.entries.single().message.contains("kind=OFFLINE"))
         assertTrue(logs.entries.single().message.contains("transportKind=OFFLINE"))
@@ -86,13 +87,29 @@ class NetworkFailureProblemsTest {
         val logs = RecordingLogWriter()
         val result: Result<String, NetworkFailure> = Err(failure)
 
-        val outcome = result.toOutcome(logs.logger, "todos.rename") { it }
+        val outcome = logs.bridge("todos").toOutcome(result, "rename") { it }
 
         assertEquals(
             Problem(ProblemKind.UNEXPECTED, "request-2"),
             assertIs<Outcome.Failed>(outcome).problem,
         )
         assertEquals(Severity.Error, logs.entries.single().severity)
+    }
+
+    @Test
+    fun `a runtime failure with a cause logs once at error severity`() {
+        val logs = RecordingLogWriter()
+
+        val problem = logs.bridge("posts").unexpected("sync(Unit)", IllegalStateException("boom"))
+
+        assertEquals(Problem(ProblemKind.UNEXPECTED), problem)
+        val entry = logs.entries.single()
+        assertEquals(Severity.Error, entry.severity)
+        assertEquals("posts", entry.tag)
+        assertTrue(entry.message.contains("operation=posts.sync(Unit)"))
+        assertTrue(entry.message.contains("kind=UNEXPECTED"))
+        assertTrue(entry.message.contains("exceptionClass=IllegalStateException"))
+        assertTrue(entry.message.contains("exceptionMessage=boom"))
     }
 
     @Test
@@ -154,7 +171,9 @@ class NetworkFailureProblemsTest {
 
 private class RecordingLogWriter : LogWriter() {
     val entries = mutableListOf<LogEntry>()
-    val logger = Logger(StaticConfig(logWriterList = listOf(this)))
+    private val logger = Logger(StaticConfig(logWriterList = listOf(this)))
+
+    fun bridge(tag: String): CommandBridge = CommandBridge(logger, tag)
 
     override fun log(
         severity: Severity,
@@ -162,8 +181,8 @@ private class RecordingLogWriter : LogWriter() {
         tag: String,
         throwable: Throwable?,
     ) {
-        entries += LogEntry(severity, message)
+        entries += LogEntry(severity, message, tag)
     }
 }
 
-private data class LogEntry(val severity: Severity, val message: String)
+private data class LogEntry(val severity: Severity, val message: String, val tag: String)

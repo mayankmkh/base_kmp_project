@@ -54,13 +54,16 @@ import kotlinx.coroutines.withContext
  * | sync throws         | treated as an `UNEXPECTED` failure                           |
  *
  * A caller whose worker was cancelled receives an `UNEXPECTED` failure unless the caller itself was
- * cancelled, in which case its own cancellation propagates.
+ * cancelled, in which case its own cancellation propagates. A sync that throws is a defect minted
+ * here rather than read off the wire, so [bridge] logs it the way it logs classified failures; an
+ * abandoned worker has nothing to diagnose and is not logged.
  */
 @Suppress("TooManyFunctions")
 public class SyncCoordinator<Key : Any>(
     private val scope: CoroutineScope,
     private val sync: suspend (Key, RefreshQos) -> Outcome<Unit>,
     retryTriggers: Flow<Unit> = emptyFlow(),
+    private val bridge: CommandBridge,
     private val timeSource: TimeSource = TimeSource.Monotonic,
     private val minInterval: Duration = 30.seconds,
     private val maxEntries: Int = 256,
@@ -162,17 +165,21 @@ public class SyncCoordinator<Key : Any>(
             worker.await()
         } catch (_: CancellationException) {
             currentCoroutineContext().ensureActive()
-            Outcome.Failed(WorkerProblem)
+            // The worker was abandoned, not broken: nothing to diagnose, so nothing to log.
+            Outcome.Failed(AbandonedWorkerProblem)
         }
 
+    @Suppress("TooGenericExceptionCaught")
     private suspend fun runSync(key: Key, qos: RefreshQos): Outcome<Unit> =
         try {
             sync.invoke(key, qos)
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Throwable) {
-            Outcome.Failed(WorkerProblem)
+        } catch (thrown: Throwable) {
+            Outcome.Failed(bridge.unexpected(operation(key), thrown))
         }
+
+    private fun operation(key: Key): String = "sync($key)"
 
     private fun entryLocked(key: Key): Entry =
         entries[key]
@@ -227,4 +234,4 @@ public class SyncCoordinator<Key : Any>(
     }
 }
 
-private val WorkerProblem = Problem(ProblemKind.UNEXPECTED)
+private val AbandonedWorkerProblem = Problem(ProblemKind.UNEXPECTED)

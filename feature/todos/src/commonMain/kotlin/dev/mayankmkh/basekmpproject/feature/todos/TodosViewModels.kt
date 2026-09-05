@@ -27,6 +27,7 @@ import dev.mayankmkh.basekmpproject.foundation.resource.Violation
 import dev.mayankmkh.basekmpproject.foundation.resource.failure
 import dev.mayankmkh.basekmpproject.foundation.resource.hasValue
 import dev.mayankmkh.basekmpproject.foundation.resource.isAbsent
+import dev.mayankmkh.basekmpproject.foundation.resource.isInitialLoading
 import dev.mayankmkh.basekmpproject.foundation.resource.isRefreshing
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -429,7 +430,7 @@ internal class TodoSummaryViewModel(
                 TodoSummaryState(
                     open = observation.value?.todos?.count { !it.completed } ?: 0,
                     completed = observation.value?.todos?.count(Todo::completed) ?: 0,
-                    isLoading = !observation.hasValue,
+                    isLoading = observation.isInitialLoading,
                 )
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodoSummaryState())
@@ -454,7 +455,7 @@ private fun ResourceObservation<TodoList>.toListState(
     TodoListState(
         todos = value?.todos.orEmpty(),
         settings = settings,
-        isInitialLoading = !hasValue && isRefreshing,
+        isInitialLoading = isInitialLoading,
         isRefreshing = hasValue && isRefreshing,
         problem = failure,
         pendingDelete = pendingDelete,
@@ -470,7 +471,7 @@ private fun ResourceObservation<Todo>.toDetailState(
     TodoDetailState(
         todo = value,
         title = draftTitle ?: value?.title.orEmpty(),
-        isInitialLoading = !hasValue && isRefreshing,
+        isInitialLoading = isInitialLoading,
         isRefreshing = hasValue && isRefreshing,
         isSubmitting = isSubmitting,
         problem = failure,

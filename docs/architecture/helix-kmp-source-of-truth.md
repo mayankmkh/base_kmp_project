@@ -3156,11 +3156,13 @@ data class ResourceObservation<T : Any>(
 ) {
     companion object {
         fun <T : Any> initial(): ResourceObservation<T> =
-            ResourceObservation(value = null, operation = ResourceOperation.Refreshing)
+            ResourceObservation(value = null, operation = ResourceOperation.Unsynchronized)
     }
 }
 
 sealed interface ResourceOperation {
+    /** No synchronization has completed in this process yet. */
+    data object Unsynchronized : ResourceOperation
     data object Idle : ResourceOperation
     data object Refreshing : ResourceOperation
 
@@ -3177,8 +3179,10 @@ data class SyncStatus(
 ```
 
 `T : Any` is deliberate. The outer nullable value means the durable source currently has no row.
-The operation distinguishes a never-synchronized key (`Refreshing`), a failed attempt (`Failed`),
-and a confirmed absence (`Idle`).
+The operation distinguishes a never-synchronized key (`Unsynchronized`), an attempt in flight
+(`Refreshing`), a failed attempt (`Failed`), and a confirmed absence (`Idle`). `isInitialLoading`
+is the derived question presentation actually asks: no value yet, and the resource may still
+produce one.
 
 **Value semantics:** `value` is what the durable source currently holds for the key, or `null`
 while the Capability cannot yet vouch for it. A Capability that needs "this collection was
@@ -3187,21 +3191,22 @@ transaction as the rows, so an empty synchronized collection is a legal `Idle` v
 never-synchronized one stays `null`. The contract carries no age or freshness policy; a Capability
 that needs one models the timestamp inside `T`.
 
-**Status mapping:** `SyncStatus.toOperation(hasValue)` in `:foundation:resource` is the one
-mapping from the durable value and the key's `SyncStatus` to an operation, in this order:
-`Refreshing` while `inFlight`; `Failed(lastFailure)` when the last attempt failed; `Refreshing`
-while the value is `null` and the key has never succeeded; otherwise `Idle`.
+**Status mapping:** `SyncStatus.toOperation()` in `:foundation:resource` is the one mapping from
+the key's `SyncStatus` to an operation, in this order: `Refreshing` while `inFlight`;
+`Failed(lastFailure)` when the last attempt failed; `Unsynchronized` until one has succeeded;
+otherwise `Idle`. The durable value takes no part in it.
 `SyncCoordinator.observations(key, values)` in
 `:foundation:resource-runtime` applies it: it combines the durable value flow with `status(key)`,
 drops unchanged emissions and wraps the result in `observing` for the same key, so a Capability
 hands over its value flow and never repeats the mapping. A confirmed detail 404 is an endpoint
 answer: the implementation removes the local row and completes the sync. The resulting
 `ResourceObservation(value = null, operation = Idle)` is confirmed absent, exposed by `isAbsent`.
-A clean ledger with a `null` value remains `Refreshing` while the durable query catches up or until
-a later attempt confirms a result. A Capability's sync function uses the logging
-`remoteResult.commit(logger, operation) { persist(it) }` bridge. Its local source observes
-SQLDelight through `:foundation:sqldelight`'s `observeList`, `observeOneOrNull` and `observeOne`
-helpers, and builds its generated database once with `LazyDatabase` over the app's shared
+A clean ledger stays `Unsynchronized` until an attempt succeeds, so a durable value written by an
+earlier process is shown as is rather than announced as fresh. A Capability builds one
+`CommandBridge(logger, "<capability>")` and routes every command through it, so its sync function
+reads `bridge.commit(remoteResult, operation) { persist(it) }` and its logged operations are
+prefixed with the capability's tag. Its local source observes SQLDelight through
+`:foundation:sqldelight`'s `observeList`, `observeOneOrNull` and `observeOne` helpers, and builds its generated database once with `LazyDatabase` over the app's shared
 `SqlDriverProvider`, observing queries through `LazyDatabase.observe`. The app shares its cold platform connectivity monitor once with
 `ConnectivityMonitor.shared(applicationScope)`, so every coordinator takes
 `connectivityMonitor.reconnects()` directly.
@@ -3229,8 +3234,11 @@ The `NetworkFailure` to `Problem` mapping is fixed: offline and timeout transpor
 `OFFLINE` and `TIMEOUT`; HTTP 401 or 403 becomes `FORBIDDEN`; HTTP 408, 429 and 5xx become `SERVER`;
 any other unmapped HTTP status, decoding failure or unexpected failure becomes `UNEXPECTED`.
 `Problem.reference` is the failure's request id. `UNEXPECTED` logs at error severity and every
-other kind at warning; the log record itself is owned by the bridge in
-`:foundation:resource-runtime` and pinned by `NetworkFailureProblemsTest`.
+other kind at warning; the log record itself is owned by `CommandBridge` in
+`:foundation:resource-runtime` and pinned by `CommandBridgeTest`. A defect the runtime catches
+itself goes through the same bridge: `SyncCoordinator` reports a sync worker that threw through
+`CommandBridge.unexpected` at error severity. A worker abandoned because its scope ended has
+nothing to diagnose and is not logged.
 
 **RefreshQos semantics:** `CRITICAL_VISIBLE` means the user is blocked on the resource; `VISIBLE`
 means the user is looking at it; `BACKGROUND` is maintenance/reconnect work that must not compete
@@ -3245,9 +3253,11 @@ The legal structural combinations are exhaustive:
 
 | value | operation | meaning/example |
 |---|---|---|
-| `null` | `Refreshing` | initial load, or an unsynchronized key whose sync is in flight |
+| `null` | `Unsynchronized` | nothing durable and nothing synchronized yet in this process |
+| `null` | `Refreshing` | initial load: a sync is in flight and there is still nothing to show |
 | `null` | `Failed(...)` | failure with no value to show |
 | `null` | `Idle` | synchronization confirmed that the detail is absent |
+| `T` | `Unsynchronized` | durable value from an earlier process, shown before any sync succeeded |
 | `T` | `Idle` | durable value, no active sync |
 | `T` | `Refreshing` | durable value shown while a sync runs |
 | `T` | `Failed(...)` | durable value retained after a failed sync, typically offline |
@@ -5731,8 +5741,8 @@ of that state.
 
 ## ADR-43 - Sync coordination is domain-blind and the database owns the value
 
-**Decision:** `:foundation:resource-runtime` ships `SyncCoordinator<Key>` plus the small helpers
-that connect it to a Capability (`observations`, `toProblem`, `toOutcome`, `commit`); it owns no
+**Decision:** `:foundation:resource-runtime` ships `SyncCoordinator<Key>` plus the small pieces
+that connect it to a Capability (`observations` and the per-Capability `CommandBridge`); it owns no
 value.
 It starts or joins one worker per key, skips keys attempted within `minInterval`, counts observers
 around a Capability-supplied upstream flow, retries observed keys whose last attempt failed offline
@@ -6459,7 +6469,7 @@ private fun ResourceObservation<LiveScore>.toLiveScoreState(): LiveScoreState {
 
     return LiveScoreState(
         score = value,
-        isInitialLoading = value == null && operation is ResourceOperation.Refreshing,
+        isInitialLoading = isInitialLoading,
         isRefreshing = value != null && operation is ResourceOperation.Refreshing,
         problem = failure?.problem?.let { problem ->
             when {

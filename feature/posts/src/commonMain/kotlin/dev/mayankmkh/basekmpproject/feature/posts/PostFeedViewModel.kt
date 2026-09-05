@@ -14,6 +14,7 @@ import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
 import dev.mayankmkh.basekmpproject.foundation.resource.failure
 import dev.mayankmkh.basekmpproject.foundation.resource.hasValue
+import dev.mayankmkh.basekmpproject.foundation.resource.isInitialLoading
 import dev.mayankmkh.basekmpproject.foundation.resource.isRefreshing
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -81,7 +82,7 @@ internal class PostFeedViewModel(
 private fun ResourceObservation<PostFeed>.toFeedState() =
     PostFeedState(
         posts = value?.posts.orEmpty(),
-        isInitialLoading = !hasValue && isRefreshing,
+        isInitialLoading = isInitialLoading,
         isRefreshing = hasValue && isRefreshing,
         problem = failure,
     )

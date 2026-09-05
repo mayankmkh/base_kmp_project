@@ -6,8 +6,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
-/** A process-local implementation for tests and for targets that reject persistent page secrets. */
-public fun inMemorySecretStore(): SecretStore = MemorySecretStore()
+/** For tests, the in-memory factory and targets that reject persistent page secrets. */
+internal fun inMemorySecretStore(): SecretStore = MemorySecretStore()
 
 /**
  * Also the snapshot behind the iOS Keychain actual, which writes through to the Keychain and then

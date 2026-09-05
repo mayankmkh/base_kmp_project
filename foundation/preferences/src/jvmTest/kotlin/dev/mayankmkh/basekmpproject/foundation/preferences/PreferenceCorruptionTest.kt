@@ -30,10 +30,7 @@ class PreferenceCorruptionTest {
     private val logs = TestLogWriter(Severity.Verbose)
     private val logger = Logger(TestConfig(Severity.Verbose, listOf(logs)))
 
-    // Exactly the logger the production factory hands the stores it opens: tagged once, in the
-    // factory's constructor. Building the factory opens nothing.
-    private val storeLogger =
-        DataStorePreferenceStores(PlatformContext("preferences-log-test"), logger).logger
+    private val storeLogger = logger.withTag("preferences")
 
     @Test
     fun `a corrupt preference file is replaced with empty preferences`() = runTest {

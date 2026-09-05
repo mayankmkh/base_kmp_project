@@ -59,10 +59,6 @@ public interface PreferenceEditor {
     public fun clear()
 }
 
-/**
- * A no-filesystem store for common tests and for tests of consumers. Public because a consumer's
- * own test constructs one directly; [inMemoryPreferenceStores] is what a test of a whole graph
- * swaps in.
- */
-public fun inMemoryPreferenceStore(): PreferenceStore =
+/** For tests and the in-memory factory; nothing touches disk. */
+internal fun inMemoryPreferenceStore(): PreferenceStore =
     DataStorePreferenceStore(InMemoryDataStore(emptyPreferences()))

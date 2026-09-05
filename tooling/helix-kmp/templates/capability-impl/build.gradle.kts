@@ -13,6 +13,11 @@ plugins {
 //    in `:storage:database` by hand.
 // 5. Keep `.sq` equal to the migrated shape; verification runs in `:storage:database`. Run
 //    `./gradlew :storage:database:verifyCommonMainAppDatabaseMigration`.
+// When this Capability needs a small settings file or a secret: add
+// `implementation(projects.foundation.preferences)` or
+// `implementation(projects.platform.secureStorage)` and have the source that owns the file take
+// `PreferenceStores` or `SecretStores` from Koin and open its own file, as `TodosSettingsSource`
+// and `CredentialStore` do.
 // Network failures cross the logging `toOutcome()` bridge from `:foundation:resource-runtime`.
 
 kotlin {

@@ -5,9 +5,7 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoId
 import dev.mayankmkh.basekmpproject.foundation.network.AnonymousCredentialProvider
 import dev.mayankmkh.basekmpproject.foundation.network.CredentialProvider
-import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStore
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
-import dev.mayankmkh.basekmpproject.platform.securestorage.SecretStore
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
@@ -69,11 +67,6 @@ class KoinGraphTest {
                 FeatureInstanceKey::class,
                 PostId::class,
                 TodoId::class,
-                // A store is opened from the `PreferenceStores`/`SecretStores` factory inside
-                // its owner's definition lambda, so the graph declares the factories and never the
-                // stores their owners take.
-                PreferenceStore::class,
-                SecretStore::class,
                 LoggerConfig::class,
                 // `AppEnvironment` is built from the entry point's debug flag before Koin starts.
                 Boolean::class,

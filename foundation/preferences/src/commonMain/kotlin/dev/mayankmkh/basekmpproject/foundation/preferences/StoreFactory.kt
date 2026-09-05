@@ -22,9 +22,6 @@ private val openFiles = OpenNameRegistry("store for file")
 
 internal fun registerOpenFile(file: PrefFile): Unit = openFiles.register(file.name)
 
-/** The tag every line this module writes carries. */
-internal const val LogTag: String = "preferences"
-
 /**
  * The handler every store opens with (section 5): DataStore replaces a file it cannot read, and
  * this warning is the only trace that the user lost it. Neither the file's contents nor the

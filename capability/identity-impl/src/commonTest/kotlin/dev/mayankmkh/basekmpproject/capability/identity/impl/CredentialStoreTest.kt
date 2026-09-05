@@ -1,7 +1,7 @@
 package dev.mayankmkh.basekmpproject.capability.identity.impl
 
 import app.cash.turbine.test
-import dev.mayankmkh.basekmpproject.platform.securestorage.inMemorySecretStore
+import dev.mayankmkh.basekmpproject.platform.securestorage.inMemorySecretStores
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -11,7 +11,7 @@ import kotlinx.coroutines.test.runTest
 
 class CredentialStoreTest {
 
-    private val credentials = CredentialStore(inMemorySecretStore())
+    private val credentials = CredentialStore(inMemorySecretStores())
 
     @Test
     fun `there is no token to begin with`() = runTest {

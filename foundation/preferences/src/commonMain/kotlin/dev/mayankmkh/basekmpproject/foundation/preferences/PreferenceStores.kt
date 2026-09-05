@@ -5,11 +5,8 @@ import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.serialization.KSerializer
 
 /**
- * Opens the files this app stores small state in.
- *
- * A logger is a property of the process, not of a store, so the app builds one factory and every
- * store it opens writes through the same tagged logger. Capability implementations resolve this
- * factory from Koin and name their own files.
+ * Opens the files this app stores small state in. The app builds one factory from its logger and
+ * Capability implementations take it to open the files they own (preferences.md section 12).
  */
 public interface PreferenceStores {
     /** Opens one preferences file. */
@@ -23,12 +20,7 @@ public interface PreferenceStores {
     ): DocumentStore<T>
 }
 
-/**
- * The production factory: DataStore files under the platform's application data location.
- *
- * [logger] is the app's logger; the module tags it with its own name and hands the tagged logger to
- * every store it opens.
- */
+/** The production factory: DataStore files under the platform's application data location. */
 public fun preferenceStores(context: PlatformContext, logger: Logger): PreferenceStores =
     DataStorePreferenceStores(context, logger)
 
@@ -37,7 +29,7 @@ public fun inMemoryPreferenceStores(): PreferenceStores = InMemoryPreferenceStor
 
 internal class DataStorePreferenceStores(private val context: PlatformContext, logger: Logger) :
     PreferenceStores {
-    internal val logger: Logger = logger.withTag(LogTag)
+    private val logger: Logger = logger.withTag("preferences")
 
     override fun open(file: PrefFile): PreferenceStore {
         registerOpenFile(file)

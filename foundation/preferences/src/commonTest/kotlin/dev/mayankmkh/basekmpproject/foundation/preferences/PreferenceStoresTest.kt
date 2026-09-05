@@ -19,20 +19,10 @@ class PreferenceStoresTest {
     fun `the in-memory factory registers no file name`() = runTest {
         val stores = inMemoryPreferenceStores()
         val key = stringPrefKey("token")
-
         stores.open(file).set(key, "first")
-        val second = stores.open(file)
-
-        assertNull(second.get(key))
-    }
-
-    @Test
-    fun `the in-memory factory registers no document file name`() = runTest {
-        val stores = inMemoryPreferenceStores()
-
         stores.openDocument(file, Int.serializer(), 1).update { it + 1 }
-        val second = stores.openDocument(file, Int.serializer(), 1)
 
-        assertEquals(1, second.data.first())
+        assertNull(stores.open(file).get(key))
+        assertEquals(1, stores.openDocument(file, Int.serializer(), 1).data.first())
     }
 }

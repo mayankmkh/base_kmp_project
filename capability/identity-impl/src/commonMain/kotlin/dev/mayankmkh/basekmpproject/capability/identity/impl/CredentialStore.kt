@@ -1,9 +1,10 @@
 package dev.mayankmkh.basekmpproject.capability.identity.impl
 
-import dev.mayankmkh.basekmpproject.platform.securestorage.SecretStore
+import dev.mayankmkh.basekmpproject.platform.securestorage.SecretStores
 import kotlinx.coroutines.flow.Flow
 
-internal class CredentialStore(private val store: SecretStore) {
+internal class CredentialStore(stores: SecretStores) {
+    private val store = stores.open("identity.credentials")
 
     suspend fun getAuthToken(): String? = store.get(TokenKey)
 

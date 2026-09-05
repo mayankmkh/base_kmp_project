@@ -114,12 +114,7 @@ private val platformContextModule = module {
     single { createPlatformContext() }
 }
 
-/**
- * The factories every stored file is opened through.
- *
- * A logger is a property of the process, not of a store, so the app builds each factory once with
- * its own logger and Capability implementations name their files against it.
- */
+/** The factories every stored file is opened through; Capability implementations take them. */
 private val storesModule = module {
     single<PreferenceStores> { preferenceStores(get(), get()) }
     single<SecretStores> { secretStores(get(), get()) }

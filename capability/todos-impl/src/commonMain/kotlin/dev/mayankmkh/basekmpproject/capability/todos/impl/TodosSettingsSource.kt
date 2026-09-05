@@ -2,14 +2,17 @@ package dev.mayankmkh.basekmpproject.capability.todos.impl
 
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSettings
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSort
-import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStore
+import dev.mayankmkh.basekmpproject.foundation.preferences.PrefFile
+import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStores
 import dev.mayankmkh.basekmpproject.foundation.preferences.booleanPrefKey
 import dev.mayankmkh.basekmpproject.foundation.preferences.stringPrefKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 
-internal class TodosSettingsSource(private val store: PreferenceStore) {
+internal class TodosSettingsSource(stores: PreferenceStores) {
+    private val store = stores.open(PrefFile("todos.settings"))
+
     // One edit that sets both keys wakes both key flows; dedup here so no consumer has to.
     fun observe(): Flow<TodoSettings> =
         combine(store.observe(HideCompletedKey), store.observe(SortKey)) { hideCompleted, sort ->

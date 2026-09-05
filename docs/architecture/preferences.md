@@ -95,9 +95,8 @@ public fun inMemoryPreferenceStores(): PreferenceStores
 public fun inMemoryPreferenceStore(): PreferenceStore
 ```
 
-A store takes no logger. A logger is a property of the process, not of a store, so it lives on the
-factory the app builds once: `preferenceStores` tags it with `preferences` in its constructor and
-every store it opens writes through that one tagged logger. `:app:shared` declares the factory as a
+A store takes no logger: `preferenceStores` tags the app's logger with `preferences` once and every
+store it opens writes through it (rationale in §12). `:app:shared` declares the factory as a
 Koin `single` and a Capability implementation opens its own file from it, which is also what makes
 a whole-graph test swappable: `inMemoryPreferenceStores()` replaces one definition and nothing
 touches disk. `inMemoryPreferenceStore()` stays public for a consumer test that constructs one store
@@ -270,10 +269,9 @@ Values are strings. Tokens, refresh tokens and keys are strings; anything struct
 Capability's document encoded to a string before it is handed here. `observe` exists because the
 Identity implementation exposes the signed-in state as a `Flow`.
 
-Both modules take the app's `Logger` on their production factory, once, rather than on every open
-(tagging per master document §18.8), and write only the decisions that would otherwise be
-invisible: memory-only secrets on web, a replaced file, and the loss of the OS keyset vault. No
-secret, key or file content reaches a line. The in-memory factories take no logger; they decide
+Both production factories take the app's `Logger` once (tagging per master document §18.8) and
+write only the decisions that would otherwise be invisible: memory-only secrets on web, a replaced
+file, and the loss of the OS keyset vault. No secret, key or file content reaches a line. The in-memory factories take no logger; they decide
 nothing. `secretStores` builds the platform's opener once with the factory, so a platform that has
 one fact to state about itself states it there, and a platform that decides nothing, as iOS does,
 never reads the logger at all.

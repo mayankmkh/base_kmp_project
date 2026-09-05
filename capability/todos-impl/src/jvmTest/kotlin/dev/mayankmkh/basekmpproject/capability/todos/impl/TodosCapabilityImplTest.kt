@@ -11,7 +11,7 @@ import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSort
 import dev.mayankmkh.basekmpproject.capability.todos.api.UpdateTodoResult
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
-import dev.mayankmkh.basekmpproject.foundation.preferences.inMemoryPreferenceStore
+import dev.mayankmkh.basekmpproject.foundation.preferences.inMemoryPreferenceStores
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
@@ -168,7 +168,7 @@ class TodosCapabilityImplTest {
 
     @Test
     fun `settings source round trips the capability value`() = runTest {
-        val source = TodosSettingsSource(inMemoryPreferenceStore())
+        val source = TodosSettingsSource(inMemoryPreferenceStores())
         val expected = TodoSettings(hideCompleted = true, sort = TodoSort.TITLE)
 
         source.update(expected)
@@ -183,7 +183,7 @@ class TodosCapabilityImplTest {
         TodosCapabilityImpl(
             remoteSource = TodosRemoteSource(createHttpClient(engine, CONFIG), JSON),
             localSource = local,
-            settingsSource = TodosSettingsSource(inMemoryPreferenceStore()),
+            settingsSource = TodosSettingsSource(inMemoryPreferenceStores()),
             applicationRuntimeScope =
                 ApplicationRuntimeScope(
                     dispatcher,

@@ -44,6 +44,6 @@ public class LazyDatabase<D : Any>(
  * never suspends, so a coordinator-backed observation stays cold until somebody collects it. The
  * database is obtained once, so rows flow straight to the collector with no intermediate channel.
  */
-public fun <D : Any, T> LazyDatabase<D>.observe(query: (D) -> Flow<T>): Flow<T> = flow {
-    emitAll(query(get()))
+public fun <D : Any, T> LazyDatabase<D>.observe(query: D.() -> Flow<T>): Flow<T> = flow {
+    emitAll(get().query())
 }

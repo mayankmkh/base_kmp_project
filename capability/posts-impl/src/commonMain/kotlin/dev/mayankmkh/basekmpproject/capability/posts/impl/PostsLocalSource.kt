@@ -20,17 +20,17 @@ internal class PostsLocalSource(drivers: SqlDriverProvider) {
     private val database = LazyDatabase(drivers, AppDatabase::invoke)
 
     /** Emits the durable feed, then again after every write to `post` or `postFeedEntry`. */
-    fun observeFeed(): Flow<List<PostEntity>> = database.observe { database ->
-        database.postsSchemaQueries.selectFeed(::PostEntity).observeList()
+    fun observeFeed(): Flow<List<PostEntity>> = database.observe {
+        postsSchemaQueries.selectFeed(::PostEntity).observeList()
     }
 
-    fun observeById(id: String): Flow<PostEntity?> = database.observe { database ->
-        database.postsSchemaQueries.selectById(id, ::PostEntity).observeOneOrNull()
+    fun observeById(id: String): Flow<PostEntity?> = database.observe {
+        postsSchemaQueries.selectById(id, ::PostEntity).observeOneOrNull()
     }
 
     /** Whether the feed endpoint has completed successfully at least once. */
-    fun observeFeedInitialized(): Flow<Boolean> = database.observe { database ->
-        database.postsSchemaQueries
+    fun observeFeedInitialized(): Flow<Boolean> = database.observe {
+        postsSchemaQueries
             .feedInitializationCount()
             .observeOne()
             .map { it > 0L }

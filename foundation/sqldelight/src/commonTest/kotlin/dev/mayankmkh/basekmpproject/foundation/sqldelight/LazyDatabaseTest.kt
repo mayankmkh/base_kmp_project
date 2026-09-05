@@ -61,7 +61,7 @@ class LazyDatabaseTest {
                 },
                 create = { "database" },
             )
-        val observation = lazyDatabase.observe { flowOf(it) }
+        val observation = lazyDatabase.observe { flowOf(this) }
 
         assertFalse(opened)
         assertEquals("database", observation.first())

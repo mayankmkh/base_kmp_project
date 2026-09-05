@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.core.Serializer
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import co.touchlab.kermit.Logger
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -25,6 +26,8 @@ import kotlinx.coroutines.flow.map
  * read and the directory creation off the thread that resolves the Koin graph.
  */
 internal fun dataStoreSecretStore(
+    name: String,
+    logger: Logger,
     produceSerializer: () -> Serializer<Map<String, String>>,
     scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
     produceFile: () -> File,
@@ -32,7 +35,19 @@ internal fun dataStoreSecretStore(
     DataStoreSecretStore(
         DataStoreFactory.create(
             serializer = LazySerializer(produceSerializer),
-            corruptionHandler = ReplaceFileCorruptionHandler { emptyMap() },
+            // A file that cannot be decrypted or parsed is dropped rather than rethrown at every
+            // read; on this store that signs the user out, so it is worth a line. The failure class
+            // separates a lost keyset from malformed JSON; neither the file nor its keys are
+            // logged.
+            corruptionHandler =
+                ReplaceFileCorruptionHandler { failure ->
+                    logger.w {
+                        "secret_store_replaced" +
+                            " name=$name" +
+                            " causeClass=${(failure.cause ?: failure)::class.simpleName}"
+                    }
+                    emptyMap()
+                },
             scope = scope,
             produceFile = { produceFile().also { it.parentFile?.ensureDirectory() } },
         )

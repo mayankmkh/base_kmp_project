@@ -2,6 +2,7 @@ package dev.mayankmkh.basekmpproject.platform.securestorage
 
 import androidx.datastore.core.Serializer
 import androidx.datastore.tink.AeadSerializer
+import co.touchlab.kermit.Logger
 import com.google.crypto.tink.Aead
 import com.google.crypto.tink.InsecureSecretKeyAccess
 import com.google.crypto.tink.KeyTemplates
@@ -13,12 +14,21 @@ import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import dev.mayankmkh.basekmpproject.foundation.runtime.applicationDataDirectory
 import java.security.GeneralSecurityException
 
-internal actual fun createSecretStore(context: PlatformContext, name: String): SecretStore =
+internal actual fun createSecretStore(
+    context: PlatformContext,
+    name: String,
+    logger: Logger,
+): SecretStore =
     dataStoreSecretStore(
+        name = name,
+        logger = logger,
         produceSerializer = {
             val directory = applicationDataDirectory(context.applicationId)
-            encryptedSerializer(name, applicationKeysetVault(context.applicationId, directory))
-        }
+            encryptedSerializer(
+                name,
+                applicationKeysetVault(context.applicationId, directory, logger),
+            )
+        },
     ) {
         applicationDataDirectory(context.applicationId)
             .also(::createOwnerOnly)

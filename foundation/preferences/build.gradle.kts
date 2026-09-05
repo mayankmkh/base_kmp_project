@@ -24,6 +24,11 @@ kotlin {
     }
 
     sourceSets {
+        jvmTest {
+            dependencies {
+                implementation(libs.touchlab.kermit.test)
+            }
+        }
         commonMain {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
@@ -34,6 +39,8 @@ kotlin {
                 // `api` because `KSerializer` sits on the public `openDocumentStore` signature and
                 // the catalog has no separate serialization-core alias.
                 api(libs.kotlinx.serialization.json)
+                // Same reason: the open functions take the app's `Logger`.
+                api(libs.touchlab.kermit)
             }
         }
     }

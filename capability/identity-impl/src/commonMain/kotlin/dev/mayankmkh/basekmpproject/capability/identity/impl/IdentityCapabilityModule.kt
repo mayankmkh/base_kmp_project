@@ -13,7 +13,7 @@ import org.koin.dsl.module
  * tests and apps without sign-in.
  */
 public val identityCapabilityModule: Module = module {
-    single { CredentialStore(openSecretStore(get(), "identity.credentials")) }
+    single { CredentialStore(openSecretStore(get(), "identity.credentials", get())) }
     single { IdentityCapabilityImpl(get()) }
     single<IdentityQueries> { get<IdentityCapabilityImpl>() }
     single<IdentityCommands> { get<IdentityCapabilityImpl>() }

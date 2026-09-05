@@ -80,12 +80,17 @@ public interface DocumentStore<T> {
     public suspend fun update(transform: (T) -> T): T
 }
 
-public fun openPreferenceStore(context: PlatformContext, file: PrefFile): PreferenceStore
+public fun openPreferenceStore(
+    context: PlatformContext,
+    file: PrefFile,
+    logger: Logger,
+): PreferenceStore
 public fun <T> openDocumentStore(
     context: PlatformContext,
     file: PrefFile,
     serializer: KSerializer<T>,
     defaultValue: T,
+    logger: Logger,
 ): DocumentStore<T>
 
 public fun inMemoryPreferenceStore(): PreferenceStore
@@ -149,10 +154,15 @@ write for the rest of the process, and a preferences file that was truncated by 
 would brick the app until reinstall. Losing the file is the cheaper outcome for anything this
 module stores.
 
-The handler runs once per corruption and the store carries on. There is no hook for callers to be
-told: the module has no logger, and a Capability that must know can compare the observed value
-with its own expectations. A production app will want a counter; that hook is deferred until the
-template has a telemetry seam to attach it to (§12.1).
+The handler runs once per corruption and the store carries on. It writes one warning through the
+app's `Logger`, tagged `preferences`, naming the file and the class of the failure underneath
+`CorruptionException`. Neither the file's contents nor the failure's own message is logged: a
+serializer's complaint quotes the bytes it choked on, and a preferences file holds whatever a
+Capability put there.
+
+There is still no hook for callers to be told; a Capability that must know can compare the observed
+value with its own expectations. A production app will want a counter as well as a line; that hook
+is deferred until the template has a telemetry seam to attach it to (§12.1).
 
 ## 6. One store per file
 
@@ -242,13 +252,23 @@ public interface SecretStore {
     public suspend fun clear()
 }
 
-public fun openSecretStore(context: PlatformContext, name: String): SecretStore
+public fun openSecretStore(
+    context: PlatformContext,
+    name: String,
+    logger: Logger,
+): SecretStore
 public fun inMemorySecretStore(): SecretStore
 ```
 
 Values are strings. Tokens, refresh tokens and keys are strings; anything structured is a
 Capability's document encoded to a string before it is handed here. `observe` exists because the
 Identity implementation exposes the signed-in state as a `Flow`.
+
+Both modules take the app's one `Logger` on their open functions and tag it with their own name, as
+the master document §18.8 requires. They write only where a decision would otherwise be invisible:
+a platform that keeps secrets in memory only, a stored file that had to be replaced, and the loss
+of the OS keyset vault. No secret, key or file content reaches a log line. The in-memory variants
+take no logger; they decide nothing.
 
 ### 8.3 Per platform
 
@@ -296,8 +316,10 @@ current user with DPAPI and `CRYPTPROTECT_UI_FORBIDDEN`, then the protected blob
 default collection with attributes `application=<applicationId>` and `purpose=secure-storage`.
 An unavailable native library or Linux Secret Service selects a cleartext
 `<applicationDataDirectory>/secure-storage.keyset` fallback, created `0600` inside the existing
-`0700` directory on POSIX, and prints one warning line with the reason. Once a native store has
-answered, an error for its item becomes `SecretStoreException` and never silently falls back.
+`0700` directory on POSIX, and logs one warning with the backend's own reason. Once per process,
+because the vault is memoised per application id and every store opened afterwards would otherwise
+repeat it. Once a native store has answered, an error for its item becomes `SecretStoreException`
+and never silently falls back.
 
 The OS store holds the Tink keyset itself rather than a key-encryption key. The single-key JSON is
 only a few hundred bytes and fits every backend. Adding a key-encryption key would still require the
@@ -321,11 +343,11 @@ and not with `dependsOn`, which would switch the template off for iOS and web.
 ## 9. Identity
 
 `CredentialStore` in `:capability:identity-impl` moves from `PreferenceStore` to `SecretStore`,
-opened as `openSecretStore(context, "identity.credentials")`. Its tests use `inMemorySecretStore()`.
-The Identity Koin module resolves the app's shared `PlatformContext`. The old plain
-`credentials.preferences_pb` file is not migrated: the sample app has no users, and a token
-migration would be a Capability concern in a product, written as a one-shot read from the old store
-followed by a delete.
+opened as `openSecretStore(context, "identity.credentials", logger)`. Its tests use
+`inMemorySecretStore()`. The Identity Koin module resolves the app's shared `PlatformContext` and
+its logger. The old plain `credentials.preferences_pb` file is not migrated: the sample app has no
+users, and a token migration would be a Capability concern in a product, written as a one-shot read
+from the old store followed by a delete.
 
 The ownership table in [`network.md`](network.md) §2 changes its "Credential persistence" row to
 `:platform:secure-storage`.
@@ -347,16 +369,18 @@ name the app uses for its own storage and must never change once a build has shi
 - `:foundation:preferences` JVM test that opens a real file store in a temporary directory, writes
   a value, overwrites the file with garbage, reopens it and asserts the value is gone and the store
   is writable again. A second JVM test opens the same logical file twice and asserts the failure
-  names the file.
+  names the file, and a replaced corrupt file warns exactly once with the file's name and without
+  its contents.
 - `:platform:secure-storage` JVM tests: the `Map<String, String>` serializer round trip and the
   same store wrapped in `AeadSerializer` with plain Tink. A tampered ciphertext reads as an empty
-  store. An in-memory keyset vault proves first use generates and stores one keyset, a new file with
-  the same vault decrypts copied ciphertext, and a different store name rejects that ciphertext as
-  corruption. The file fallback round trips and is `0600` on POSIX. A macOS-only smoke test writes,
-  reads and deletes one unique generic password, skipping when the JVM cannot access the login
-  Keychain. Two more tests pin the open-time guarantees: the encrypting serializer is built on the
-  first read rather than when the store opens, and opening the same name twice fails with a message
-  that names it.
+  store. An operating system with no vault falls back to the file vault and warns once over
+  Kermit's `TestLogWriter` from `kermit-test`, however many times a store is opened. An in-memory keyset vault proves
+  first use generates and stores one keyset, a new file with the same vault decrypts copied
+  ciphertext, and a different store name rejects that ciphertext as corruption. The file fallback
+  round trips and is `0600` on POSIX. A macOS-only smoke test writes, reads and deletes one unique
+  generic password, skipping when the JVM cannot access the login Keychain. Two more tests pin the
+  open-time guarantees: the encrypting serializer is built on the first read rather than when the
+  store opens, and opening the same name twice fails with a message that names it.
 - `:capability:identity-impl` tests move to `inMemorySecretStore()` unchanged in intent.
 - Android Keystore and iOS Keychain actuals compile in `check` and are exercised by running the
   apps. Windows DPAPI and Linux libsecret compile on the JVM but need their target operating systems
@@ -391,8 +415,8 @@ change behind the existing surfaces.
 - **Migrations.** `openPreferenceStore` and `openDocumentStore` do not expose DataStore's
   `migrations` parameter. A fork moving an existing Android app off `SharedPreferences` adds an
   optional parameter; the template has no legacy data to migrate.
-- **Corruption visibility.** The reset in §5 is silent. When the template gains a telemetry seam,
-  the open functions take an optional callback or report through it.
+- **Corruption visibility.** The reset in §5 now logs (§5); it still has no counter and no caller
+  callback. When the template gains a telemetry seam, the open functions report through it as well.
 - **Web secrets across a reload.** Memory-only sign-out on refresh is deliberate (§8.3).
   `sessionStorage` would survive a refresh without pretending to be secure; whether that is wanted
   depends on the host page the app embeds in.

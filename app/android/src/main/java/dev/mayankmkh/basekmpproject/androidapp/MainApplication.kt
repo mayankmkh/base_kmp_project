@@ -3,16 +3,14 @@ package dev.mayankmkh.basekmpproject.androidapp
 import android.app.Application
 import dev.mayankmkh.basekmpproject.app.shared.di.initKoin
 import org.koin.android.ext.koin.androidContext
-import org.koin.android.ext.koin.androidLogger
-import org.koin.core.logger.Level
 
 class MainApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        initKoin {
-            androidLogger(if (BuildConfig.DEBUG) Level.DEBUG else Level.INFO)
-            androidContext(this@MainApplication)
-        }
+        // `BuildConfig.DEBUG` is the one debug signal that exists before the graph does, and the
+        // shared module has no `BuildConfig` of its own. Koin's own diagnostics travel through the
+        // app's Kermit logger on every target, so there is no `androidLogger` here.
+        initKoin(isDebug = BuildConfig.DEBUG) { androidContext(this@MainApplication) }
     }
 }

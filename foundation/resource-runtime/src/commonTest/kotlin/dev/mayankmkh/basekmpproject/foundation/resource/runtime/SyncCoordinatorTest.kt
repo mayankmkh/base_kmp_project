@@ -1,10 +1,11 @@
 package dev.mayankmkh.basekmpproject.foundation.resource.runtime
 
 import app.cash.turbine.test
-import co.touchlab.kermit.LogWriter
+import co.touchlab.kermit.ExperimentalKermitApi
 import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
-import co.touchlab.kermit.StaticConfig
+import co.touchlab.kermit.TestConfig
+import co.touchlab.kermit.TestLogWriter
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
@@ -31,8 +32,11 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
+@OptIn(ExperimentalKermitApi::class)
 class SyncCoordinatorTest {
-    private val logs = CoordinatorLogWriter()
+    private val logs = TestLogWriter(Severity.Verbose)
+    // Under a tag no capability would use, so the coordinator's own lines are unmistakable.
+    private val bridge = CommandBridge(Logger(TestConfig(Severity.Verbose, listOf(logs))), "sync")
 
     @Test
     fun `start join and success follow the state table`() = runTest {
@@ -122,7 +126,7 @@ class SyncCoordinatorTest {
             coordinator.status("key").first(),
         )
         // The capability's bridge already logged that failure; the coordinator adds nothing.
-        assertTrue(logs.entries.isEmpty())
+        assertTrue(logs.logs.isEmpty())
     }
 
     @Test
@@ -296,7 +300,7 @@ class SyncCoordinatorTest {
                         never.await()
                         Outcome.Completed(Unit)
                     },
-                    bridge = logs.bridge,
+                    bridge = bridge,
                 )
             val caller = backgroundScope.async { coordinator.sync("key", RefreshQos.visible()) }
             started.await()
@@ -309,7 +313,7 @@ class SyncCoordinatorTest {
             )
             assertEquals(IdleStatus, coordinator.status("key").first())
             // Abandoned work has nothing to diagnose, so it is not logged.
-            assertTrue(logs.entries.isEmpty())
+            assertTrue(logs.logs.isEmpty())
         }
 
     @Test
@@ -322,7 +326,7 @@ class SyncCoordinatorTest {
             Outcome.Failed(Problem(ProblemKind.UNEXPECTED)),
             outcome,
         )
-        val entry = logs.entries.single()
+        val entry = logs.logs.single()
         assertEquals(Severity.Error, entry.severity)
         assertTrue(entry.message.contains("operation=sync.sync(key)"))
         assertTrue(entry.message.contains("exceptionMessage=boom"))
@@ -376,7 +380,7 @@ class SyncCoordinatorTest {
             scope = backgroundScope,
             sync = sync,
             retryTriggers = retryTriggers,
-            bridge = logs.bridge,
+            bridge = bridge,
             timeSource = timeSource,
             minInterval = minIntervalSeconds.seconds,
             maxEntries = maxEntries,
@@ -387,20 +391,3 @@ class SyncCoordinatorTest {
         val Offline = Problem(ProblemKind.OFFLINE)
     }
 }
-
-/** Records what the coordinator's own failures log, under a tag no capability would use. */
-private class CoordinatorLogWriter : LogWriter() {
-    val entries = mutableListOf<CoordinatorLogEntry>()
-    val bridge = CommandBridge(Logger(StaticConfig(logWriterList = listOf(this))), "sync")
-
-    override fun log(
-        severity: Severity,
-        message: String,
-        tag: String,
-        throwable: Throwable?,
-    ) {
-        entries += CoordinatorLogEntry(severity, message)
-    }
-}
-
-private data class CoordinatorLogEntry(val severity: Severity, val message: String)

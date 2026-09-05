@@ -60,6 +60,7 @@ kotlin {
                 implementation(projects.platform.secureStorage)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.touchlab.kermit)
+                implementation(libs.touchlab.kermit.koin)
                 api(libs.androidx.navigation3.runtime)
                 implementation(libs.jetbrains.androidx.navigation3.ui)
                 implementation(libs.compose.material3.adaptive.navigation3)

@@ -13,7 +13,7 @@ import org.koin.dsl.onClose
 public val todosCapabilityModule: Module = module {
     singleOf(::TodosLocalSource)
     single(named(TodosSettingsStoreQualifier)) {
-        openPreferenceStore(get(), PrefFile("todos.settings"))
+        openPreferenceStore(get(), PrefFile("todos.settings"), get())
     }
     single { TodosSettingsSource(get(named(TodosSettingsStoreQualifier))) }
     single { TodosRemoteSource(get(), get()) }

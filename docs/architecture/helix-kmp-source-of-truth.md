@@ -3972,6 +3972,24 @@ Historical POC qualification found the selected OpenTelemetry Kotlin version did
 
 Current OpenTelemetry Kotlin remains a developing project; target support/version changes are an adapter qualification concern, not a Feature API concern.
 
+### Logging
+
+One Kermit `Logger` is configured at the App composition root and flows through Koin. Product code never resolves Kermit's global companion object.
+
+```text
+minimum severity   Verbose in a debug build, Warn otherwise
+tag                the module's own name, applied where the module receives the logger
+iOS writer         Kermit's Xcode-tuned default in debug; OSLog with subsystem = the application id in release
+Koin diagnostics   the same logger, on every target
+Features           do not log at all
+```
+
+`initKoin` takes the entry point's own debug signal rather than reading one from the graph: Koin's logger must exist before the first module loads, so the app's `Logger` is built one step earlier and both are configured from that signal. Each entry point supplies the signal its platform actually has; on Android that is the application module's `BuildConfig.DEBUG`.
+
+Tagging is the convention, not a per-call-site decision. The Capability command bridge, the Ktor adapter, the runtime's coroutine exception handler, `:foundation:preferences` and `:platform:secure-storage` each apply `withTag` to the logger they are handed, so every line names its origin and no call site repeats a tag.
+
+Features report Outputs and state, never log lines (§19.2). A module below presentation logs only where a decision would otherwise be invisible, and §19.7 governs what may appear in the line.
+
 ## 18.9 Coil image loading
 
 Start with one reusable image UI mechanism, for example `:ui:image`:

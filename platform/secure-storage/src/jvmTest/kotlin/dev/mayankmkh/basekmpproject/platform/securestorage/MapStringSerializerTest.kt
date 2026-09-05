@@ -1,6 +1,11 @@
 package dev.mayankmkh.basekmpproject.platform.securestorage
 
 import androidx.datastore.tink.AeadSerializer
+import co.touchlab.kermit.ExperimentalKermitApi
+import co.touchlab.kermit.Logger
+import co.touchlab.kermit.Severity
+import co.touchlab.kermit.TestConfig
+import co.touchlab.kermit.TestLogWriter
 import com.google.crypto.tink.Aead
 import com.google.crypto.tink.KeyTemplates
 import com.google.crypto.tink.KeysetHandle
@@ -12,6 +17,7 @@ import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -20,6 +26,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 
+@OptIn(ExperimentalKermitApi::class)
 class MapStringSerializerTest {
     @Test
     fun `map serializer round trips every entry`() = runTest {
@@ -36,7 +43,15 @@ class MapStringSerializerTest {
     fun `Tink encrypted store round trips`() = runTest {
         val file = Files.createTempDirectory("tink-round-trip").resolve("test.secrets").toFile()
         val scope = dataStoreScope(UnconfinedTestDispatcher(testScheduler))
-        val store = dataStoreSecretStore({ encryptedSerializer() }, scope) { file }
+        val store =
+            dataStoreSecretStore(
+                name = StoreName,
+                logger = Logger,
+                produceSerializer = { encryptedSerializer() },
+                scope = scope,
+            ) {
+                file
+            }
 
         store.set("token", "secret")
 
@@ -48,8 +63,18 @@ class MapStringSerializerTest {
     fun `tampered ciphertext reopens as an empty store`() = runTest {
         val file = Files.createTempDirectory("tink-tamper").resolve("test.secrets").toFile()
         val aead = aead()
+        val logs = TestLogWriter(Severity.Verbose)
+        val logger = Logger(TestConfig(Severity.Verbose, listOf(logs)))
         val firstScope = dataStoreScope(UnconfinedTestDispatcher(testScheduler))
-        val first = dataStoreSecretStore({ encryptedSerializer(aead) }, firstScope) { file }
+        val first =
+            dataStoreSecretStore(
+                name = StoreName,
+                logger = logger,
+                produceSerializer = { encryptedSerializer(aead) },
+                scope = firstScope,
+            ) {
+                file
+            }
         first.set("token", "secret")
         firstScope.coroutineContext[Job]?.cancelAndJoin()
 
@@ -59,9 +84,21 @@ class MapStringSerializerTest {
         Files.write(file.toPath(), ciphertext)
 
         val secondScope = dataStoreScope(UnconfinedTestDispatcher(testScheduler))
-        val reopened = dataStoreSecretStore({ encryptedSerializer(aead) }, secondScope) { file }
+        val reopened =
+            dataStoreSecretStore(
+                name = StoreName,
+                logger = logger,
+                produceSerializer = { encryptedSerializer(aead) },
+                scope = secondScope,
+            ) {
+                file
+            }
 
         assertNull(reopened.get("token"))
+        // Signing the user out silently is what this line exists to prevent.
+        val entry = logs.logs.single()
+        assertEquals(Severity.Warn, entry.severity)
+        assertTrue(entry.message.contains("name=$StoreName"), entry.message)
         secondScope.coroutineContext[Job]?.cancelAndJoin()
     }
 
@@ -78,6 +115,7 @@ class MapStringSerializerTest {
         CoroutineScope(dispatcher + SupervisorJob())
 
     private companion object {
-        val AssociatedData = "test.secrets".encodeToByteArray()
+        const val StoreName = "test.secrets"
+        val AssociatedData = StoreName.encodeToByteArray()
     }
 }

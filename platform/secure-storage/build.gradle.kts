@@ -23,10 +23,17 @@ kotlin {
     }
 
     sourceSets {
+        jvmTest {
+            dependencies {
+                implementation(libs.touchlab.kermit.test)
+            }
+        }
         commonMain {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
                 api(projects.foundation.runtime)
+                // `api` because the app's `Logger` sits on the public `openSecretStore` signature.
+                api(libs.touchlab.kermit)
             }
         }
         val jvmAndAndroidMain by getting {

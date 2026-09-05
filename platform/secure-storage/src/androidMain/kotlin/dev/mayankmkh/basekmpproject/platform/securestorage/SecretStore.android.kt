@@ -1,6 +1,7 @@
 package dev.mayankmkh.basekmpproject.platform.securestorage
 
 import androidx.datastore.tink.AeadSerializer
+import co.touchlab.kermit.Logger
 import com.google.crypto.tink.Aead
 import com.google.crypto.tink.KeyTemplates
 import com.google.crypto.tink.RegistryConfiguration
@@ -8,8 +9,14 @@ import com.google.crypto.tink.aead.AeadConfig
 import com.google.crypto.tink.integration.android.AndroidKeysetManager
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 
-internal actual fun createSecretStore(context: PlatformContext, name: String): SecretStore =
+internal actual fun createSecretStore(
+    context: PlatformContext,
+    name: String,
+    logger: Logger,
+): SecretStore =
     dataStoreSecretStore(
+        name = name,
+        logger = logger,
         produceSerializer = {
             AeadSerializer(keystoreAead(context), MapStringSerializer, name.encodeToByteArray())
         },

@@ -25,6 +25,9 @@ import org.koin.dsl.module
 import org.koin.test.verify.verify
 
 class KoinGraphTest {
+    // The graph is the same either way; a debug environment keeps the logger's own configuration
+    // under test rather than a filtered one.
+    private val environment = AppEnvironment(isDebug = true)
 
     @Test
     fun `every declared dependency resolves`() {
@@ -32,7 +35,7 @@ class KoinGraphTest {
         // its own: capability and feature modules depend on bindings the app modules declare, so
         // isolated
         // verification would report holes the running app does not have.
-        module { includes(appModules) }.verify(extraTypes = LAMBDA_BUILT)
+        module { includes(appModules(environment)) }.verify(extraTypes = LAMBDA_BUILT)
     }
 
     @Test
@@ -42,7 +45,7 @@ class KoinGraphTest {
         val koin =
             koinApplication {
                     modules(
-                        libModules +
+                        libModules(environment) +
                             module { single<CredentialProvider> { AnonymousCredentialProvider } }
                     )
                 }

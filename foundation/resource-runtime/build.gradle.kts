@@ -18,6 +18,7 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(libs.ktor.client.mock)
+                implementation(libs.touchlab.kermit.test)
             }
         }
         jvmTest

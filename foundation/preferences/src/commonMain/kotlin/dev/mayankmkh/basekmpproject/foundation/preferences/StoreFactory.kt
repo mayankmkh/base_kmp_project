@@ -1,8 +1,10 @@
 package dev.mayankmkh.basekmpproject.foundation.preferences
 
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.core.okio.OkioSerializer
 import androidx.datastore.preferences.core.Preferences
+import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.foundation.runtime.OpenNameRegistry
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 
@@ -18,6 +20,32 @@ private val openFiles = OpenNameRegistry("store for file")
 
 internal fun registerOpenFile(file: PrefFile): Unit = openFiles.register(file.name)
 
+/** The tag every line this module writes carries. */
+internal const val LogTag: String = "preferences"
+
+/**
+ * The handler every store opens with (section 5): DataStore replaces a file it cannot read, and
+ * this warning is the only trace that the user lost it.
+ *
+ * The line names the file and the class of the failure underneath the [CorruptionException].
+ * Neither the file's contents nor the failure's own message is logged: a serializer's complaint
+ * quotes the bytes it choked on, and a preferences file holds whatever a Capability put there.
+ */
+internal fun <T> replaceCorruptFile(
+    logger: Logger,
+    file: PrefFile,
+    kind: String,
+    defaultValue: () -> T,
+): ReplaceFileCorruptionHandler<T> = ReplaceFileCorruptionHandler { failure ->
+    logger.w {
+        "store_file_replaced" +
+            " kind=$kind" +
+            " file=${file.name}" +
+            " causeClass=${(failure.cause ?: failure)::class.simpleName}"
+    }
+    defaultValue()
+}
+
 // Deferred (preferences.md section 12.1): DataStore's `migrations` parameter is not exposed. A
 // fork moving an existing app off SharedPreferences adds an optional parameter to the open
 // functions here; nothing in the template needs it yet.
@@ -25,10 +53,12 @@ internal fun registerOpenFile(file: PrefFile): Unit = openFiles.register(file.na
 internal expect fun createPreferenceDataStore(
     context: PlatformContext,
     file: PrefFile,
+    logger: Logger,
 ): DataStore<Preferences>
 
 internal expect fun <T> createDocumentDataStore(
     context: PlatformContext,
     file: PrefFile,
     serializer: OkioSerializer<T>,
+    logger: Logger,
 ): DataStore<T>

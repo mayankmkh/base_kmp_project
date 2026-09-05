@@ -2,6 +2,7 @@
 
 package dev.mayankmkh.basekmpproject.platform.securestorage
 
+import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -66,9 +67,15 @@ import platform.Security.kSecReturnAttributes
 import platform.Security.kSecReturnData
 import platform.Security.kSecValueData
 
-// One Keychain service per store keeps `clear()` on one namespace from touching another.
-internal actual fun createSecretStore(context: PlatformContext, name: String): SecretStore =
-    KeychainSecretStore(service = "${context.applicationId}.$name")
+// One Keychain service per store keeps `clear()` on one namespace from touching another. The
+// Keychain either answers or fails with an `OSStatus`, so there is no quiet fallback to record and
+// the logger goes unused here.
+@Suppress("UnusedParameter")
+internal actual fun createSecretStore(
+    context: PlatformContext,
+    name: String,
+    logger: Logger,
+): SecretStore = KeychainSecretStore(service = "${context.applicationId}.$name")
 
 /**
  * Writes go to the Keychain first and to the in-memory snapshot second, so the snapshot never holds

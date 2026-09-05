@@ -3,6 +3,7 @@ package dev.mayankmkh.basekmpproject.foundation.preferences
 import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.okio.OkioSerializer
+import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.KSerializer
@@ -17,15 +18,19 @@ public interface DocumentStore<T> {
     public suspend fun update(transform: (T) -> T): T
 }
 
+/** Opens one document file. [logger] carries the same rule as `openPreferenceStore`. */
 public fun <T> openDocumentStore(
     context: PlatformContext,
     file: PrefFile,
     serializer: KSerializer<T>,
     defaultValue: T,
+    logger: Logger,
 ): DocumentStore<T> {
     registerOpenFile(file)
     val documentSerializer = JsonDocumentSerializer(serializer, defaultValue)
-    return DataStoreDocumentStore(createDocumentDataStore(context, file, documentSerializer))
+    return DataStoreDocumentStore(
+        createDocumentDataStore(context, file, documentSerializer, logger.withTag(LogTag))
+    )
 }
 
 public fun <T> inMemoryDocumentStore(defaultValue: T): DocumentStore<T> =

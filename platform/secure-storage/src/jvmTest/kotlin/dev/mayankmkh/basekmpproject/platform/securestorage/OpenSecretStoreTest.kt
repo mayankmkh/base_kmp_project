@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.platform.securestorage
 
+import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -11,9 +12,10 @@ class OpenSecretStoreTest {
         // Nothing is read, so the desktop directory is never created on the test machine.
         val context = PlatformContext("secure-storage-registry-test")
         val name = "registry-${System.nanoTime()}"
-        openSecretStore(context, name)
+        openSecretStore(context, name, Logger)
 
-        val failure = assertFailsWith<IllegalStateException> { openSecretStore(context, name) }
+        val failure =
+            assertFailsWith<IllegalStateException> { openSecretStore(context, name, Logger) }
 
         assertTrue(failure.message.orEmpty().contains(name))
     }

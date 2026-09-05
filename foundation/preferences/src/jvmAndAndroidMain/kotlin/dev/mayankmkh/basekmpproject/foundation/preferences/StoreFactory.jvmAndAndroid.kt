@@ -2,12 +2,12 @@ package dev.mayankmkh.basekmpproject.foundation.preferences
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
-import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.core.okio.OkioSerializer
 import androidx.datastore.core.okio.OkioStorage
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import java.io.File
 import okio.FileSystem
@@ -17,9 +17,10 @@ import okio.Path.Companion.toPath
 internal actual fun createPreferenceDataStore(
     context: PlatformContext,
     file: PrefFile,
+    logger: Logger,
 ): DataStore<Preferences> =
     PreferenceDataStoreFactory.createWithPath(
-        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+        corruptionHandler = replaceCorruptFile(logger, file, "preferences") { emptyPreferences() },
         produceFile = { context.storePath(file.preferencesFileName) },
     )
 
@@ -27,6 +28,7 @@ internal actual fun <T> createDocumentDataStore(
     context: PlatformContext,
     file: PrefFile,
     serializer: OkioSerializer<T>,
+    logger: Logger,
 ): DataStore<T> =
     DataStoreFactory.create(
         storage =
@@ -35,7 +37,8 @@ internal actual fun <T> createDocumentDataStore(
                 serializer = serializer,
                 producePath = { context.storePath(file.documentFileName) },
             ),
-        corruptionHandler = ReplaceFileCorruptionHandler { serializer.defaultValue },
+        corruptionHandler =
+            replaceCorruptFile(logger, file, "document") { serializer.defaultValue },
     )
 
 /** The directory this platform keeps DataStore files in. Created here, on the DataStore scope. */

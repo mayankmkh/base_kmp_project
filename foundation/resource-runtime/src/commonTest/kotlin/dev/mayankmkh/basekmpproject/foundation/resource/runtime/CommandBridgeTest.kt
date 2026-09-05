@@ -1,9 +1,10 @@
 package dev.mayankmkh.basekmpproject.foundation.resource.runtime
 
-import co.touchlab.kermit.LogWriter
+import co.touchlab.kermit.ExperimentalKermitApi
 import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
-import co.touchlab.kermit.StaticConfig
+import co.touchlab.kermit.TestConfig
+import co.touchlab.kermit.TestLogWriter
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
@@ -29,18 +30,19 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.IOException
 
+@OptIn(ExperimentalKermitApi::class)
 class CommandBridgeTest {
     @Test
     fun `commit persists a success without logging`() = runTest {
         val result: Result<String, NetworkFailure> = Ok("value")
         val persisted = mutableListOf<String>()
-        val logs = RecordingLogWriter()
+        val logs = TestLogWriter(Severity.Verbose)
 
         val outcome = logs.bridge("posts").commit(result, "refresh", persisted::add)
 
         assertEquals(Outcome.Completed(Unit), outcome)
         assertEquals(listOf("value"), persisted)
-        assertTrue(logs.entries.isEmpty())
+        assertTrue(logs.logs.isEmpty())
     }
 
     @Test
@@ -52,7 +54,7 @@ class CommandBridgeTest {
                 cause = IOException("offline"),
             )
         val result: Result<String, NetworkFailure> = Err(failure)
-        val logs = RecordingLogWriter()
+        val logs = TestLogWriter(Severity.Verbose)
         var completionCalls = 0
 
         val outcome =
@@ -66,15 +68,15 @@ class CommandBridgeTest {
             Problem(ProblemKind.OFFLINE, "request-1"),
             assertIs<Outcome.Failed>(outcome).problem,
         )
-        assertEquals(1, logs.entries.size)
-        assertEquals(Severity.Warn, logs.entries.single().severity)
-        assertEquals("todos", logs.entries.single().tag)
-        assertTrue(logs.entries.single().message.contains("operation=todos.create"))
-        assertTrue(logs.entries.single().message.contains("kind=OFFLINE"))
-        assertTrue(logs.entries.single().message.contains("transportKind=OFFLINE"))
-        assertTrue(logs.entries.single().message.contains("requestId=request-1"))
-        assertTrue(logs.entries.single().message.contains("exceptionClass=IOException"))
-        assertTrue(logs.entries.single().message.contains("exceptionMessage=offline"))
+        assertEquals(1, logs.logs.size)
+        assertEquals(Severity.Warn, logs.logs.single().severity)
+        assertEquals("todos", logs.logs.single().tag)
+        assertTrue(logs.logs.single().message.contains("operation=todos.create"))
+        assertTrue(logs.logs.single().message.contains("kind=OFFLINE"))
+        assertTrue(logs.logs.single().message.contains("transportKind=OFFLINE"))
+        assertTrue(logs.logs.single().message.contains("requestId=request-1"))
+        assertTrue(logs.logs.single().message.contains("exceptionClass=IOException"))
+        assertTrue(logs.logs.single().message.contains("exceptionMessage=offline"))
     }
 
     @Test
@@ -84,7 +86,7 @@ class CommandBridgeTest {
                 requestId = "request-2",
                 cause = IllegalStateException("unexpected"),
             )
-        val logs = RecordingLogWriter()
+        val logs = TestLogWriter(Severity.Verbose)
         val result: Result<String, NetworkFailure> = Err(failure)
 
         val outcome = logs.bridge("todos").toOutcome(result, "rename") { it }
@@ -93,17 +95,17 @@ class CommandBridgeTest {
             Problem(ProblemKind.UNEXPECTED, "request-2"),
             assertIs<Outcome.Failed>(outcome).problem,
         )
-        assertEquals(Severity.Error, logs.entries.single().severity)
+        assertEquals(Severity.Error, logs.logs.single().severity)
     }
 
     @Test
     fun `a runtime failure with a cause logs once at error severity`() {
-        val logs = RecordingLogWriter()
+        val logs = TestLogWriter(Severity.Verbose)
 
         val problem = logs.bridge("posts").unexpected("sync(Unit)", IllegalStateException("boom"))
 
         assertEquals(Problem(ProblemKind.UNEXPECTED), problem)
-        val entry = logs.entries.single()
+        val entry = logs.logs.single()
         assertEquals(Severity.Error, entry.severity)
         assertEquals("posts", entry.tag)
         assertTrue(entry.message.contains("operation=posts.sync(Unit)"))
@@ -169,20 +171,6 @@ class CommandBridgeTest {
     }
 }
 
-private class RecordingLogWriter : LogWriter() {
-    val entries = mutableListOf<LogEntry>()
-    private val logger = Logger(StaticConfig(logWriterList = listOf(this)))
-
-    fun bridge(tag: String): CommandBridge = CommandBridge(logger, tag)
-
-    override fun log(
-        severity: Severity,
-        message: String,
-        tag: String,
-        throwable: Throwable?,
-    ) {
-        entries += LogEntry(severity, message, tag)
-    }
-}
-
-private data class LogEntry(val severity: Severity, val message: String, val tag: String)
+/** A bridge whose only writer is [this], so a test asserts on records instead of output. */
+private fun TestLogWriter.bridge(tag: String): CommandBridge =
+    CommandBridge(Logger(TestConfig(Severity.Verbose, listOf(this))), tag)

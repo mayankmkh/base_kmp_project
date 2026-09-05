@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.platform.securestorage
 
+import co.touchlab.kermit.Logger
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,6 +19,8 @@ class DataStoreSecretStoreTest {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler) + SupervisorJob())
         val store =
             dataStoreSecretStore(
+                name = "test",
+                logger = Logger,
                 produceSerializer = {
                     builds++
                     MapStringSerializer

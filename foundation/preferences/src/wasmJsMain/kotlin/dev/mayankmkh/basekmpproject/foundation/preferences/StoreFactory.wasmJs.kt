@@ -2,18 +2,19 @@ package dev.mayankmkh.basekmpproject.foundation.preferences
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
-import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.core.okio.OkioSerializer
 import androidx.datastore.core.okio.WebLocalStorage
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferencesSerializer
 import androidx.datastore.preferences.core.emptyPreferences
+import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 
 internal actual fun createPreferenceDataStore(
     context: PlatformContext,
     file: PrefFile,
+    logger: Logger,
 ): DataStore<Preferences> =
     PreferenceDataStoreFactory.create(
         storage =
@@ -21,13 +22,14 @@ internal actual fun createPreferenceDataStore(
                 serializer = PreferencesSerializer,
                 name = "${context.applicationId}.${file.preferencesFileName}",
             ),
-        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+        corruptionHandler = replaceCorruptFile(logger, file, "preferences") { emptyPreferences() },
     )
 
 internal actual fun <T> createDocumentDataStore(
     context: PlatformContext,
     file: PrefFile,
     serializer: OkioSerializer<T>,
+    logger: Logger,
 ): DataStore<T> =
     DataStoreFactory.create(
         storage =
@@ -35,5 +37,6 @@ internal actual fun <T> createDocumentDataStore(
                 serializer = serializer,
                 name = "${context.applicationId}.${file.documentFileName}",
             ),
-        corruptionHandler = ReplaceFileCorruptionHandler { serializer.defaultValue },
+        corruptionHandler =
+            replaceCorruptFile(logger, file, "document") { serializer.defaultValue },
     )

@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.platform.securestorage
 
+import co.touchlab.kermit.Logger
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -55,6 +56,8 @@ class DesktopKeysetVaultTest {
         scope: CoroutineScope,
     ): SecretStore =
         dataStoreSecretStore(
+            name = name,
+            logger = Logger,
             produceSerializer = { encryptedSerializer(name, vault) },
             scope = scope,
             produceFile = { file },

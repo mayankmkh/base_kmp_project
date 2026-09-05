@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.platform.securestorage
 
+import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.foundation.runtime.OpenNameRegistry
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.coroutines.flow.Flow
@@ -21,11 +22,19 @@ public interface SecretStore {
  *
  * Android keeps the Tink keyset in `<applicationId>.secure-storage`; app backup rules can use this
  * stable name to exclude the keyset alongside the non-backed-up ciphertext.
+ *
+ * [logger] is the app's one logger, tagged here with this module's name as every module that takes
+ * a logger does. It records the decisions that would otherwise be invisible: a platform that keeps
+ * secrets in memory only, a stored file that had to be replaced, and the loss of the OS keyset
+ * vault. No secret, key or file content is ever written to it.
  */
-public fun openSecretStore(context: PlatformContext, name: String): SecretStore {
+public fun openSecretStore(context: PlatformContext, name: String, logger: Logger): SecretStore {
     openStores.register(name)
-    return createSecretStore(context, name)
+    return createSecretStore(context, name, logger.withTag(LogTag))
 }
+
+/** The tag every line this module writes carries. */
+internal const val LogTag: String = "secure-storage"
 
 // Same rule as `:foundation:preferences`: a store is a process-lifetime object, so a second open of
 // the same name is a wiring mistake that should fail here, with the store's name in the message.
@@ -43,4 +52,8 @@ private val openStores = OpenNameRegistry("secret store named")
 public class SecretStoreException(message: String, cause: Throwable? = null) :
     RuntimeException(message, cause)
 
-internal expect fun createSecretStore(context: PlatformContext, name: String): SecretStore
+internal expect fun createSecretStore(
+    context: PlatformContext,
+    name: String,
+    logger: Logger,
+): SecretStore

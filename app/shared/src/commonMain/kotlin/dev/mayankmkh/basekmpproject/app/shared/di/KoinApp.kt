@@ -1,8 +1,10 @@
 package dev.mayankmkh.basekmpproject.app.shared.di
 
+import co.touchlab.kermit.LogWriter
 import co.touchlab.kermit.Logger
+import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
-import co.touchlab.kermit.platformLogWriter
+import co.touchlab.kermit.koin.KermitKoinLogger
 import dev.mayankmkh.basekmpproject.app.shared.config.KermitKtorLogger
 import dev.mayankmkh.basekmpproject.app.shared.config.apiBaseUrl
 import dev.mayankmkh.basekmpproject.capability.identity.impl.identityCapabilityModule
@@ -26,6 +28,7 @@ import io.ktor.client.plugins.logging.Logger as KtorLogger
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.serialization.json.Json
 import org.koin.core.context.startKoin
+import org.koin.core.module.Module
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.scope.Scope
 import org.koin.dsl.KoinAppDeclaration
@@ -34,15 +37,45 @@ import org.koin.dsl.includes
 import org.koin.dsl.module
 import org.koin.dsl.onClose
 
-fun initKoin(config: KoinAppDeclaration? = null) {
+/**
+ * Starts the application graph.
+ *
+ * [isDebug] comes from the platform entry point rather than from the graph. Koin's own logger has
+ * to exist before the first module loads, and it writes through the app's [Logger], so both are
+ * built here; on Android the only truthful signal is the application module's `BuildConfig.DEBUG`,
+ * which `MainApplication` passes.
+ */
+fun initKoin(isDebug: Boolean = platformIsDebugBuild(), config: KoinAppDeclaration? = null) {
+    val environment = AppEnvironment(isDebug)
     startKoin {
-        modules(appModules)
+        // Koin's own diagnostics reach the same destination as everything else, on every target,
+        // instead of Logcat on Android and nowhere at all elsewhere.
+        logger(KermitKoinLogger(environment.logger.withTag("koin")))
+        modules(appModules(environment))
 
         // Last, so what the caller declares wins: a later definition of the same type replaces the
         // one already loaded. That is how a test swaps the `HttpClient` for one on a `MockEngine`
         // without the app module knowing anything about tests.
         includes(config)
     }
+}
+
+/**
+ * What a platform entry point knows about its own build before Koin exists.
+ *
+ * The one [Logger] the app writes through is built here rather than resolved from the graph,
+ * because Koin's logger needs it one step earlier than any `single` can be resolved. A debug build
+ * keeps every severity; anything else keeps warnings and errors, so a shipped build neither formats
+ * nor writes a message nobody reads.
+ */
+internal class AppEnvironment(val isDebug: Boolean) {
+    val logger: Logger =
+        Logger(
+            StaticConfig(
+                minSeverity = if (isDebug) Severity.Verbose else Severity.Warn,
+                logWriterList = listOf(appLogWriter(isDebug)),
+            )
+        )
 }
 
 private val jsonModule = module {
@@ -61,15 +94,14 @@ private val dispatchersModule = module {
     single { AppDispatchers() }
 }
 
-internal val loggerModule = module {
-    single { Logger(StaticConfig(logWriterList = listOf(platformLogWriter()))) }
-}
+// The one instance, so every module tags the same logger rather than configuring its own.
+private fun loggerModule(environment: AppEnvironment) = module { single { environment.logger } }
 
 private val runtimeModule = module {
     // Application ownership is explicit: capabilities take named children and close those children
     // with their Koin singleton; stopping Koin closes the parent as the final safety net.
     single {
-        val logger = get<Logger>()
+        val logger = get<Logger>().withTag("runtime")
         val handler = CoroutineExceptionHandler { _, throwable ->
             logger.e(throwable) { "Uncaught application-runtime failure" }
         }
@@ -90,13 +122,13 @@ private val platformContextModule = module {
  * override just the host without rebuilding the plugin stack. The `CredentialProvider` comes from
  * `identityCapabilityModule` through App composition.
  */
-private val networkModule = module {
+private fun networkModule(environment: AppEnvironment) = module {
     single {
         NetworkConfig(
             baseUrl = apiBaseUrl,
             // Headers, never bodies: the plugin buffers bodies to print them, and the sensitive
             // headers are sanitised inside the client. Release builds log nothing.
-            logLevel = if (isDebugBuild()) LogLevel.HEADERS else LogLevel.NONE,
+            logLevel = if (environment.isDebug) LogLevel.HEADERS else LogLevel.NONE,
         )
     }
     // Locale comes from the app language owner and app version from platform build metadata once
@@ -136,17 +168,14 @@ private val databaseModule = module {
     singleOf(::AppDatabaseDriverProvider) bind SqlDriverProvider::class
 }
 
-// Declared last: top-level properties initialise in source order, so a list assembled any earlier
-// would capture nulls.
-
-internal val libModules =
+internal fun libModules(environment: AppEnvironment): List<Module> =
     listOf(
         jsonModule,
         dispatchersModule,
-        loggerModule,
+        loggerModule(environment),
         runtimeModule,
         platformContextModule,
-        networkModule,
+        networkModule(environment),
         connectivityModule,
         databaseModule,
     )
@@ -161,12 +190,20 @@ private val productModules =
     )
 
 // One list so `KoinGraphTest` verifies the graph `initKoin` starts.
-internal val appModules = libModules + productModules
+internal fun appModules(environment: AppEnvironment): List<Module> =
+    libModules(environment) + productModules
 
 /**
- * Whether this process is a debug build. Each target answers from its own runtime signal, so no
- * generated `BuildConfig` is needed in a library module.
+ * Whether this process is a debug build, for an entry point that has no signal of its own. Each
+ * target answers from its own runtime signal, so no generated `BuildConfig` is needed in a library
+ * module.
  */
-internal expect fun Scope.isDebugBuild(): Boolean
+internal expect fun platformIsDebugBuild(): Boolean
+
+/**
+ * Where log lines go on this target. Kermit's `platformLogWriter()` is tuned for local development,
+ * so a target may pick a different writer for release builds.
+ */
+internal expect fun appLogWriter(isDebug: Boolean): LogWriter
 
 internal expect fun Scope.createPlatformContext(): PlatformContext

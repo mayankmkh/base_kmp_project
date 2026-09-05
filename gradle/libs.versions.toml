@@ -152,6 +152,9 @@ sqldelight-web-worker-driver = { group = "app.cash.sqldelight", name = "web-work
 michael-bull-kotlin-result = { group = "com.michael-bull.kotlin-result", name = "kotlin-result", version.ref = "kotlinResult" }
 
 touchlab-kermit = { group = "co.touchlab", name = "kermit", version.ref = "touchlabKermit" }
+# Routes Koin's own diagnostics into the same Kermit logger the app configures.
+touchlab-kermit-koin = { group = "co.touchlab", name = "kermit-koin", version.ref = "touchlabKermit" }
+touchlab-kermit-test = { group = "co.touchlab", name = "kermit-test", version.ref = "touchlabKermit" }
 
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 # Android Keystore-backed keyset management for the encrypted secrets store.

@@ -17,9 +17,10 @@ import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.reconnects
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.shareIn
 
 internal class PostsCapabilityImpl(
     private val remoteSource: PostsRemoteSource,
@@ -29,18 +30,15 @@ internal class PostsCapabilityImpl(
 ) : PostsQueries, PostsCommands, AutoCloseable {
     private val scope = applicationRuntimeScope.childScope("posts")
 
-    private val feedSync = SyncCoordinator<Unit>(scope, sync = { _, _ -> syncFeed() })
+    // The platform monitor is a cold flow that registers a callback per collector, so both
+    // coordinators share one subscription.
+    private val reconnects = connectivityMonitor.reconnects().shareIn(scope, SharingStarted.Lazily)
 
-    private val postSync = SyncCoordinator<PostId>(scope, sync = { id, _ -> syncPost(id) })
+    private val feedSync =
+        SyncCoordinator<Unit>(scope, sync = { _, _ -> syncFeed() }, retryTriggers = reconnects)
 
-    init {
-        scope.launch {
-            connectivityMonitor.reconnects().collect {
-                feedSync.retryOffline(RefreshQos.background())
-                postSync.retryOffline(RefreshQos.background())
-            }
-        }
-    }
+    private val postSync =
+        SyncCoordinator<PostId>(scope, sync = { id, _ -> syncPost(id) }, retryTriggers = reconnects)
 
     override fun observeFeed(): Flow<ResourceObservation<PostFeed>> =
         feedSync.observations(

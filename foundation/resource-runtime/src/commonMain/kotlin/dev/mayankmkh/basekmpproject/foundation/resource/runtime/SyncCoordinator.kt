@@ -19,8 +19,10 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -30,11 +32,15 @@ import kotlinx.coroutines.withContext
  *
  * One worker runs per key. [sync] starts or joins it, [syncIfDue] additionally skips a key whose
  * last attempt is younger than [minInterval], [observing] counts observers around an upstream flow
- * and starts one due background sync per collection, [retryOffline] restarts every observed key
- * whose last attempt failed offline, and [status] exposes the per-key ledger. Collect [status]
- * inside [observing] for the same key: an unobserved key may be evicted once the ledger exceeds
- * [maxEntries], which resets its status. [observations] wires all three together for the common
- * case.
+ * and starts one due background sync per collection, every [retryTriggers] emission restarts the
+ * observed keys whose last attempt failed offline, and [status] exposes the per-key ledger. Collect
+ * [status] inside [observing] for the same key: an unobserved key may be evicted once the ledger
+ * exceeds [maxEntries], which resets its status. [observations] wires observing and status together
+ * for the common case.
+ *
+ * [retryTriggers] is domain and platform blind: a Capability usually passes its connectivity
+ * monitor's reconnect events. Keys that succeeded, failed for another reason, or already have a
+ * worker are left alone, because connectivity returning is not evidence that their value changed.
  *
  * | Event               | State change                                                 |
  * |---------------------|--------------------------------------------------------------|
@@ -54,6 +60,7 @@ import kotlinx.coroutines.withContext
 public class SyncCoordinator<Key : Any>(
     private val scope: CoroutineScope,
     private val sync: suspend (Key, RefreshQos) -> RefreshOutcome,
+    retryTriggers: Flow<Unit> = emptyFlow(),
     private val timeSource: TimeSource = TimeSource.Monotonic,
     private val minInterval: Duration = 30.seconds,
     private val maxEntries: Int = 256,
@@ -64,6 +71,7 @@ public class SyncCoordinator<Key : Any>(
     init {
         require(maxEntries > 0)
         require(!minInterval.isNegative())
+        scope.launch { retryTriggers.collect { retryOffline(RefreshQos.background()) } }
     }
 
     public suspend fun sync(key: Key, qos: RefreshQos): RefreshOutcome =
@@ -98,11 +106,9 @@ public class SyncCoordinator<Key : Any>(
 
     /**
      * Starts a worker for every observed key whose last attempt failed with an
-     * [ResourceProblemCategory.OFFLINE] problem and returns without awaiting them. Keys that
-     * succeeded, failed for another reason, or already have a worker are left alone; connectivity
-     * returning is not evidence that their value changed.
+     * [ResourceProblemCategory.OFFLINE] problem and returns without awaiting them.
      */
-    public suspend fun retryOffline(qos: RefreshQos) {
+    private suspend fun retryOffline(qos: RefreshQos) {
         mutex.withLock {
             for ((key, entry) in entries) {
                 if (entry.observers > 0 && entry.inFlight == null && entry.failedOffline()) {

@@ -17,7 +17,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -159,9 +161,10 @@ class SyncCoordinatorTest {
     @Test
     fun `observing starts an appearance sync and stopping removes the offline retry`() = runTest {
         val upstream = MutableSharedFlow<String>()
+        val reconnects = MutableSharedFlow<Unit>()
         var calls = 0
         val coordinator =
-            coordinator<String> { _, _ ->
+            coordinator<String>(retryTriggers = reconnects) { _, _ ->
                 calls++
                 RefreshOutcome.Failed(Offline)
             }
@@ -169,75 +172,78 @@ class SyncCoordinatorTest {
         runCurrent()
         assertEquals(1, calls)
 
-        coordinator.retryOffline(RefreshQos.background())
+        reconnects.emit(Unit)
         runCurrent()
         assertEquals(2, calls)
         collector.cancelAndJoin()
-        coordinator.retryOffline(RefreshQos.background())
+        reconnects.emit(Unit)
         runCurrent()
         assertEquals(2, calls)
     }
 
     @Test
-    fun `retryOffline restarts only observed keys whose last attempt failed offline`() = runTest {
-        val upstream = MutableSharedFlow<Unit>()
-        val outcomes =
-            mapOf(
-                "offline" to RefreshOutcome.Failed(Offline),
-                "temporary" to
-                    RefreshOutcome.Failed(
-                        ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true)
-                    ),
-                "succeeded" to RefreshOutcome.Succeeded,
+    fun `a retry trigger restarts only observed keys whose last attempt failed offline`() =
+        runTest {
+            val upstream = MutableSharedFlow<Unit>()
+            val reconnects = MutableSharedFlow<Unit>()
+            val outcomes =
+                mapOf(
+                    "offline" to RefreshOutcome.Failed(Offline),
+                    "temporary" to
+                        RefreshOutcome.Failed(
+                            ResourceProblem(ResourceProblemCategory.TEMPORARY, retryable = true)
+                        ),
+                    "succeeded" to RefreshOutcome.Succeeded,
+                )
+            val calls = mutableMapOf<String, Int>()
+            val coordinator =
+                coordinator<String>(retryTriggers = reconnects) { key, _ ->
+                    calls[key] = calls.getOrElse(key) { 0 } + 1
+                    outcomes[key] ?: RefreshOutcome.Failed(Offline)
+                }
+            val observers =
+                outcomes.keys.map { key ->
+                    backgroundScope.launch { coordinator.observing(key, upstream).collect {} }
+                }
+            assertEquals(
+                RefreshOutcome.Failed(Offline),
+                coordinator.sync("unobserved", RefreshQos.visible()),
             )
-        val calls = mutableMapOf<String, Int>()
-        val coordinator =
-            coordinator<String> { key, _ ->
-                calls[key] = calls.getOrElse(key) { 0 } + 1
-                outcomes[key] ?: RefreshOutcome.Failed(Offline)
-            }
-        val observers =
-            outcomes.keys.map { key ->
-                backgroundScope.launch { coordinator.observing(key, upstream).collect {} }
-            }
-        assertEquals(
-            RefreshOutcome.Failed(Offline),
-            coordinator.sync("unobserved", RefreshQos.visible()),
-        )
-        runCurrent()
-        assertEquals(
-            mapOf("offline" to 1, "temporary" to 1, "succeeded" to 1, "unobserved" to 1),
-            calls,
-        )
+            runCurrent()
+            assertEquals(
+                mapOf("offline" to 1, "temporary" to 1, "succeeded" to 1, "unobserved" to 1),
+                calls,
+            )
 
-        coordinator.retryOffline(RefreshQos.background())
-        runCurrent()
+            reconnects.emit(Unit)
+            runCurrent()
 
-        assertEquals(
-            mapOf("offline" to 2, "temporary" to 1, "succeeded" to 1, "unobserved" to 1),
-            calls,
-        )
-        observers.forEach { it.cancelAndJoin() }
-    }
+            assertEquals(
+                mapOf("offline" to 2, "temporary" to 1, "succeeded" to 1, "unobserved" to 1),
+                calls,
+            )
+            observers.forEach { it.cancelAndJoin() }
+        }
 
     @Test
-    fun `retryOffline leaves an in-flight retry alone`() = runTest {
+    fun `a retry trigger leaves an in-flight retry alone`() = runTest {
         val upstream = MutableSharedFlow<Unit>()
+        val reconnects = MutableSharedFlow<Unit>()
         val release = CompletableDeferred<Unit>()
         var calls = 0
         val coordinator =
-            coordinator<String> { _, _ ->
+            coordinator<String>(retryTriggers = reconnects) { _, _ ->
                 calls++
                 if (calls > 1) release.await()
                 RefreshOutcome.Failed(Offline)
             }
         val observer = backgroundScope.launch { coordinator.observing("key", upstream).collect {} }
         runCurrent()
-        coordinator.retryOffline(RefreshQos.background())
+        reconnects.emit(Unit)
         runCurrent()
         assertEquals(2, calls)
 
-        coordinator.retryOffline(RefreshQos.background())
+        reconnects.emit(Unit)
         runCurrent()
         assertEquals(2, calls)
 
@@ -355,11 +361,13 @@ class SyncCoordinatorTest {
         timeSource: TestTimeSource = TestTimeSource(),
         minIntervalSeconds: Int = 30,
         maxEntries: Int = 256,
+        retryTriggers: Flow<Unit> = emptyFlow(),
         sync: suspend (Key, RefreshQos) -> RefreshOutcome,
     ) =
         SyncCoordinator(
             scope = backgroundScope,
             sync = sync,
+            retryTriggers = retryTriggers,
             timeSource = timeSource,
             minInterval = minIntervalSeconds.seconds,
             maxEntries = maxEntries,

@@ -3112,10 +3112,11 @@ The database is the value owner. A Capability implementation observes its durabl
 cold flow and lets `SyncCoordinator<Key>` from `:foundation:resource-runtime` (`foundation_runtime`)
 coordinate the work that writes them: one worker runs per key, callers join an in-flight worker
 instead of starting another, `syncIfDue` skips a key attempted within `minInterval`, observers are
-counted around the upstream flow so the first collection starts one due background sync and
-`retryOffline` restarts only observed keys whose last attempt failed `OFFLINE` (connectivity
-returning is not evidence that a synchronised value changed), and `status(key)` exposes the per-key
-ledger as `SyncStatus`.
+counted around the upstream flow so the first collection starts one due background sync, every
+emission of the constructor's `retryTriggers` flow restarts only observed keys whose last attempt
+failed `OFFLINE` (connectivity returning is not evidence that a synchronised value changed), and
+`status(key)` exposes the per-key ledger as `SyncStatus`. The trigger flow is platform blind; a
+Capability passes its `ConnectivityMonitor.reconnects()`.
 The ledger is process-local and bounded: once it exceeds `maxEntries`, the oldest unobserved idle
 key is evicted, which resets its status, so consumers collect `status` inside `observing` for the
 same key. The coordinator never reads, caches, or compares values, has no grace timeout, and does
@@ -5698,7 +5699,8 @@ problem in project code; see ADR-43.
 **Decision:** `:foundation:resource-runtime` ships `SyncCoordinator<Key>` and nothing else. It
 starts or joins one worker per key, skips keys attempted within `minInterval`, counts observers
 around a Capability-supplied upstream flow, retries observed keys whose last attempt failed offline
-on demand, and exposes a per-key `SyncStatus` ledger bounded by `maxEntries`. It never reads, caches, compares, or re-reads values.
+whenever its `retryTriggers` flow emits, and exposes a per-key `SyncStatus` ledger bounded by
+`maxEntries`. It never reads, caches, compares, or re-reads values.
 Capability implementations observe SQLDelight directly, persist their own "synchronized at least
 once" marker in the same transaction as the rows, apply that marker to the value flow, and hand the
 flow to `observations`, which applies the contract's `SyncStatus.toOperation` mapping.

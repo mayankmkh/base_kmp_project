@@ -15,8 +15,8 @@ Capability. The replacement keeps `:foundation:resource-runtime` but changes wha
 - `SyncCoordinator<Key>` schedules at most one sync per key, joins concurrent callers, isolates
   caller cancellation from the shared worker, applies `minInterval` for `syncIfDue`, counts
   observers per key through `observing(key, upstream)`, restarts only observed keys whose last
-  attempt failed offline on `retryOffline` without awaiting them, evicts idle entries beyond
-  `maxEntries`, and exposes
+  attempt failed offline when its `retryTriggers` flow emits (Capabilities pass
+  `ConnectivityMonitor.reconnects()`), evicts idle entries beyond `maxEntries`, and exposes
   `status(key)` as `Flow<SyncStatus>` (`inFlight`, `lastFailure`, `hasSucceeded`). It never sees a
   value. `observations(key, values)` wraps a durable value flow in `observing` and applies the
   contract's `SyncStatus.toOperation` mapping.

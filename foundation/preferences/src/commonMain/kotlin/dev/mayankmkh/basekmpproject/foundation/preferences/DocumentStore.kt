@@ -3,8 +3,6 @@ package dev.mayankmkh.basekmpproject.foundation.preferences
 import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.okio.OkioSerializer
-import co.touchlab.kermit.Logger
-import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
@@ -18,22 +16,7 @@ public interface DocumentStore<T> {
     public suspend fun update(transform: (T) -> T): T
 }
 
-/** Opens one document file. [logger] is the app's logger; the module tags it with its own name. */
-public fun <T> openDocumentStore(
-    context: PlatformContext,
-    file: PrefFile,
-    serializer: KSerializer<T>,
-    defaultValue: T,
-    logger: Logger,
-): DocumentStore<T> {
-    registerOpenFile(file)
-    val documentSerializer = JsonDocumentSerializer(serializer, defaultValue)
-    return DataStoreDocumentStore(
-        createDocumentDataStore(context, file, documentSerializer, logger.withTag(LogTag))
-    )
-}
-
-public fun <T> inMemoryDocumentStore(defaultValue: T): DocumentStore<T> =
+internal fun <T> inMemoryDocumentStore(defaultValue: T): DocumentStore<T> =
     DataStoreDocumentStore(InMemoryDataStore(defaultValue))
 
 internal class DataStoreDocumentStore<T>(private val dataStore: DataStore<T>) : DocumentStore<T> {

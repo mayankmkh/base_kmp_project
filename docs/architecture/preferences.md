@@ -30,7 +30,7 @@ mechanics inside the two modules.
 
 | Concern | Owner |
 | --- | --- |
-| Opening stores, serialisation, corruption recovery, file naming | `:foundation:preferences` |
+| The store factories, serialisation, corruption recovery, file naming | `:foundation:preferences` |
 | Secrets on each platform | `:platform:secure-storage` |
 | Platform context contract | `:foundation:runtime` owns `PlatformContext`; `:app:*` supplies one instance |
 | Which files exist, which keys they hold, what the values mean | Capability implementations |
@@ -80,22 +80,28 @@ public interface DocumentStore<T> {
     public suspend fun update(transform: (T) -> T): T
 }
 
-public fun openPreferenceStore(
-    context: PlatformContext,
-    file: PrefFile,
-    logger: Logger,
-): PreferenceStore
-public fun <T> openDocumentStore(
-    context: PlatformContext,
-    file: PrefFile,
-    serializer: KSerializer<T>,
-    defaultValue: T,
-    logger: Logger,
-): DocumentStore<T>
+public interface PreferenceStores {
+    public fun open(file: PrefFile): PreferenceStore
+    public fun <T> openDocument(
+        file: PrefFile,
+        serializer: KSerializer<T>,
+        defaultValue: T,
+    ): DocumentStore<T>
+}
+
+public fun preferenceStores(context: PlatformContext, logger: Logger): PreferenceStores
+public fun inMemoryPreferenceStores(): PreferenceStores
 
 public fun inMemoryPreferenceStore(): PreferenceStore
-public fun <T> inMemoryDocumentStore(defaultValue: T): DocumentStore<T>
 ```
+
+A store takes no logger. A logger is a property of the process, not of a store, so it lives on the
+factory the app builds once: `preferenceStores` tags it with `preferences` in its constructor and
+every store it opens writes through that one tagged logger. `:app:shared` declares the factory as a
+Koin `single` and a Capability implementation opens its own file from it, which is also what makes
+a whole-graph test swappable: `inMemoryPreferenceStores()` replaces one definition and nothing
+touches disk. `inMemoryPreferenceStore()` stays public for a consumer test that constructs one store
+directly; its document twin is internal, because the factory covers that need.
 
 `PrefKey<T>` wraps the matching `Preferences.Key<T>` and is only constructible through the seven
 factories, so the set of storable types is exactly the set DataStore supports. `byteArrayPrefKey`
@@ -165,7 +171,7 @@ is deferred until the template has a telemetry seam to attach it to (§12.1).
 ## 6. One store per file
 
 DataStore allows one active instance per file per process and throws `IllegalStateException` from
-the first read otherwise. `openPreferenceStore` and `openDocumentStore` register the file name in a
+the first read otherwise. `PreferenceStores.open` and `openDocument` register the file name in a
 process-wide set and fail at open with a message that names the file, so two Capabilities that both
 picked `PrefFile("settings")` fail at Koin resolution with a readable cause instead of on the first
 read with DataStore's path-only message. Stores are process-lifetime singles in Koin, so the set is
@@ -177,7 +183,7 @@ enforces uniqueness; the convention makes uniqueness the default. The registry i
 `OpenNameRegistry` in `:foundation:runtime`, a compare-and-set name set that both store modules
 instantiate once; the modules differ only in the noun the failure message uses.
 
-`openSecretStore` keeps its own instance of the same registry over store names. On Android and desktop the reason is
+`SecretStores.open` keeps its own instance of the same registry over store names. On Android and desktop the reason is
 the same DataStore rule. On iOS two instances of one Keychain service would each hold a snapshot
 that the other's writes never reach, so `observe` on one would miss `set` on the other.
 
@@ -214,7 +220,7 @@ Why JSON rather than protobuf:
   memory; every later `data` emission is the in-memory value. Encoding runs on writes only.
 
 The `KSerializer<T>` parameter is format-agnostic, so swapping JSON for CBOR or `ProtoBuf` later is
-a change inside `openDocumentStore` and a one-time data migration, not an API change. Document
+a change inside `PreferenceStores.openDocument` and a one-time data migration, not an API change. Document
 files use the `.json` suffix so the on-disk format is visible without opening the file.
 
 DataStore alpha10 ships its own `WebSerializer<T>` for kotlinx JSON on web only. The module does not
@@ -250,11 +256,13 @@ public interface SecretStore {
     public suspend fun clear()
 }
 
-public fun openSecretStore(
-    context: PlatformContext,
-    name: String,
-    logger: Logger,
-): SecretStore
+public interface SecretStores {
+    public fun open(name: String): SecretStore
+}
+
+public fun secretStores(context: PlatformContext, logger: Logger): SecretStores
+public fun inMemorySecretStores(): SecretStores
+
 public fun inMemorySecretStore(): SecretStore
 ```
 
@@ -262,10 +270,13 @@ Values are strings. Tokens, refresh tokens and keys are strings; anything struct
 Capability's document encoded to a string before it is handed here. `observe` exists because the
 Identity implementation exposes the signed-in state as a `Flow`.
 
-Both modules take the app's `Logger` on their open functions (tagging per master document §18.8)
-and write only the decisions that would otherwise be invisible: memory-only secrets on web, a
-replaced file, and the loss of the OS keyset vault. No secret, key or file content reaches a line.
-The in-memory variants take no logger; they decide nothing.
+Both modules take the app's `Logger` on their production factory, once, rather than on every open
+(tagging per master document §18.8), and write only the decisions that would otherwise be
+invisible: memory-only secrets on web, a replaced file, and the loss of the OS keyset vault. No
+secret, key or file content reaches a line. The in-memory factories take no logger; they decide
+nothing. `secretStores` builds the platform's opener once with the factory, so a platform that has
+one fact to state about itself states it there, and a platform that decides nothing, as iOS does,
+never reads the logger at all.
 
 ### 8.3 Per platform
 
@@ -323,8 +334,9 @@ only a few hundred bytes and fits every backend. Adding a key-encryption key wou
 same OS custody while adding a second encrypted keyset file, another format and another failure
 boundary without improving protection.
 
-**wasmJs.** Memory only. A bearer token in `localStorage` is readable by any script on the origin,
-including the host page the app is embedded in. The secret lives for the page's lifetime and the
+**wasmJs.** Memory only, warned once per factory rather than once per store, because it is a fact
+about the platform and not about any one store. A bearer token in `localStorage` is readable by any
+script on the origin, including the host page the app is embedded in. The secret lives for the page's lifetime and the
 user signs in again on reload. A web product that wants persistent sessions uses `httpOnly`
 cookies so that the token never reaches the page at all, at which point `SecretStore` holds
 nothing on web and the Identity implementation's web actual asks the server instead.
@@ -340,9 +352,9 @@ and not with `dependsOn`, which would switch the template off for iOS and web.
 ## 9. Identity
 
 `CredentialStore` in `:capability:identity-impl` moves from `PreferenceStore` to `SecretStore`,
-opened as `openSecretStore(context, "identity.credentials", logger)`. Its tests use
-`inMemorySecretStore()`. The Identity Koin module resolves the app's shared `PlatformContext` and
-its logger. The old plain `credentials.preferences_pb` file is not migrated: the sample app has no
+opened as `get<SecretStores>().open("identity.credentials")`. Its tests use `inMemorySecretStore()`.
+The Identity Koin module resolves the app's `SecretStores` and names its own store; the context and
+the logger stay with the factory. The old plain `credentials.preferences_pb` file is not migrated: the sample app has no
 users, and a token migration would be a Capability concern in a product, written as a one-shot read
 from the old store followed by a delete.
 
@@ -351,7 +363,8 @@ The ownership table in [`network.md`](network.md) §2 changes its "Credential pe
 
 ## 10. Composition
 
-`:app:shared` supplies one Koin singleton through
+`:app:shared` declares `preferenceStores(context, logger)` and `secretStores(context, logger)` as
+Koin singletons in one `storesModule`, and supplies the context they take through
 `expect fun Scope.createPlatformContext(): PlatformContext`. Android constructs it with the app
 `Context` and `ApplicationId`. iOS, desktop JVM and wasmJs construct it with `ApplicationId`.
 The constant remains next to `apiBaseUrl` in `config/Environment.kt`. The Android application id
@@ -360,14 +373,15 @@ name the app uses for its own storage and must never change once a build has shi
 
 ## 11. Testing
 
-- `:foundation:preferences` common tests over `inMemoryPreferenceStore()` and
-  `inMemoryDocumentStore()`: typed round trips for each key type, `edit` atomicity, `observe`
-  quiet on unrelated keys, `clear`, document `update` returning the new value.
+- `:foundation:preferences` common tests over `inMemoryPreferenceStore()` and the in-memory
+  factory: typed round trips for each key type, `edit` atomicity, `observe` quiet on unrelated
+  keys, `clear`, document `update` returning the new value, and two opens of one file name through
+  `inMemoryPreferenceStores()`, which registers nothing.
 - `:foundation:preferences` JVM test that opens a real file store in a temporary directory, writes
   a value, overwrites the file with garbage, reopens it and asserts the value is gone and the store
-  is writable again. A second JVM test opens the same logical file twice and asserts the failure
-  names the file, and a replaced corrupt file warns exactly once with the file's name and without
-  its contents.
+  is writable again. A second JVM test opens the same logical file twice through one factory and
+  asserts the failure names the file, and a replaced corrupt file warns exactly once with the
+  file's name, without its contents, and under the tag the factory applied.
 - `:platform:secure-storage` JVM tests: the `Map<String, String>` serializer round trip and the
   same store wrapped in `AeadSerializer` with plain Tink. A tampered ciphertext reads as an empty
   store. An operating system with no vault falls back to the file vault and warns once over
@@ -375,9 +389,11 @@ name the app uses for its own storage and must never change once a build has shi
   first use generates and stores one keyset, a new file with the same vault decrypts copied
   ciphertext, and a different store name rejects that ciphertext as corruption. The file fallback
   round trips and is `0600` on POSIX. A macOS-only smoke test writes, reads and deletes one unique
-  generic password, skipping when the JVM cannot access the login Keychain. Two more tests pin the
+  generic password, skipping when the JVM cannot access the login Keychain. Three more tests pin the
   open-time guarantees: the encrypting serializer is built on the first read rather than when the
-  store opens, and opening the same name twice fails with a message that names it.
+  store opens, opening the same name twice through one factory fails with a message that names it,
+  and a store opened with the factory's logger writes its lines under the module's tag. A common
+  test opens one name twice through `inMemorySecretStores()`, which registers nothing.
 - `:capability:identity-impl` tests move to `inMemorySecretStore()` unchanged in intent.
 - Android Keystore and iOS Keychain actuals compile in `check` and are exercised by running the
   apps. Windows DPAPI and Linux libsecret compile on the JVM but need their target operating systems
@@ -391,9 +407,12 @@ name the app uses for its own storage and must never change once a build has shi
   encrypted file on another is a platform service, not a preferences mechanism, and the master
   document places it under Platform. Keeping it out of Foundation also keeps Tink off the
   classpath of every module that only wants a Boolean.
-- **No `Json` parameter on `openDocumentStore`.** One leniency rule for all persisted documents;
+- **No `Json` parameter on `openDocument`.** One leniency rule for all persisted documents;
   a caller that wants different rules is asking for a different file format.
 - **No caller-visible corruption callback.** See §5.
+- **One factory per module over a logger on every open.** A logger is a property of the process,
+  not of a store, so it lives on the factory the app builds once. No call site carries one, and a
+  test of the whole graph swaps one definition instead of every store.
 - **Registry over silent instance sharing.** Returning the existing store for a duplicate file
   name would merge two Capabilities' key namespaces without either noticing.
 - **Stay on the alpha line.** Stable 1.2.1 has wasmJs artifacts but they throw; `WebLocalStorage`
@@ -409,11 +428,11 @@ name the app uses for its own storage and must never change once a build has shi
 Reviewed on 2026-09-04 and judged worth doing only when a consumer asks. Each is a small, local
 change behind the existing surfaces.
 
-- **Migrations.** `openPreferenceStore` and `openDocumentStore` do not expose DataStore's
+- **Migrations.** `PreferenceStores.open` and `openDocument` do not expose DataStore's
   `migrations` parameter. A fork moving an existing Android app off `SharedPreferences` adds an
   optional parameter; the template has no legacy data to migrate.
 - **Corruption visibility.** The reset in §5 now logs (§5); it still has no counter and no caller
-  callback. When the template gains a telemetry seam, the open functions report through it as well.
+  callback. When the template gains a telemetry seam, the factories report through it as well.
 - **Web secrets across a reload.** Memory-only sign-out on refresh is deliberate (§8.3).
   `sessionStorage` would survive a refresh without pretending to be secure; whether that is wanted
   depends on the host page the app embeds in.

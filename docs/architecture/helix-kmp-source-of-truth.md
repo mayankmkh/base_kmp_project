@@ -3989,7 +3989,7 @@ module loads, so the app's `Logger` is built one step earlier and every verbosit
 Koin, Ktor) derives from that one decision.
 
 Tags: a module that owns a logging seam tags the logger in its own entry point (`CommandBridge`,
-`openPreferenceStore`, `openSecretStore`); the app tags the loggers it hands to third-party adapters
+`preferenceStores`, `secretStores`); the app tags the loggers it hands to third-party adapters
 and to its own runtime (`HTTP`, `koin`, `runtime`).
 
 Lines are structured: `logEvent(name, "key" to value, ...)` in `:foundation:runtime` renders

@@ -2,7 +2,6 @@ package dev.mayankmkh.basekmpproject.platform.securestorage
 
 import androidx.datastore.core.Serializer
 import androidx.datastore.tink.AeadSerializer
-import co.touchlab.kermit.Logger
 import com.google.crypto.tink.Aead
 import com.google.crypto.tink.InsecureSecretKeyAccess
 import com.google.crypto.tink.KeyTemplates
@@ -10,15 +9,10 @@ import com.google.crypto.tink.KeysetHandle
 import com.google.crypto.tink.RegistryConfiguration
 import com.google.crypto.tink.TinkJsonProtoKeysetFormat
 import com.google.crypto.tink.aead.AeadConfig
-import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import dev.mayankmkh.basekmpproject.foundation.runtime.applicationDataDirectory
 import java.security.GeneralSecurityException
 
-internal actual fun createSecretStore(
-    context: PlatformContext,
-    name: String,
-    logger: Logger,
-): SecretStore =
+internal actual fun PlatformSecretStores.storeOpener(): (String) -> SecretStore = { name ->
     dataStoreSecretStore(
         name = name,
         logger = logger,
@@ -34,6 +28,7 @@ internal actual fun createSecretStore(
             .also(::createOwnerOnly)
             .resolve("$name.secrets")
     }
+}
 
 internal fun encryptedSerializer(
     name: String,

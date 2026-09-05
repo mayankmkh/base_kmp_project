@@ -15,6 +15,8 @@ import dev.mayankmkh.basekmpproject.feature.todos.api.todosFeatureModule
 import dev.mayankmkh.basekmpproject.foundation.network.DynamicHeaders
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
+import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStores
+import dev.mayankmkh.basekmpproject.foundation.preferences.preferenceStores
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import dev.mayankmkh.basekmpproject.foundation.runtime.dispatchers.AppDispatchers
@@ -22,6 +24,8 @@ import dev.mayankmkh.basekmpproject.foundation.sqldelight.SqlDriverProvider
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.createConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.shared
+import dev.mayankmkh.basekmpproject.platform.securestorage.SecretStores
+import dev.mayankmkh.basekmpproject.platform.securestorage.secretStores
 import dev.mayankmkh.basekmpproject.storage.database.AppDatabaseDriverProvider
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger as KtorLogger
@@ -111,6 +115,17 @@ private val platformContextModule = module {
 }
 
 /**
+ * The factories every stored file is opened through.
+ *
+ * A logger is a property of the process, not of a store, so the app builds each factory once with
+ * its own logger and Capability implementations name their files against it.
+ */
+private val storesModule = module {
+    single<PreferenceStores> { preferenceStores(get(), get()) }
+    single<SecretStores> { secretStores(get(), get()) }
+}
+
+/**
  * The one `HttpClient` the app talks to the network through.
  *
  * `single`, not `factory`: a client owns a connection pool and an engine, so handing every caller
@@ -164,6 +179,7 @@ internal fun libModules(environment: AppEnvironment): List<Module> =
         dispatchersModule,
         runtimeModule,
         platformContextModule,
+        storesModule,
         networkModule,
         connectivityModule,
         databaseModule,

@@ -36,8 +36,8 @@ import dev.mayankmkh.basekmpproject.app.shared.nav.TodoDetailRoute
 import dev.mayankmkh.basekmpproject.app.shared.nav.rememberAppNavigationState
 import dev.mayankmkh.basekmpproject.app.shared.navigationSavedStateConfiguration
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
-import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStore
-import dev.mayankmkh.basekmpproject.foundation.preferences.inMemoryPreferenceStore
+import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStores
+import dev.mayankmkh.basekmpproject.foundation.preferences.inMemoryPreferenceStores
 import dev.mayankmkh.basekmpproject.ui.designsystem.theme.BaseKmpProjectTheme
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -54,7 +54,6 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.koin.core.context.stopKoin
-import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 /**
@@ -88,9 +87,7 @@ class RootContentTest {
                             json = get(),
                         )
                     }
-                    single<PreferenceStore>(named("todos.settings.store")) {
-                        inMemoryPreferenceStore()
-                    }
+                    single<PreferenceStores> { inMemoryPreferenceStores() }
                 }
             )
         }

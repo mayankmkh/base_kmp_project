@@ -34,6 +34,21 @@ class InMemorySecretStoreTest {
         assertNull(store.get("two"))
     }
 
+    /**
+     * The production factory registers each name for the life of the process. The in-memory factory
+     * registers nothing, so a suite that starts the graph once per test opens the same names again
+     * and again.
+     */
+    @Test
+    fun `the in-memory factory registers no store name`() = runTest {
+        val stores = inMemorySecretStores()
+
+        stores.open("identity.credentials").set("token", "first")
+        val second = stores.open("identity.credentials")
+
+        assertNull(second.get("token"))
+    }
+
     @Test
     fun `replaceAll swaps the whole snapshot in one emission`() = runTest {
         val store = MemorySecretStore()

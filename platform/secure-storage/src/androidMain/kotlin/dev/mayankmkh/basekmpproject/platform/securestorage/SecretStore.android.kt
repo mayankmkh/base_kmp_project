@@ -1,7 +1,6 @@
 package dev.mayankmkh.basekmpproject.platform.securestorage
 
 import androidx.datastore.tink.AeadSerializer
-import co.touchlab.kermit.Logger
 import com.google.crypto.tink.Aead
 import com.google.crypto.tink.KeyTemplates
 import com.google.crypto.tink.RegistryConfiguration
@@ -9,11 +8,7 @@ import com.google.crypto.tink.aead.AeadConfig
 import com.google.crypto.tink.integration.android.AndroidKeysetManager
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 
-internal actual fun createSecretStore(
-    context: PlatformContext,
-    name: String,
-    logger: Logger,
-): SecretStore =
+internal actual fun PlatformSecretStores.storeOpener(): (String) -> SecretStore = { name ->
     dataStoreSecretStore(
         name = name,
         logger = logger,
@@ -22,6 +17,7 @@ internal actual fun createSecretStore(
         },
         produceFile = { context.appContext.noBackupFilesDir.resolve("datastore/$name.secrets") },
     )
+}
 
 // One AES256_GCM keyset per app, stored in SharedPreferences and wrapped by an Android Keystore
 // master key; the store name is the associated data, so files cannot be swapped between stores.

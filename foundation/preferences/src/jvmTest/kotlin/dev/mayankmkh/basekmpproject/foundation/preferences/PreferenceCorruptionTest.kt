@@ -30,6 +30,11 @@ class PreferenceCorruptionTest {
     private val logs = TestLogWriter(Severity.Verbose)
     private val logger = Logger(TestConfig(Severity.Verbose, listOf(logs)))
 
+    // Exactly the logger the production factory hands the stores it opens: tagged once, in the
+    // factory's constructor. Building the factory opens nothing.
+    private val storeLogger =
+        DataStorePreferenceStores(PlatformContext("preferences-log-test"), logger).logger
+
     @Test
     fun `a corrupt preference file is replaced with empty preferences`() = runTest {
         val file =
@@ -51,7 +56,8 @@ class PreferenceCorruptionTest {
 
     /**
      * The replacement in section 5 costs the user that file. One warning names the file and the
-     * failure class underneath; the contents that could not be read never reach the log.
+     * failure class underneath, under the tag the factory applied; the contents that could not be
+     * read never reach the log.
      */
     @Test
     fun `replacing a corrupt preference file warns once`() = runTest {
@@ -78,14 +84,12 @@ class PreferenceCorruptionTest {
 
     @Test
     fun `opening the same logical file twice fails immediately and names it`() {
-        val context = PlatformContext("preferences-registry-test")
+        // Nothing is read, so the desktop directory is never created on the test machine.
+        val stores = preferenceStores(PlatformContext("preferences-registry-test"), logger)
         val file = PrefFile("registry-${System.nanoTime()}")
-        openPreferenceStore(context, file, logger)
+        stores.open(file)
 
-        val failure =
-            assertFailsWith<IllegalStateException> {
-                openPreferenceStore(context, file, logger)
-            }
+        val failure = assertFailsWith<IllegalStateException> { stores.open(file) }
 
         assertTrue(failure.message.orEmpty().contains(file.name))
     }
@@ -93,16 +97,13 @@ class PreferenceCorruptionTest {
     private fun TestScope.storeScope() =
         CoroutineScope(UnconfinedTestDispatcher(testScheduler) + SupervisorJob())
 
-    // The production corruption handler over a file the test controls, so the warning under test is
-    // the one a real store writes.
+    // The production corruption handler, over the factory's own logger and a file the test
+    // controls, so the warning under test is the one a real store writes.
     private fun openStore(file: Path, scope: CoroutineScope): PreferenceStore =
         DataStorePreferenceStore(
             PreferenceDataStoreFactory.createWithPath(
                 corruptionHandler =
-                    replaceCorruptFile(
-                        logger.withTag("preferences"),
-                        PrefFile("corrupt").preferencesFileName,
-                    ) {
+                    replaceCorruptFile(storeLogger, PrefFile("corrupt").preferencesFileName) {
                         emptyPreferences()
                     },
                 scope = scope,

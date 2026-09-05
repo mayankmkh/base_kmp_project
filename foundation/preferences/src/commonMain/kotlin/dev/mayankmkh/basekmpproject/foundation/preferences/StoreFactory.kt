@@ -42,8 +42,8 @@ internal fun <T> replaceCorruptFile(
 }
 
 // Deferred (preferences.md section 12.1): DataStore's `migrations` parameter is not exposed. A
-// fork moving an existing app off SharedPreferences adds an optional parameter to the open
-// functions here; nothing in the template needs it yet.
+// fork moving an existing app off SharedPreferences adds an optional parameter to the factory's
+// open functions; nothing in the template needs it yet.
 
 internal expect fun createPreferenceDataStore(
     context: PlatformContext,

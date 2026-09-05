@@ -9,8 +9,6 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
-import co.touchlab.kermit.Logger
-import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlin.jvm.JvmInline
 import kotlinx.coroutines.flow.Flow
 
@@ -62,19 +60,9 @@ public interface PreferenceEditor {
 }
 
 /**
- * Opens one preferences file. [logger] is the app's logger; the module tags it with its own name.
+ * A no-filesystem store for common tests and for tests of consumers. Public because a consumer's
+ * own test constructs one directly; [inMemoryPreferenceStores] is what a test of a whole graph
+ * swaps in.
  */
-public fun openPreferenceStore(
-    context: PlatformContext,
-    file: PrefFile,
-    logger: Logger,
-): PreferenceStore {
-    registerOpenFile(file)
-    return DataStorePreferenceStore(
-        createPreferenceDataStore(context, file, logger.withTag(LogTag))
-    )
-}
-
-/** A no-filesystem store for common tests and for tests of consumers. */
 public fun inMemoryPreferenceStore(): PreferenceStore =
     DataStorePreferenceStore(InMemoryDataStore(emptyPreferences()))

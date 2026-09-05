@@ -36,11 +36,13 @@ kotlin {
                 implementation(libs.androidx.datastore.core)
                 implementation(libs.androidx.datastore.core.okio)
                 implementation(libs.androidx.datastore.preferences.core)
-                // `api` because `KSerializer` sits on the public `openDocumentStore` signature and
-                // the catalog has no separate serialization-core alias.
+                // `api` because `KSerializer` sits on `PreferenceStores.openDocument` and the
+                // catalog has no separate serialization-core alias.
                 api(libs.kotlinx.serialization.json)
-                // Same reason: the open functions take the app's `Logger`.
-                api(libs.touchlab.kermit)
+                // `implementation` because `Logger` reaches the public surface only as the
+                // parameter of `preferenceStores`, and its one caller is the App composition root,
+                // which declares Kermit itself.
+                implementation(libs.touchlab.kermit)
             }
         }
     }

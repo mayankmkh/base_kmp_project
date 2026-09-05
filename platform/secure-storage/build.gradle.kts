@@ -32,8 +32,10 @@ kotlin {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
                 api(projects.foundation.runtime)
-                // `api` because the app's `Logger` sits on the public `openSecretStore` signature.
-                api(libs.touchlab.kermit)
+                // `implementation` because `Logger` reaches the public surface only as the
+                // parameter of `secretStores`, and its one caller is the App composition root,
+                // which declares Kermit itself.
+                implementation(libs.touchlab.kermit)
             }
         }
         val jvmAndAndroidMain by getting {

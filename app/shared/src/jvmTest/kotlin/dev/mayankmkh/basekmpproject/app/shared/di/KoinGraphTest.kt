@@ -69,8 +69,10 @@ class KoinGraphTest {
                 FeatureInstanceKey::class,
                 PostId::class,
                 TodoId::class,
+                // A store is opened from the `PreferenceStores`/`SecretStores` factory inside
+                // its owner's definition lambda, so the graph declares the factories and never the
+                // stores their owners take.
                 PreferenceStore::class,
-                // Opened inside the Identity module's `CredentialStore` definition lambda.
                 SecretStore::class,
                 LoggerConfig::class,
                 // `AppEnvironment` is built from the entry point's debug flag before Koin starts.

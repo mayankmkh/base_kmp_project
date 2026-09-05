@@ -24,7 +24,8 @@ internal actual fun createPreferenceDataStore(
     logger: Logger,
 ): DataStore<Preferences> =
     PreferenceDataStoreFactory.createWithPath(
-        corruptionHandler = replaceCorruptFile(logger, file, "preferences") { emptyPreferences() },
+        corruptionHandler =
+            replaceCorruptFile(logger, file.preferencesFileName) { emptyPreferences() },
         produceFile = { "$dataStoreDirectory/${file.preferencesFileName}".toPath() },
     )
 
@@ -43,7 +44,7 @@ internal actual fun <T> createDocumentDataStore(
                 producePath = { "$dataStoreDirectory/${file.documentFileName}".toPath() },
             ),
         corruptionHandler =
-            replaceCorruptFile(logger, file, "document") { serializer.defaultValue },
+            replaceCorruptFile(logger, file.documentFileName) { serializer.defaultValue },
     )
 
 @OptIn(ExperimentalForeignApi::class)

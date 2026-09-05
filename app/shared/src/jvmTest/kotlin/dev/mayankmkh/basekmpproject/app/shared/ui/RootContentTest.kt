@@ -77,7 +77,7 @@ class RootContentTest {
         originalUserHome = System.getProperty("user.home")
         testUserHome = Files.createTempDirectory("base-kmp-navigation-test")
         System.setProperty("user.home", testUserHome.toString())
-        initKoin {
+        initKoin(isDebug = true) {
             modules(
                 module {
                     single<HttpClient> {

@@ -32,13 +32,15 @@ import kotlinx.io.IOException
 
 @OptIn(ExperimentalKermitApi::class)
 class CommandBridgeTest {
+    private val logs = TestLogWriter(Severity.Verbose)
+    private val logger = Logger(TestConfig(Severity.Verbose, listOf(logs)))
+
     @Test
     fun `commit persists a success without logging`() = runTest {
         val result: Result<String, NetworkFailure> = Ok("value")
         val persisted = mutableListOf<String>()
-        val logs = TestLogWriter(Severity.Verbose)
 
-        val outcome = logs.bridge("posts").commit(result, "refresh", persisted::add)
+        val outcome = CommandBridge(logger, "posts").commit(result, "refresh", persisted::add)
 
         assertEquals(Outcome.Completed(Unit), outcome)
         assertEquals(listOf("value"), persisted)
@@ -54,11 +56,10 @@ class CommandBridgeTest {
                 cause = IOException("offline"),
             )
         val result: Result<String, NetworkFailure> = Err(failure)
-        val logs = TestLogWriter(Severity.Verbose)
         var completionCalls = 0
 
         val outcome =
-            logs.bridge("todos").toOutcome(result, "create") {
+            CommandBridge(logger, "todos").toOutcome(result, "create") {
                 completionCalls++
                 it
             }
@@ -86,10 +87,9 @@ class CommandBridgeTest {
                 requestId = "request-2",
                 cause = IllegalStateException("unexpected"),
             )
-        val logs = TestLogWriter(Severity.Verbose)
         val result: Result<String, NetworkFailure> = Err(failure)
 
-        val outcome = logs.bridge("todos").toOutcome(result, "rename") { it }
+        val outcome = CommandBridge(logger, "todos").toOutcome(result, "rename") { it }
 
         assertEquals(
             Problem(ProblemKind.UNEXPECTED, "request-2"),
@@ -100,9 +100,9 @@ class CommandBridgeTest {
 
     @Test
     fun `a runtime failure with a cause logs once at error severity`() {
-        val logs = TestLogWriter(Severity.Verbose)
 
-        val problem = logs.bridge("posts").unexpected("sync(Unit)", IllegalStateException("boom"))
+        val problem =
+            CommandBridge(logger, "posts").unexpected("sync(Unit)", IllegalStateException("boom"))
 
         assertEquals(Problem(ProblemKind.UNEXPECTED), problem)
         val entry = logs.logs.single()
@@ -170,7 +170,3 @@ class CommandBridgeTest {
         return requireNotNull(client.tryCatching { get("thing").bodyAsText() }.getError())
     }
 }
-
-/** A bridge whose only writer is [this], so a test asserts on records instead of output. */
-private fun TestLogWriter.bridge(tag: String): CommandBridge =
-    CommandBridge(Logger(TestConfig(Severity.Verbose, listOf(this))), tag)

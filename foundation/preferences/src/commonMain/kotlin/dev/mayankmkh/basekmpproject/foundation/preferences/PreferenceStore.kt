@@ -62,10 +62,7 @@ public interface PreferenceEditor {
 }
 
 /**
- * Opens one preferences file.
- *
- * [logger] is the app's one logger; this module tags it with its own name, as every module that
- * takes a logger does. It is only ever written to when a file has to be replaced (section 5).
+ * Opens one preferences file. [logger] is the app's logger; the module tags it with its own name.
  */
 public fun openPreferenceStore(
     context: PlatformContext,

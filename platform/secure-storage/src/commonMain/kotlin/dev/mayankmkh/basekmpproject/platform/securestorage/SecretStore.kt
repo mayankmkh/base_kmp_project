@@ -23,18 +23,13 @@ public interface SecretStore {
  * Android keeps the Tink keyset in `<applicationId>.secure-storage`; app backup rules can use this
  * stable name to exclude the keyset alongside the non-backed-up ciphertext.
  *
- * [logger] is the app's one logger, tagged here with this module's name as every module that takes
- * a logger does. It records the decisions that would otherwise be invisible: a platform that keeps
- * secrets in memory only, a stored file that had to be replaced, and the loss of the OS keyset
- * vault. No secret, key or file content is ever written to it.
+ * [logger] is the app's logger; the module tags it with its own name and writes only the decisions
+ * that would otherwise be invisible. No secret, key or file content is ever written to it.
  */
 public fun openSecretStore(context: PlatformContext, name: String, logger: Logger): SecretStore {
     openStores.register(name)
-    return createSecretStore(context, name, logger.withTag(LogTag))
+    return createSecretStore(context, name, logger.withTag("secure-storage"))
 }
-
-/** The tag every line this module writes carries. */
-internal const val LogTag: String = "secure-storage"
 
 // Same rule as `:foundation:preferences`: a store is a process-lifetime object, so a second open of
 // the same name is a wiring mistake that should fail here, with the store's name in the message.

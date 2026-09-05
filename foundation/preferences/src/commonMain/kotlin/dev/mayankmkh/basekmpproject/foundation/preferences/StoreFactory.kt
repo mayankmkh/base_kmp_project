@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.Preferences
 import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.foundation.runtime.OpenNameRegistry
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
+import dev.mayankmkh.basekmpproject.foundation.runtime.causeClassName
+import dev.mayankmkh.basekmpproject.foundation.runtime.logEvent
 
 internal val PrefFile.preferencesFileName: String
     get() = "$name.preferences_pb"
@@ -25,23 +27,16 @@ internal const val LogTag: String = "preferences"
 
 /**
  * The handler every store opens with (section 5): DataStore replaces a file it cannot read, and
- * this warning is the only trace that the user lost it.
- *
- * The line names the file and the class of the failure underneath the [CorruptionException].
- * Neither the file's contents nor the failure's own message is logged: a serializer's complaint
- * quotes the bytes it choked on, and a preferences file holds whatever a Capability put there.
+ * this warning is the only trace that the user lost it. Neither the file's contents nor the
+ * failure's own message is logged, because both can quote what the file held.
  */
 internal fun <T> replaceCorruptFile(
     logger: Logger,
-    file: PrefFile,
-    kind: String,
+    fileName: String,
     defaultValue: () -> T,
 ): ReplaceFileCorruptionHandler<T> = ReplaceFileCorruptionHandler { failure ->
     logger.w {
-        "store_file_replaced" +
-            " kind=$kind" +
-            " file=${file.name}" +
-            " causeClass=${(failure.cause ?: failure)::class.simpleName}"
+        logEvent("store_file_replaced", "file" to fileName, "causeClass" to failure.causeClassName)
     }
     defaultValue()
 }

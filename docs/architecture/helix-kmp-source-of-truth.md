@@ -3984,11 +3984,21 @@ Koin diagnostics   the same logger, on every target
 Features           do not log at all
 ```
 
-`initKoin` takes the entry point's own debug signal rather than reading one from the graph: Koin's logger must exist before the first module loads, so the app's `Logger` is built one step earlier and both are configured from that signal. Each entry point supplies the signal its platform actually has; on Android that is the application module's `BuildConfig.DEBUG`.
+`initKoin` requires the entry point's own debug signal; Koin's logger must exist before the first
+module loads, so the app's `Logger` is built one step earlier and every verbosity gate (Kermit,
+Koin, Ktor) derives from that one decision.
 
-Tagging is the convention, not a per-call-site decision. The Capability command bridge, the Ktor adapter, the runtime's coroutine exception handler, `:foundation:preferences` and `:platform:secure-storage` each apply `withTag` to the logger they are handed, so every line names its origin and no call site repeats a tag.
+Tags: a module that owns a logging seam tags the logger in its own entry point (`CommandBridge`,
+`openPreferenceStore`, `openSecretStore`); the app tags the loggers it hands to third-party adapters
+and to its own runtime (`HTTP`, `koin`, `runtime`).
 
-Features report Outputs and state, never log lines (§19.2). A module below presentation logs only where a decision would otherwise be invisible, and §19.7 governs what may appear in the line.
+Lines are structured: `logEvent(name, "key" to value, ...)` in `:foundation:runtime` renders
+`name key=value ...`, so every module writes the same shape. A line never carries secrets, key
+material, file contents or user data; an exception message is included only where the exception is
+known not to quote them (network failures yes, store corruption no).
+
+Features report Outputs and state, never log lines (§19.2). A module below presentation logs only
+where a decision would otherwise be invisible, and §19.7 governs what may appear in the line.
 
 ## 18.9 Coil image loading
 

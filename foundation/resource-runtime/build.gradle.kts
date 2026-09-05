@@ -9,6 +9,7 @@ kotlin {
         commonMain {
             dependencies {
                 api(projects.foundation.resource)
+                implementation(projects.foundation.runtime)
                 api(libs.kotlinx.coroutines.core)
                 api(libs.michael.bull.kotlin.result)
                 api(libs.touchlab.kermit)

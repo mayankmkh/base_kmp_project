@@ -20,7 +20,8 @@ internal actual fun createPreferenceDataStore(
     logger: Logger,
 ): DataStore<Preferences> =
     PreferenceDataStoreFactory.createWithPath(
-        corruptionHandler = replaceCorruptFile(logger, file, "preferences") { emptyPreferences() },
+        corruptionHandler =
+            replaceCorruptFile(logger, file.preferencesFileName) { emptyPreferences() },
         produceFile = { context.storePath(file.preferencesFileName) },
     )
 
@@ -38,7 +39,7 @@ internal actual fun <T> createDocumentDataStore(
                 producePath = { context.storePath(file.documentFileName) },
             ),
         corruptionHandler =
-            replaceCorruptFile(logger, file, "document") { serializer.defaultValue },
+            replaceCorruptFile(logger, file.documentFileName) { serializer.defaultValue },
     )
 
 /** The directory this platform keeps DataStore files in. Created here, on the DataStore scope. */

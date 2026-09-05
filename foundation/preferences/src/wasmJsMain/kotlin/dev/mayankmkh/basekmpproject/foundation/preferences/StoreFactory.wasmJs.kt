@@ -22,7 +22,8 @@ internal actual fun createPreferenceDataStore(
                 serializer = PreferencesSerializer,
                 name = "${context.applicationId}.${file.preferencesFileName}",
             ),
-        corruptionHandler = replaceCorruptFile(logger, file, "preferences") { emptyPreferences() },
+        corruptionHandler =
+            replaceCorruptFile(logger, file.preferencesFileName) { emptyPreferences() },
     )
 
 internal actual fun <T> createDocumentDataStore(
@@ -38,5 +39,5 @@ internal actual fun <T> createDocumentDataStore(
                 name = "${context.applicationId}.${file.documentFileName}",
             ),
         corruptionHandler =
-            replaceCorruptFile(logger, file, "document") { serializer.defaultValue },
+            replaceCorruptFile(logger, file.documentFileName) { serializer.defaultValue },
     )

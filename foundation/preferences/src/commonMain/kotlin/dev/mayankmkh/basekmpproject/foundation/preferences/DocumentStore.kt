@@ -18,7 +18,7 @@ public interface DocumentStore<T> {
     public suspend fun update(transform: (T) -> T): T
 }
 
-/** Opens one document file. [logger] carries the same rule as `openPreferenceStore`. */
+/** Opens one document file. [logger] is the app's logger; the module tags it with its own name. */
 public fun <T> openDocumentStore(
     context: PlatformContext,
     file: PrefFile,

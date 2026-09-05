@@ -10,6 +10,7 @@ import dev.mayankmkh.basekmpproject.foundation.network.status
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
+import dev.mayankmkh.basekmpproject.foundation.runtime.logEvent
 import io.ktor.http.HttpStatusCode
 
 /**
@@ -59,11 +60,13 @@ public class CommandBridge(logger: Logger, private val tag: String) {
     public fun unexpected(operation: String, cause: Throwable): Problem {
         // Built inside the lambda so a filtered severity costs nothing.
         val message = {
-            "unexpected_failure" +
-                " operation=$tag.$operation" +
-                " kind=${ProblemKind.UNEXPECTED}" +
-                " exceptionClass=${cause::class.simpleName}" +
-                " exceptionMessage=${cause.message}"
+            logEvent(
+                "unexpected_failure",
+                "operation" to "$tag.$operation",
+                "kind" to ProblemKind.UNEXPECTED,
+                "exceptionClass" to cause::class.simpleName,
+                "exceptionMessage" to cause.message,
+            )
         }
         logger.e(message = message)
         return Problem(ProblemKind.UNEXPECTED)
@@ -76,14 +79,16 @@ public class CommandBridge(logger: Logger, private val tag: String) {
     ) {
         // Built inside the lambda so a filtered severity costs nothing.
         val message = {
-            "network_failure" +
-                " operation=$tag.$operation" +
-                " kind=${problem.kind}" +
-                " httpStatus=${failure.status?.value}" +
-                " transportKind=${(failure as? NetworkFailure.Transport)?.kind}" +
-                " requestId=${problem.reference}" +
-                " exceptionClass=${failure.cause::class.simpleName}" +
-                " exceptionMessage=${failure.cause.message}"
+            logEvent(
+                "network_failure",
+                "operation" to "$tag.$operation",
+                "kind" to problem.kind,
+                "httpStatus" to failure.status?.value,
+                "transportKind" to (failure as? NetworkFailure.Transport)?.kind,
+                "requestId" to problem.reference,
+                "exceptionClass" to failure.cause::class.simpleName,
+                "exceptionMessage" to failure.cause.message,
+            )
         }
         if (problem.kind == ProblemKind.UNEXPECTED) logger.e(message = message)
         else logger.w(message = message)

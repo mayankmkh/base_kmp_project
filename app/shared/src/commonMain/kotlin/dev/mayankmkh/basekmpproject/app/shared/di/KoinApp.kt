@@ -28,6 +28,7 @@ import io.ktor.client.plugins.logging.Logger as KtorLogger
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.serialization.json.Json
 import org.koin.core.context.startKoin
+import org.koin.core.logger.Level
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.scope.Scope
@@ -38,19 +39,17 @@ import org.koin.dsl.module
 import org.koin.dsl.onClose
 
 /**
- * Starts the application graph.
- *
- * [isDebug] comes from the platform entry point rather than from the graph. Koin's own logger has
- * to exist before the first module loads, and it writes through the app's [Logger], so both are
- * built here; on Android the only truthful signal is the application module's `BuildConfig.DEBUG`,
- * which `MainApplication` passes.
+ * Starts the application graph. [isDebug] is the entry point's own build signal; Koin's logger must
+ * exist before the first module loads, so the app's [Logger] is built from it one step earlier.
  */
-fun initKoin(isDebug: Boolean = platformIsDebugBuild(), config: KoinAppDeclaration? = null) {
+fun initKoin(isDebug: Boolean, config: KoinAppDeclaration? = null) {
     val environment = AppEnvironment(isDebug)
     startKoin {
-        // Koin's own diagnostics reach the same destination as everything else, on every target,
-        // instead of Logcat on Android and nowhere at all elsewhere.
-        logger(KermitKoinLogger(environment.logger.withTag("koin")))
+        logger(
+            KermitKoinLogger(environment.logger.withTag("koin")).apply {
+                level = environment.koinLevel
+            }
+        )
         modules(appModules(environment))
 
         // Last, so what the caller declares wins: a later definition of the same type replaces the
@@ -60,21 +59,16 @@ fun initKoin(isDebug: Boolean = platformIsDebugBuild(), config: KoinAppDeclarati
     }
 }
 
-/**
- * What a platform entry point knows about its own build before Koin exists.
- *
- * The one [Logger] the app writes through is built here rather than resolved from the graph,
- * because Koin's logger needs it one step earlier than any `single` can be resolved. A debug build
- * keeps every severity; anything else keeps warnings and errors, so a shipped build neither formats
- * nor writes a message nobody reads.
- */
+/** The one place the build type turns into log verbosity; every gate below reads from here. */
 internal class AppEnvironment(val isDebug: Boolean) {
+    val minSeverity: Severity = if (isDebug) Severity.Verbose else Severity.Warn
+    val koinLevel: Level = if (isDebug) Level.DEBUG else Level.WARNING
+    // Headers, never bodies: the plugin buffers bodies to print them, and the sensitive headers are
+    // sanitised inside the client. Release builds log nothing.
+    val ktorLogLevel: LogLevel = if (isDebug) LogLevel.HEADERS else LogLevel.NONE
     val logger: Logger =
         Logger(
-            StaticConfig(
-                minSeverity = if (isDebug) Severity.Verbose else Severity.Warn,
-                logWriterList = listOf(appLogWriter(isDebug)),
-            )
+            StaticConfig(minSeverity = minSeverity, logWriterList = listOf(appLogWriter(isDebug)))
         )
 }
 
@@ -94,8 +88,10 @@ private val dispatchersModule = module {
     single { AppDispatchers() }
 }
 
-// The one instance, so every module tags the same logger rather than configuring its own.
-private fun loggerModule(environment: AppEnvironment) = module { single { environment.logger } }
+private fun environmentModule(environment: AppEnvironment) = module {
+    single { environment }
+    single { environment.logger }
+}
 
 private val runtimeModule = module {
     // Application ownership is explicit: capabilities take named children and close those children
@@ -122,15 +118,8 @@ private val platformContextModule = module {
  * override just the host without rebuilding the plugin stack. The `CredentialProvider` comes from
  * `identityCapabilityModule` through App composition.
  */
-private fun networkModule(environment: AppEnvironment) = module {
-    single {
-        NetworkConfig(
-            baseUrl = apiBaseUrl,
-            // Headers, never bodies: the plugin buffers bodies to print them, and the sensitive
-            // headers are sanitised inside the client. Release builds log nothing.
-            logLevel = if (environment.isDebug) LogLevel.HEADERS else LogLevel.NONE,
-        )
-    }
+private val networkModule = module {
+    single { NetworkConfig(baseUrl = apiBaseUrl, logLevel = get<AppEnvironment>().ktorLogLevel) }
     // Locale comes from the app language owner and app version from platform build metadata once
     // either is required by the backend; the sample API needs no changing headers today.
     single<DynamicHeaders> { DynamicHeaders.None }
@@ -170,12 +159,12 @@ private val databaseModule = module {
 
 internal fun libModules(environment: AppEnvironment): List<Module> =
     listOf(
+        environmentModule(environment),
         jsonModule,
         dispatchersModule,
-        loggerModule(environment),
         runtimeModule,
         platformContextModule,
-        networkModule(environment),
+        networkModule,
         connectivityModule,
         databaseModule,
     )
@@ -192,13 +181,6 @@ private val productModules =
 // One list so `KoinGraphTest` verifies the graph `initKoin` starts.
 internal fun appModules(environment: AppEnvironment): List<Module> =
     libModules(environment) + productModules
-
-/**
- * Whether this process is a debug build, for an entry point that has no signal of its own. Each
- * target answers from its own runtime signal, so no generated `BuildConfig` is needed in a library
- * module.
- */
-internal expect fun platformIsDebugBuild(): Boolean
 
 /**
  * Where log lines go on this target. Kermit's `platformLogWriter()` is tuned for local development,

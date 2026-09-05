@@ -29,16 +29,11 @@ unpushed. This report now also records the subsequent P1 control-plane working-t
   scope ended has nothing to diagnose and is not logged. `SyncCoordinatorTest` pins one entry for
   the former, none for the latter, and none for an outcome the sync function
   itself produced, which the Capability's own bridge already logged.
-- Logging is configured once, at the App root (master source §18.8). `app/shared/.../di/KoinApp.kt`
-  builds the single Kermit `Logger` from the entry point's own debug signal, at `Severity.Verbose`
-  in a debug build and `Severity.Warn` otherwise, and hands the same logger to Koin through
-  `kermit-koin`, so Koin's diagnostics land where everything else does on every target rather than
-  in Logcat alone. iOS keeps Kermit's Xcode-tuned default writer in debug and writes through `OSLogWriter` with the application id as its subsystem in release. Every
-  module that receives the logger tags it with its own name where it takes it in: `CommandBridge`,
-  `KermitKtorLogger`, the runtime exception handler, `:foundation:preferences` and
-  `:platform:secure-storage`. `PreferenceCorruptionTest` and `KeysetVaultFallbackTest` pin the two
-  fallbacks that used to be silent, each warning once and neither carrying file contents or key
-  material. Feature modules still log nothing.
+- Logging follows master source §18.8: `app/shared/.../di/KoinApp.kt` builds the one Kermit
+  `Logger` from the entry point's debug signal and derives every verbosity gate from it;
+  `PreferenceCorruptionTest`, `KeysetVaultFallbackTest` and `MapStringSerializerTest` pin the three
+  fallbacks that used to be silent, each warning once through `logEvent` and none carrying file
+  contents or key material. Feature modules log nothing.
 - `foundation/network/.../SafeCall.kt` and `Client.kt` keep kotlin-result and transport details
   inside implementations while attaching the final attempt's `X-Request-Id` to every failure
   kind. `SafeCallTest` covers HTTP, transport, decoding and unexpected request ids plus

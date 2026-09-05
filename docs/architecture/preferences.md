@@ -154,11 +154,9 @@ write for the rest of the process, and a preferences file that was truncated by 
 would brick the app until reinstall. Losing the file is the cheaper outcome for anything this
 module stores.
 
-The handler runs once per corruption and the store carries on. It writes one warning through the
-app's `Logger`, tagged `preferences`, naming the file and the class of the failure underneath
-`CorruptionException`. Neither the file's contents nor the failure's own message is logged: a
-serializer's complaint quotes the bytes it choked on, and a preferences file holds whatever a
-Capability put there.
+The handler runs once per corruption and the store carries on, warning once with the file name and
+the class of the failure underneath `CorruptionException`. Neither the file's contents nor the
+failure's own message is logged: both can quote what the file held.
 
 There is still no hook for callers to be told; a Capability that must know can compare the observed
 value with its own expectations. A production app will want a counter as well as a line; that hook
@@ -264,11 +262,10 @@ Values are strings. Tokens, refresh tokens and keys are strings; anything struct
 Capability's document encoded to a string before it is handed here. `observe` exists because the
 Identity implementation exposes the signed-in state as a `Flow`.
 
-Both modules take the app's one `Logger` on their open functions and tag it with their own name, as
-the master document §18.8 requires. They write only where a decision would otherwise be invisible:
-a platform that keeps secrets in memory only, a stored file that had to be replaced, and the loss
-of the OS keyset vault. No secret, key or file content reaches a log line. The in-memory variants
-take no logger; they decide nothing.
+Both modules take the app's `Logger` on their open functions (tagging per master document §18.8)
+and write only the decisions that would otherwise be invisible: memory-only secrets on web, a
+replaced file, and the loss of the OS keyset vault. No secret, key or file content reaches a line.
+The in-memory variants take no logger; they decide nothing.
 
 ### 8.3 Per platform
 

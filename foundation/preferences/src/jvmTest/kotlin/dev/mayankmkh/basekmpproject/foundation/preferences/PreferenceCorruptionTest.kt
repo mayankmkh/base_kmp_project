@@ -71,7 +71,7 @@ class PreferenceCorruptionTest {
 
         val entry = logs.logs.single()
         assertEquals(Severity.Warn, entry.severity)
-        assertEquals(LogTag, entry.tag)
+        assertEquals("preferences", entry.tag)
         assertTrue(entry.message.contains("file=corrupt"), entry.message)
         assertFalse(entry.message.contains("kept"), entry.message)
     }
@@ -100,9 +100,8 @@ class PreferenceCorruptionTest {
             PreferenceDataStoreFactory.createWithPath(
                 corruptionHandler =
                     replaceCorruptFile(
-                        logger.withTag(LogTag),
-                        PrefFile("corrupt"),
-                        "preferences",
+                        logger.withTag("preferences"),
+                        PrefFile("corrupt").preferencesFileName,
                     ) {
                         emptyPreferences()
                     },

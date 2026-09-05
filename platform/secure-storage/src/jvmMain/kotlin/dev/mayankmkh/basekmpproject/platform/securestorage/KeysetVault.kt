@@ -1,10 +1,10 @@
 package dev.mayankmkh.basekmpproject.platform.securestorage
 
 import co.touchlab.kermit.Logger
+import dev.mayankmkh.basekmpproject.foundation.runtime.logEvent
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
 
 /** Holds the cleartext Tink keyset outside the encrypted DataStore file. */
 internal interface KeysetVault {
@@ -25,81 +25,82 @@ internal fun applicationKeysetVault(
     logger: Logger,
 ): KeysetVault =
     applicationVaults.computeIfAbsent(applicationId) {
-        selectKeysetVault(applicationId, directory, KeysetFallbackWarning(logger))
+        selectKeysetVault(applicationId, directory, logger)
     }
 
 /**
- * Says once that the keyset left the OS vault for an owner-only cleartext file.
- *
- * Once, because the answer never changes for the rest of the process and every store that opens
- * afterwards would repeat it. The reason is the backend's own message, which names the library and
- * the operation; the keyset itself is never part of it.
+ * The keyset left the OS vault for an owner-only cleartext file. Said once per process: selection
+ * is memoised per application id and the fallback switch happens at most once. The reason is the
+ * backend's own message, which names the library and the operation; the keyset is never part of it.
  */
-internal class KeysetFallbackWarning(private val logger: Logger) {
-    private val warned = AtomicBoolean(false)
-
-    fun warn(reason: String) {
-        if (!warned.compareAndSet(false, true)) return
-        val oneLineReason = reason.replace(Regex("\\s+"), " ").trim()
-        logger.w {
-            "keyset_vault_fallback" +
-                " reason=\"$oneLineReason\"" +
-                " using an owner-only cleartext keyset file"
-        }
+private fun warnAboutFallback(logger: Logger, reason: String) {
+    logger.w {
+        logEvent(
+            "keyset_vault_fallback",
+            "reason" to reason.replace(Regex("\\s+"), " ").trim(),
+            "using" to "owner-only cleartext keyset file",
+        )
     }
 }
 
 private fun selectKeysetVault(
     applicationId: String,
     directory: File,
-    warning: KeysetFallbackWarning,
+    logger: Logger,
 ): KeysetVault {
     val fallback = FileKeysetVault(directory.resolve(KeysetFileName))
     val osName = System.getProperty("os.name").orEmpty()
     return when {
         osName.lowercase(Locale.ROOT).contains("mac") ->
-            loadNativeVault("macOS Keychain", fallback, warning) {
+            loadNativeVault("macOS Keychain", fallback, logger) {
                 FallbackKeysetVault(
                     MacOsKeychainKeysetVault("$applicationId.secure-storage"),
                     fallback,
-                    warning,
+                    logger,
                 )
             }
         osName.lowercase(Locale.ROOT).contains("win") ->
             FallbackKeysetVault(
                 WindowsDpapiKeysetVault(directory.resolve(KeysetFileName)),
                 fallback,
-                warning,
+                logger,
             )
         osName.lowercase(Locale.ROOT).contains("linux") ->
-            loadNativeVault("libsecret-1", fallback, warning) {
-                FallbackKeysetVault(LibSecretKeysetVault(applicationId), fallback, warning)
+            loadNativeVault("libsecret-1", fallback, logger) {
+                FallbackKeysetVault(LibSecretKeysetVault(applicationId), fallback, logger)
             }
-        else -> fallback.also { warning.warn("unsupported operating system '$osName'") }
+        else ->
+            fallback.also { warnAboutFallback(logger, "unsupported operating system '$osName'") }
     }
 }
 
 private inline fun loadNativeVault(
     backend: String,
     fallback: KeysetVault,
-    warning: KeysetFallbackWarning,
+    logger: Logger,
     load: () -> KeysetVault,
 ): KeysetVault =
     try {
         load()
     } catch (failure: IllegalArgumentException) {
-        fallback.also { warning.warn("$backend could not be loaded: ${failure.message}") }
+        fallback.also {
+            warnAboutFallback(logger, "$backend could not be loaded: ${failure.message}")
+        }
     } catch (failure: SecurityException) {
-        fallback.also { warning.warn("$backend could not be loaded: ${failure.message}") }
+        fallback.also {
+            warnAboutFallback(logger, "$backend could not be loaded: ${failure.message}")
+        }
     } catch (failure: LinkageError) {
-        fallback.also { warning.warn("$backend could not be loaded: ${failure.message}") }
+        fallback.also {
+            warnAboutFallback(logger, "$backend could not be loaded: ${failure.message}")
+        }
     }
 
 /** Switches permanently to the file if a native backend becomes unavailable during a call. */
 private class FallbackKeysetVault(
     primary: KeysetVault,
     private val fallback: KeysetVault,
-    private val warning: KeysetFallbackWarning,
+    private val logger: Logger,
 ) : KeysetVault {
     @Volatile private var active = primary
 
@@ -123,7 +124,7 @@ private class FallbackKeysetVault(
         synchronized(this) {
             if (active !== fallback) {
                 active = fallback
-                warning.warn(failure.message.orEmpty())
+                warnAboutFallback(logger, failure.message.orEmpty())
             }
             fallback
         }

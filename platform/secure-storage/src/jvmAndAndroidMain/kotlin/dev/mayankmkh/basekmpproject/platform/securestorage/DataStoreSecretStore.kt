@@ -5,6 +5,8 @@ import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.core.Serializer
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import co.touchlab.kermit.Logger
+import dev.mayankmkh.basekmpproject.foundation.runtime.causeClassName
+import dev.mayankmkh.basekmpproject.foundation.runtime.logEvent
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -42,9 +44,11 @@ internal fun dataStoreSecretStore(
             corruptionHandler =
                 ReplaceFileCorruptionHandler { failure ->
                     logger.w {
-                        "secret_store_replaced" +
-                            " name=$name" +
-                            " causeClass=${(failure.cause ?: failure)::class.simpleName}"
+                        logEvent(
+                            "secret_store_replaced",
+                            "name" to name,
+                            "causeClass" to failure.causeClassName,
+                        )
                     }
                     emptyMap()
                 },

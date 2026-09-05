@@ -73,6 +73,8 @@ class KoinGraphTest {
                 // Opened inside the Identity module's `CredentialStore` definition lambda.
                 SecretStore::class,
                 LoggerConfig::class,
+                // `AppEnvironment` is built from the entry point's debug flag before Koin starts.
+                Boolean::class,
                 // `NetworkConfig`'s own fields, filled in by the app environment rather than Koin.
                 Url::class,
                 Duration::class,

@@ -11,7 +11,8 @@ import dev.mayankmkh.basekmpproject.app.shared.rememberAppBackStack
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
-    initKoin()
+    // The console belongs to the host page and the Network tab is the request log.
+    initKoin(isDebug = false)
     ComposeViewport {
         val backStack = rememberAppBackStack()
         ChronologicalBrowserNavigation(

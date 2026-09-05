@@ -17,6 +17,10 @@ androidx-test-runner = "1.7.0"
 composeMultiplatform = "1.12.0"
 # The standalone material3 train lags Compose Multiplatform; 1.9.0 is its latest stable.
 composeMaterial3 = "1.9.0"
+# Kotlin's Compose Multiplatform Navigation 3 guide recommends this Material adaptive scene port.
+composeMaterial3AdaptiveNavigation3 = "1.3.0-beta02"
+# Android's adaptive navigation guidance recommends NavigationSuiteScaffold for app chrome.
+composeMaterial3AdaptiveNavigationSuite = "1.9.0"
 # Compose Multiplatform 1.12.0 ports Navigation3 UI 1.2.0-alpha02, based on AndroidX
 # Navigation3 1.2.0-alpha04. AndroidX publishes the KMP runtime directly.
 androidx-navigation3 = "1.2.0-alpha04"
@@ -81,6 +85,8 @@ androidx-test-runner = { group = "androidx.test", name = "runner", version.ref =
 compose-runtime = { group = "org.jetbrains.compose.runtime", name = "runtime", version.ref = "composeMultiplatform" }
 compose-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "composeMultiplatform" }
 compose-material3 = { group = "org.jetbrains.compose.material3", name = "material3", version.ref = "composeMaterial3" }
+compose-material3-adaptive-navigation3 = { group = "org.jetbrains.compose.material3.adaptive", name = "adaptive-navigation3", version.ref = "composeMaterial3AdaptiveNavigation3" }
+compose-material3-adaptive-navigationSuite = { group = "org.jetbrains.compose.material3", name = "material3-adaptive-navigation-suite", version.ref = "composeMaterial3AdaptiveNavigationSuite" }
 compose-ui = { group = "org.jetbrains.compose.ui", name = "ui", version.ref = "composeMultiplatform" }
 compose-ui-test = { group = "org.jetbrains.compose.ui", name = "ui-test", version.ref = "composeMultiplatform" }
 compose-ui-tooling = { group = "org.jetbrains.compose.ui", name = "ui-tooling", version.ref = "composeMultiplatform" }

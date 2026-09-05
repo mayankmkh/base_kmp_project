@@ -418,3 +418,26 @@ Recorded, not fixed (follow-ups, none blocks Feature development):
   `storage/database/build.gradle.kts` and
   `storage/database/src/commonMain/sqldelight/databases/6.db`.
 
+## Navigation shell
+
+- The Navigation 3 Common UI and Multiple Back Stacks recipes are represented by the saveable
+  Posts and Todos stacks, exit-through-home behavior, and flattened decorated entries in
+  `app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/nav/AppNavigationState.kt`
+  and `ui/RootContent.kt`.
+- The Basic Saveable and Compose Multiplatform polymorphic-serialization guidance is represented by
+  the `SavedStateConfiguration` route registry in `app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/App.kt`.
+- The Material List-Detail recipe is represented by `ListDetailSceneStrategy` metadata in
+  `ui/PostsEntries.kt` and `ui/TodosEntries.kt`, composed with the strategy in `ui/RootContent.kt`.
+- Material adaptive destination chrome is represented by `NavigationSuiteScaffold` in
+  `ui/RootContent.kt`; one `NavDisplay` remains at one composition position across layout changes.
+- The Modular Koin recipe stops at app-owned product-area entry builders in `ui/PostsEntries.kt`
+  and `ui/TodosEntries.kt`. Helix §12.2 and §12.3 keep route mapping in the app, and dependency
+  policy forbids Feature modules from depending on app or Navigation 3 types.
+- The Passing Arguments recipe is represented by typed route values being converted to domain IDs
+  and stable `FeatureInstanceKey` values by the app-side entry builders before Features obtain
+  parameterized Koin ViewModels.
+- The Results Event recipe's shared event bus is deliberately not used. Helix §12.2 requires
+  Features to emit semantic Outputs, which the app shell maps to route changes.
+- The URI Arguments and Synthetic Back Stack recipes are represented by the stable fragment mapping
+  in `nav/AppRouteBrowserHistory.kt` and the browser bridge in `nav/AppNavigationState.kt`; restored
+  detail routes gain their list parent before rendering and popping.

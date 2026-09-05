@@ -1,89 +1,88 @@
 package dev.mayankmkh.basekmpproject.app.shared.ui
 
+import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreProvider
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
-import androidx.navigation3.runtime.NavBackStack
-import androidx.navigation3.runtime.NavEntry
-import androidx.navigation3.runtime.NavEntryDecorator
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
-import dev.mayankmkh.basekmpproject.app.shared.nav.PostDetailRoute
-import dev.mayankmkh.basekmpproject.app.shared.nav.PostFeedRoute
-import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
-import dev.mayankmkh.basekmpproject.feature.posts.api.PostDetailOutput
-import dev.mayankmkh.basekmpproject.feature.posts.api.PostDetailScreen
-import dev.mayankmkh.basekmpproject.feature.posts.api.PostFeedOutput
-import dev.mayankmkh.basekmpproject.feature.posts.api.PostFeedScreen
-import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.app.shared.nav.AppNavigationState
+import dev.mayankmkh.basekmpproject.app.shared.nav.StartDestination
+import dev.mayankmkh.basekmpproject.app.shared.nav.TopDestination
 
+/**
+ * Hosts one fixed [NavDisplay] while Material 3 chooses the destination chrome.
+ *
+ * Each destination's stack is decorated on its own so its saveable state and ViewModels survive a
+ * tab switch. The display receives the home entries followed by the selected non-home destination,
+ * matching the Navigation 3 "exit through home" multiple-back-stacks recipe. Keeping the display at
+ * one composition position is what lets a window resize change only the chrome.
+ */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 internal fun RootContent(
-    backStack: NavBackStack<NavKey>,
+    navigationState: AppNavigationState,
+    navigationSuiteType: NavigationSuiteType,
     modifier: Modifier = Modifier,
 ) {
     val viewModelStoreProvider =
         rememberViewModelStoreProvider(parent = LocalViewModelStoreOwner.current)
-    val entryDecorators: List<NavEntryDecorator<NavKey>> =
-        listOf(
-            rememberSaveableStateHolderNavEntryDecorator(),
-            rememberViewModelStoreNavEntryDecorator(viewModelStoreProvider),
-        )
-    // The web build can restore a session straight onto a detail route, which makes that route the
-    // whole back stack. Popping it would leave `NavDisplay` with nothing to display, so a one-entry
-    // stack falls back to the feed instead of emptying.
-    val pop: () -> Unit = {
-        if (backStack.size > 1) {
-            backStack.removeLastOrNull()
-        } else if (backStack.singleOrNull() != PostFeedRoute) {
-            backStack.clear()
-            backStack += PostFeedRoute
-        }
-    }
-    val entryProvider: (NavKey) -> NavEntry<NavKey> = entryProvider {
-        entry<PostFeedRoute> {
-            PostFeedScreen(
-                instanceKey =
-                    FeatureInstanceKey.forScreen(
-                        route = "posts/feed",
-                        cellType = "post-feed",
+    val entryProvider = remember(navigationState) { createEntryProvider(navigationState) }
+    val entries =
+        TopDestination.entries.associateWith { destination ->
+            rememberDecoratedNavEntries(
+                backStack = navigationState.backStack(destination),
+                entryDecorators =
+                    listOf(
+                        rememberSaveableStateHolderNavEntryDecorator(),
+                        rememberViewModelStoreNavEntryDecorator(viewModelStoreProvider),
                     ),
-                onOutput = { output ->
-                    when (output) {
-                        is PostFeedOutput.OpenPost -> {
-                            val destination = PostDetailRoute(output.id.value)
-                            if (backStack.lastOrNull() != destination) backStack += destination
-                        }
-                    }
-                },
+                entryProvider = entryProvider,
             )
         }
-        entry<PostDetailRoute> { route ->
-            PostDetailScreen(
-                postId = PostId(route.id),
-                instanceKey =
-                    FeatureInstanceKey.forScreen(
-                        route = "posts/detail/${route.id}",
-                        cellType = "post-detail",
-                    ),
-                onOutput = { output ->
-                    when (output) {
-                        PostDetailOutput.Back -> pop()
-                    }
-                },
-            )
-        }
-    }
+    val selected = navigationState.topDestination
+    val displayedEntries =
+        entries.getValue(StartDestination) +
+            if (selected == StartDestination) emptyList() else entries.getValue(selected)
+    val listDetailSceneStrategy = rememberListDetailSceneStrategy<NavKey>()
 
-    NavDisplay(
-        backStack = backStack,
-        onBack = { pop() },
-        entryDecorators = entryDecorators,
-        entryProvider = entryProvider,
+    NavigationSuiteScaffold(
+        navigationItems = {
+            TopDestination.entries.forEach { destination ->
+                NavigationSuiteItem(
+                    selected = destination == selected,
+                    onClick = { navigationState.navigateTop(destination) },
+                    icon = { Text(destination.label().take(1)) },
+                    label = { Text(destination.label()) },
+                    navigationSuiteType = navigationSuiteType,
+                )
+            }
+        },
+        navigationSuiteType = navigationSuiteType,
         modifier = modifier,
-    )
+    ) {
+        // The pinned Navigation 3 UI `entries` overload installs its scene-setup and lifecycle
+        // decorators itself; the stacks above carry the public saveable-state and ViewModel ones.
+        NavDisplay(
+            entries = displayedEntries,
+            onBack = navigationState::goBack,
+            sceneStrategies = listOf(listDetailSceneStrategy),
+        )
+    }
 }
+
+private fun TopDestination.label(): String =
+    when (this) {
+        TopDestination.POSTS -> "Posts"
+        TopDestination.TODOS -> "Todos"
+    }

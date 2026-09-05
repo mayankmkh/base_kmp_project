@@ -62,6 +62,8 @@ kotlin {
                 implementation(libs.touchlab.kermit)
                 api(libs.androidx.navigation3.runtime)
                 implementation(libs.jetbrains.androidx.navigation3.ui)
+                implementation(libs.compose.material3.adaptive.navigation3)
+                implementation(libs.compose.material3.adaptive.navigationSuite)
                 implementation(libs.androidx.lifecycle.viewmodel.compose)
                 implementation(libs.androidx.lifecycle.viewmodel.navigation3)
             }

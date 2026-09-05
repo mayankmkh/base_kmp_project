@@ -9,6 +9,7 @@ kotlin {
         commonMain {
             dependencies {
                 api(projects.capability.postsApi)
+                api(projects.capability.todosApi)
                 api(projects.foundation.resource)
                 api(projects.foundation.runtime)
                 api(projects.foundation.sqldelight)

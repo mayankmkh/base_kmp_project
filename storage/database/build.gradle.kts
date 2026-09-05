@@ -10,6 +10,7 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(projects.capability.postsImpl)
+                implementation(projects.capability.todosImpl)
                 api(projects.foundation.runtime)
                 api(projects.foundation.sqldelight)
                 // The assembled database is this module's public surface and its generated
@@ -69,6 +70,7 @@ sqldelight {
             // query API suspending on every target, so common code has one shape to write against.
             generateAsync.set(true)
             dependency(project(":capability:posts-impl"))
+            dependency(project(":capability:todos-impl"))
         }
     }
 }

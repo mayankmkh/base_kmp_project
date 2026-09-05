@@ -1,0 +1,11 @@
+CREATE TABLE todo (
+    id INTEGER NOT NULL PRIMARY KEY,
+    owner_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    completed INTEGER NOT NULL,
+    local_created INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE todoListState (
+    singleton INTEGER NOT NULL PRIMARY KEY CHECK (singleton = 0)
+);

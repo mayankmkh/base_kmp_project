@@ -1,0 +1,45 @@
+CREATE TABLE todo (
+    id INTEGER NOT NULL PRIMARY KEY,
+    owner_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    completed INTEGER NOT NULL,
+    local_created INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE todoListState (
+    singleton INTEGER NOT NULL PRIMARY KEY CHECK (singleton = 0)
+);
+
+selectTodos:
+SELECT id, owner_id, title, completed, local_created
+FROM todo
+WHERE :hideCompleted = 0 OR completed = 0
+ORDER BY CASE WHEN :byTitle = 1 THEN title END COLLATE NOCASE, id;
+
+selectById:
+SELECT id, owner_id, title, completed, local_created
+FROM todo
+WHERE id = ?;
+
+upsert:
+INSERT OR REPLACE INTO todo(id, owner_id, title, completed, local_created)
+VALUES (?, ?, ?, ?, ?);
+
+deleteById:
+DELETE FROM todo
+WHERE id = ?;
+
+deleteServerBackedRows:
+DELETE FROM todo
+WHERE local_created = 0;
+
+nextLocalId:
+SELECT max(coalesce((SELECT max(id) + 1 FROM todo), 1000000), 1000000);
+
+initializationCount:
+SELECT count(*)
+FROM todoListState;
+
+markInitialized:
+INSERT OR IGNORE INTO todoListState(singleton)
+VALUES (0);

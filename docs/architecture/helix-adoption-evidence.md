@@ -400,3 +400,21 @@ Recorded, not fixed (follow-ups, none blocks Feature development):
   root-task walk inaccurately. "One source per fact" is not yet met for these tables.
 - Unused version-catalog aliases (`koin-compose`, `kotlinx-coroutines-android`, `truth`,
   `androidx-lifecycle-runtimeTesting`, possibly the `compose-*` entries).
+
+## Todos slice
+
+- Capability API product language and command-specific results:
+  `capability/todos-api/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/capability/todos/api/`.
+- SQLDelight ownership, list/detail sync coordinators, optimistic reconciliation, reconnect retry,
+  and the documented fake-backend merge rule: `capability/todos-impl/src/commonMain/`.
+- Capability-owned product preferences applied by SQL queries:
+  `capability/todos-impl/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/capability/todos/impl/TodosSettingsSource.kt`
+  and `TodosLocalSource.kt`.
+- Profile C list, detail, and editor Screens plus the Profile B independently keyed summary Cell:
+  `feature/todos/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/todos/`.
+- Typed multi-screen navigation and adaptive compact/expanded destination chrome:
+  `app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/`.
+- A second schema contributor and merged migration evidence:
+  `storage/database/build.gradle.kts` and
+  `storage/database/src/commonMain/sqldelight/databases/6.db`.
+

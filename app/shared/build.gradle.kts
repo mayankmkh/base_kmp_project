@@ -48,7 +48,10 @@ kotlin {
                 implementation(projects.capability.identityImpl)
                 implementation(projects.capability.postsApi)
                 implementation(projects.capability.postsImpl)
+                implementation(projects.capability.todosApi)
+                implementation(projects.capability.todosImpl)
                 implementation(projects.feature.posts)
+                implementation(projects.feature.todos)
                 // The app module owns the object graph, so it hands the data layer a shared
                 // `PlatformContext` and a configured `HttpClient`.
                 implementation(projects.storage.database)

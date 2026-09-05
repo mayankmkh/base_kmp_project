@@ -2,8 +2,10 @@ package dev.mayankmkh.basekmpproject.app.shared.di
 
 import co.touchlab.kermit.LoggerConfig
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
+import dev.mayankmkh.basekmpproject.capability.todos.api.TodoId
 import dev.mayankmkh.basekmpproject.foundation.network.AnonymousCredentialProvider
 import dev.mayankmkh.basekmpproject.foundation.network.CredentialProvider
+import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStore
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.platform.securestorage.SecretStore
 import io.ktor.client.HttpClient
@@ -63,6 +65,8 @@ class KoinGraphTest {
                 CoroutineExceptionHandler::class,
                 FeatureInstanceKey::class,
                 PostId::class,
+                TodoId::class,
+                PreferenceStore::class,
                 // Opened inside the Identity module's `CredentialStore` definition lambda.
                 SecretStore::class,
                 LoggerConfig::class,

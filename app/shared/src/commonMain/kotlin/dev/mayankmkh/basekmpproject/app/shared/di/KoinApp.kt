@@ -7,7 +7,9 @@ import dev.mayankmkh.basekmpproject.app.shared.config.KermitKtorLogger
 import dev.mayankmkh.basekmpproject.app.shared.config.apiBaseUrl
 import dev.mayankmkh.basekmpproject.capability.identity.impl.identityCapabilityModule
 import dev.mayankmkh.basekmpproject.capability.posts.impl.postsCapabilityModule
+import dev.mayankmkh.basekmpproject.capability.todos.impl.todosCapabilityModule
 import dev.mayankmkh.basekmpproject.feature.posts.api.postsFeatureModule
+import dev.mayankmkh.basekmpproject.feature.todos.api.todosFeatureModule
 import dev.mayankmkh.basekmpproject.foundation.network.DynamicHeaders
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
@@ -154,6 +156,8 @@ private val productModules =
         identityCapabilityModule,
         postsCapabilityModule,
         postsFeatureModule,
+        todosCapabilityModule,
+        todosFeatureModule,
     )
 
 // One list so `KoinGraphTest` verifies the graph `initKoin` starts.

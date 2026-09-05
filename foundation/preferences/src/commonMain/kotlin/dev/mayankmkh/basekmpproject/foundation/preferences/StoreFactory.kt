@@ -14,6 +14,7 @@ import dev.mayankmkh.basekmpproject.foundation.runtime.OpenNameRegistry
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import dev.mayankmkh.basekmpproject.foundation.runtime.causeClassName
 import dev.mayankmkh.basekmpproject.foundation.runtime.logEvent
+import kotlinx.coroutines.CoroutineScope
 
 internal val PrefFile.preferencesFileName: String
     get() = "$name.preferences_pb"
@@ -37,28 +38,42 @@ internal expect fun <T> storageFor(
     serializer: OkioSerializer<T>,
 ): Storage<T>
 
+// A null `scope` keeps DataStore's own default. A test passes one so it can end an instance before
+// reopening its file: DataStore allows one active instance per file per process.
 internal fun preferenceDataStore(
     context: PlatformContext,
     file: PrefFile,
     logger: Logger,
-): DataStore<Preferences> =
-    PreferenceDataStoreFactory.create(
-        storage = storageFor(context, file.preferencesFileName, PreferencesSerializer),
-        corruptionHandler =
-            replaceCorruptFile(logger, file.preferencesFileName) { emptyPreferences() },
-    )
+    scope: CoroutineScope? = null,
+): DataStore<Preferences> {
+    val storage = storageFor(context, file.preferencesFileName, PreferencesSerializer)
+    val handler = replaceCorruptFile(logger, file.preferencesFileName) { emptyPreferences() }
+    return if (scope == null) {
+        PreferenceDataStoreFactory.create(storage = storage, corruptionHandler = handler)
+    } else {
+        PreferenceDataStoreFactory.create(
+            storage = storage,
+            corruptionHandler = handler,
+            scope = scope,
+        )
+    }
+}
 
 internal fun <T> documentDataStore(
     context: PlatformContext,
     file: PrefFile,
     serializer: OkioSerializer<T>,
     logger: Logger,
-): DataStore<T> =
-    DataStoreFactory.create(
-        storage = storageFor(context, file.documentFileName, serializer),
-        corruptionHandler =
-            replaceCorruptFile(logger, file.documentFileName) { serializer.defaultValue },
-    )
+    scope: CoroutineScope? = null,
+): DataStore<T> {
+    val storage = storageFor(context, file.documentFileName, serializer)
+    val handler = replaceCorruptFile(logger, file.documentFileName) { serializer.defaultValue }
+    return if (scope == null) {
+        DataStoreFactory.create(storage = storage, corruptionHandler = handler)
+    } else {
+        DataStoreFactory.create(storage = storage, corruptionHandler = handler, scope = scope)
+    }
+}
 
 /**
  * The handler every store opens with (section 5): DataStore replaces a file it cannot read, and

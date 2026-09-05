@@ -1,13 +1,8 @@
 package dev.mayankmkh.basekmpproject.foundation.preferences
 
-import androidx.datastore.core.DataStore
-import androidx.datastore.core.DataStoreFactory
+import androidx.datastore.core.Storage
 import androidx.datastore.core.okio.OkioSerializer
 import androidx.datastore.core.okio.OkioStorage
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
-import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.cinterop.ExperimentalForeignApi
 import okio.FileSystem
@@ -18,33 +13,15 @@ import platform.Foundation.NSURL
 import platform.Foundation.NSUserDomainMask
 
 @OptIn(ExperimentalForeignApi::class)
-internal actual fun createPreferenceDataStore(
+internal actual fun <T> storageFor(
     context: PlatformContext,
-    file: PrefFile,
-    logger: Logger,
-): DataStore<Preferences> =
-    PreferenceDataStoreFactory.createWithPath(
-        corruptionHandler =
-            replaceCorruptFile(logger, file.preferencesFileName) { emptyPreferences() },
-        produceFile = { "$dataStoreDirectory/${file.preferencesFileName}".toPath() },
-    )
-
-@OptIn(ExperimentalForeignApi::class)
-internal actual fun <T> createDocumentDataStore(
-    context: PlatformContext,
-    file: PrefFile,
+    fileName: String,
     serializer: OkioSerializer<T>,
-    logger: Logger,
-): DataStore<T> =
-    DataStoreFactory.create(
-        storage =
-            OkioStorage(
-                fileSystem = FileSystem.SYSTEM,
-                serializer = serializer,
-                producePath = { "$dataStoreDirectory/${file.documentFileName}".toPath() },
-            ),
-        corruptionHandler =
-            replaceCorruptFile(logger, file.documentFileName) { serializer.defaultValue },
+): Storage<T> =
+    OkioStorage(
+        fileSystem = FileSystem.SYSTEM,
+        serializer = serializer,
+        producePath = { "$dataStoreDirectory/$fileName".toPath() },
     )
 
 @OptIn(ExperimentalForeignApi::class)

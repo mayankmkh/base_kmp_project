@@ -151,6 +151,23 @@ DataStore calls on its own scope, so opening a store during Koin graph creation 
 work. `OkioStorage` creates the file's own parent, but the app-level directory on desktop and the
 `datastore/` directory on Android and iOS are the module's responsibility.
 
+Only the location is a platform question, so only the location crosses the seam:
+
+```kotlin
+internal expect fun <T> storageFor(
+    context: PlatformContext,
+    fileName: String,
+    serializer: OkioSerializer<T>,
+): Storage<T>
+```
+
+`Storage<T>` is DataStore's own abstraction over where bytes live. Android, desktop JVM and iOS
+answer with `OkioStorage` over `FileSystem.SYSTEM` and the paths in the table above; wasmJs answers
+with `WebLocalStorage` named `<applicationId>.<file>`. Both DataStores are then built once in
+`commonMain`, over `PreferenceDataStoreFactory.create(storage = ...)` and
+`DataStoreFactory.create(storage = ...)`, so the corruption handler of section 5, the preferences
+serializer and a document's default value are written once and no platform can drift from them.
+
 ## 5. Corruption
 
 Every store is opened with `ReplaceFileCorruptionHandler` that yields the empty preferences or the
@@ -344,10 +361,10 @@ nothing on web and the Identity implementation's web actual asks the server inst
 The Android and desktop actuals share the `Map<String, String>` serializer and the DataStore
 assembly through a `jvmAndAndroidMain` source set; only the choice of wrapping the serializer in
 `AeadSerializer` and the directory differ. `:foundation:preferences` uses the same source set for
-the same reason: its two DataStore factories are shared and each platform contributes only
-`dataStoreDirectory()`. Both source sets are declared through the default hierarchy template,
-matching Android by platform type because `withAndroidTarget()` only knows the old Android target,
-and not with `dependsOn`, which would switch the template off for iOS and web.
+the same reason: Android and desktop share one `storageFor` over `OkioStorage` (section 4) and
+contribute only `dataStoreDirectory()`. Both source sets are declared through the default
+hierarchy template, matching Android by platform type because `withAndroidTarget()` only knows the
+old Android target, and not with `dependsOn`, which would switch the template off for iOS and web.
 
 ## 9. Identity
 
@@ -381,7 +398,10 @@ name the app uses for its own storage and must never change once a build has shi
   a value, overwrites the file with garbage, reopens it and asserts the value is gone and the store
   is writable again. A second JVM test opens the same logical file twice through one factory and
   asserts the failure names the file, and a replaced corrupt file warns exactly once with the
-  file's name, without its contents, and under the tag the factory applied.
+  file's name, without its contents, and under the tag the factory applied. A third writes through
+  the production factory and asserts the file appeared under
+  `applicationDataDirectory(applicationId)/datastore`, so the storage seam of section 4 cannot move
+  a desktop store's path unnoticed.
 - `:platform:secure-storage` JVM tests: the `Map<String, String>` serializer round trip and the
   same store wrapped in `AeadSerializer` with plain Tink. A tampered ciphertext reads as an empty
   store. An operating system with no vault falls back to the file vault and warns once over
@@ -430,7 +450,8 @@ change behind the existing surfaces.
 
 - **Migrations.** `PreferenceStores.open` and `openDocument` do not expose DataStore's
   `migrations` parameter. A fork moving an existing Android app off `SharedPreferences` adds an
-  optional parameter; the template has no legacy data to migrate.
+  optional parameter; the template has no legacy data to migrate. The hook lands in the two common
+  builders of section 4, once, not in a per-platform actual.
 - **Corruption visibility.** The reset in §5 now logs (§5); it still has no counter and no caller
   callback. When the template gains a telemetry seam, the factories report through it as well.
 - **Web secrets across a reload.** Memory-only sign-out on refresh is deliberate (§8.3).

@@ -33,7 +33,7 @@ internal class DataStorePreferenceStores(private val context: PlatformContext, l
 
     override fun open(file: PrefFile): PreferenceStore {
         registerOpenFile(file)
-        return DataStorePreferenceStore(createPreferenceDataStore(context, file, logger))
+        return DataStorePreferenceStore(preferenceDataStore(context, file, logger))
     }
 
     override fun <T> openDocument(
@@ -43,7 +43,7 @@ internal class DataStorePreferenceStores(private val context: PlatformContext, l
     ): DocumentStore<T> {
         registerOpenFile(file)
         return DataStoreDocumentStore(
-            createDocumentDataStore(
+            documentDataStore(
                 context,
                 file,
                 JsonDocumentSerializer(serializer, defaultValue),

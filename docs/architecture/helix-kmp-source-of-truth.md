@@ -4005,6 +4005,31 @@ No KSP or `koin-annotations` dependency is used. Typed definitions import the co
 with `Module.single { }` and needs no import alias. Aliases, runtime parameters, environment-based
 definitions, custom factories, and lifecycle hooks that do work stay in the classic lambda DSL.
 
+### Definition lifetimes
+
+Koin has no default lifetime; every definition names one, and the choice is a design decision, not
+a habit. The rules, in the order to try them:
+
+- `single` for a shared handle or a stateful owner whose identity matters: the HTTP client and its
+  engine, the database driver provider, the store factories, the connectivity monitor, the runtime
+  scope, and every Capability implementation with its sources. A singleton holds handles and
+  coordinators, never data. Data lives on disk or in a lease-evicted resource (§13.7), so an idle
+  Capability costs a few small objects and nothing the collector would want back. Koin creates a
+  singleton on first request, so a Feature the user never opens costs nothing.
+- `viewModel` for presentation state: one instance per Screen or Cell instance, keyed by
+  `FeatureInstanceKey` and cleared by the ViewModelStore that owns it (§12).
+- `factory` for a stateless or per-caller object that is cheap to build: a use case, a mapper, a
+  validator. The graph has none today because Capability implementations carry their own
+  operations; the first one that grows past comfortable reading is the signal to split operations
+  into `factory` definitions rather than to widen the singleton.
+- A Koin scope for a lifetime with an explicit open and close that several definitions share. The
+  expected first use is a user session: an authenticated client, per-user caches and the user id
+  opened at login and closed together at logout, instead of every holder resetting itself. Do not
+  introduce a scope for a lifetime a ViewModel or a lease-evicted resource already owns.
+
+Reviewers check two things: a `single` that stores data in a field instead of a resource, and a
+`factory` that reopens something a singleton should own.
+
 ### Why not Koin Annotations or Metro now
 
 This is measured, not assumed. Koin Annotations and Metro 1.4.2 were both built out on this

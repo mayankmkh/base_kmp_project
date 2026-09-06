@@ -31,7 +31,6 @@ import dev.mayankmkh.basekmpproject.platform.securestorage.secretStores
 import dev.mayankmkh.basekmpproject.storage.database.AppDatabaseDriverProvider
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logger as KtorLogger
 import kotlinx.coroutines.CoroutineExceptionHandler
 import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
@@ -165,7 +164,6 @@ private val networkModule = module {
     // Locale comes from the app language owner and app version from platform build metadata once
     // either is required by the backend; the sample API needs no changing headers today.
     single<DynamicHeaders> { DynamicHeaders.None }
-    single<KtorLogger> { KermitKtorLogger(get()) }
     // A client built over a supplied engine does not own it, so the engine closes with the graph.
     single<HttpClientEngine> { createPlatformHttpClientEngine() } onClose { it?.close() }
     single {
@@ -174,7 +172,13 @@ private val networkModule = module {
             config = get(),
             credentialProvider = get(),
             headers = get(),
-            clientLogger = get(),
+            // Constructed here rather than declared as a `single<KtorLogger>`. Ktor's `Logger` and
+            // Kermit's share a simple name, and web targets index a definition by simple name
+            // alone: two `Logger` definitions become one index key there, the later one wins, and
+            // this body's `get<Logger>()` resolves back into itself until the stack dies. The
+            // client is the only consumer, so the adapter has no reason to be in the graph.
+            // `KoinGraphTest` holds the no-collision rule for every other type.
+            clientLogger = KermitKtorLogger(get()),
             json = get(),
         )
     } onClose { it?.close() }

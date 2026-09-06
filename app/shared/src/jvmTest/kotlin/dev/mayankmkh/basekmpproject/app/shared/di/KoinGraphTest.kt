@@ -21,6 +21,7 @@ import io.ktor.client.engine.mock.respondOk
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.http.Url
 import java.nio.file.Files
+import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertFails
 import kotlin.test.assertFalse
@@ -99,6 +100,53 @@ class KoinGraphTest {
             shutdownKoin()
             Dispatchers.resetMain()
         }
+    }
+
+    /**
+     * Koin indexes a definition by [org.koin.core.definition.indexKey], and on Kotlin/Wasm and
+     * Kotlin/JS `KClass.getFullName()` is `simpleName` -- the package is gone. Two graph types
+     * sharing a simple name therefore share one index key on those targets: the module loaded later
+     * silently overrides the earlier one, and a definition whose body injects the shadowed type
+     * resolves back into itself and recurses until the stack dies. The JVM keys by the qualified
+     * name and never sees it, so this test keys the started graph the way the web build does.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class, KoinInternalApi::class)
+    @Test
+    fun `no two graph types share a simple name`() {
+        // `shutdownKoin` resolves the application runtime scope, which needs a main dispatcher.
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val application = initKoin(isDebug = true)
+        val typesByWebIndexKey = mutableMapOf<String, MutableSet<KClass<*>>>()
+        try {
+            application.koin.instanceRegistry.instances.values
+                .map { it.beanDefinition }
+                .forEach { definition ->
+                    val indexedTypes = listOf(definition.primaryType) + definition.secondaryTypes
+                    indexedTypes.forEach { type ->
+                        val key =
+                            listOf(
+                                    type.simpleName ?: type.toString(),
+                                    definition.qualifier?.value.orEmpty(),
+                                    definition.scopeQualifier.toString(),
+                                )
+                                .joinToString(":")
+                        typesByWebIndexKey.getOrPut(key) { mutableSetOf() }.add(type)
+                    }
+                }
+        } finally {
+            shutdownKoin()
+            Dispatchers.resetMain()
+        }
+
+        val collisions = typesByWebIndexKey.filterValues { it.size > 1 }
+        assertTrue(
+            collisions.isEmpty(),
+            "These types collapse onto one Koin index key on web targets. Give one of each pair a " +
+                "qualifier, or stop declaring it as a definition:\n" +
+                collisions.entries.joinToString("\n") { (key, types) ->
+                    "\t'$key' <- " + types.joinToString(", ") { it.qualifiedName ?: it.toString() }
+                },
+        )
     }
 
     @Test

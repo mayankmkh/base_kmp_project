@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "P0": {
+    "gate": "before_first_real_cell",
+    "requirements": [
+      "role_convention_plugins",
+      "module_graph_rules",
+      "stable_rule_ids_and_actionable_failures",
+      "verify_fast_affected",
+      "phase_aware_root_agent_instructions",
+      "minimal_cell_and_capability_generator"
+    ],
+    "availableCommands": [
+      "create",
+      "verify"
+    ]
+  },
+  "P1": {
+    "gate": "before_adoption_complete",
+    "requirements": [
+      "thin_graph",
+      "thin_impact",
+      "thin_doctor",
+      "thin_context",
+      "gallery_index",
+      "agent_instruction_generation_or_no_drift_check"
+    ],
+    "availableCommands": [
+      "create",
+      "verify",
+      "graph",
+      "impact",
+      "doctor",
+      "context",
+      "gallery"
+    ]
+  },
+  "P2": {
+    "gate": "evidence_driven_after_adoption",
+    "requirements": [
+      "sophisticated_doctor_scoring",
+      "advanced_context_ranking",
+      "extraction_and_merge_codemods",
+      "architecture_kit_bulk_migrations",
+      "automated_repair"
+    ],
+    "availableCommands": [
+      "extract",
+      "migrate"
+    ]
+  }
+}

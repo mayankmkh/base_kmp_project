@@ -200,8 +200,9 @@ Owner of every module is the repository (single-owner template); no CODEOWNERS c
 
 Helix KMP Baseline v1 / Master 1.3 one-time adoption
 ([§29, now `../history/helix-adoption-model.md`](../history/helix-adoption-model.md)). Roles applied per module via
-`bkp.kmp.<role>` convention plugins; dependency policy is the verbatim §9.0 JSON in
-`config/helix/dependency-policy.json` (schema 2) with an empty `config/helix/exceptions.json`.
+`bkp.kmp.<role>` convention plugins; dependency policy is
+`config/helix/dependency-policy.json` (schema 2, then still a verbatim copy of the §9.0 JSON
+block) with an empty `config/helix/exceptions.json`.
 The `:feature:posts` slice is classified as a Snapshot Resource Feature over a grouped
 Capability (`PostsQueries` / `PostsCommands`); there is no Live Resource in this template.
 
@@ -315,8 +316,9 @@ module/file/type reverse-dependency slice; this narrative remains the adoption-t
 
 ## Qualification suites touched
 
-`verifyFast` = `checkModuleGraph`, `checkHelixPolicySync`, and every module's `spotlessCheck`,
-`detektAll`, metadata compile and `jvmTest`/`test`; `verifyFull` = the fast tier plus
+As of this record, `verifyFast` = `checkModuleGraph`, `checkHelixPolicySync` (removed later, with
+the duplicated policy block it guarded), and every module's `spotlessCheck`, `detektAll`, metadata
+compile and `jvmTest`/`test`; `verifyFull` = the fast tier plus
 `:app:android:assembleDebug`, the `:app:web` development/production webpack bundles and
 `:app:shared:linkDebugFrameworkIosSimulatorArm64` (root `build.gradle.kts`). Neither tier runs
 the included build-logic TestKit tests or the tooling self-test; both are run separately

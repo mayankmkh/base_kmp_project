@@ -57,7 +57,6 @@ val verifyFast =
             verifyFastModules,
             "spotlessCheck",
             "checkModuleGraph",
-            "checkHelixPolicySync",
         )
     }
 
@@ -74,7 +73,6 @@ val verifyFull =
             verifyFullModules,
             "spotlessCheck",
             "checkModuleGraph",
-            "checkHelixPolicySync",
         )
     }
 

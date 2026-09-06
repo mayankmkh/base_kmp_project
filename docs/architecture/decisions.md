@@ -351,9 +351,9 @@ of that state.
 
 **Revisit when:** dependency/qualification tooling can inject immutable released snapshots into derived docs automatically without manual drift.
 
-## ADR-42 - Control-plane staging has one canonical machine-readable block
+## ADR-42 - Control-plane staging has one canonical machine-readable source
 
-**Decision:** P0/P1/P2 availability is defined only in Section 22.1.1. P0 precedes the first real Cell, P1 is required before adoption completion, and P2 is evidence-driven. Root agent instructions are phase-aware; Appendix A, now in [`templates/agents-and-skills.md`](templates/agents-and-skills.md), is the P1-complete/post-adoption template.
+**Decision:** P0/P1/P2 availability is defined only in `config/helix/control-plane-stages.json`, which Section 22.1.1 explains. P0 precedes the first real Cell, P1 is required before adoption completion, and P2 is evidence-driven. Root agent instructions are phase-aware; Appendix A, now in [`templates/agents-and-skills.md`](templates/agents-and-skills.md), is the P1-complete/post-adoption template.
 
 **Why:** duplicate staging lists can tell agents to run commands that are not implemented.
 

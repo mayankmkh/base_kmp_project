@@ -156,6 +156,8 @@ Do not independently edit multiple copies of the same architectural fact.
 | dependency qualification | central qualification register derived from this master + current evidence |
 | architecture exceptions | central expiring exception registry |
 | architecture index/context | generated from repository graph, never hand-maintained |
+| role-to-role dependency matrix | `config/helix/dependency-policy.json`; this master explains it |
+| control-plane stage contract | `config/helix/control-plane-stages.json`; this master explains it |
 
 The master explains these facts; it must not cause teams to duplicate them in per-module YAML or custom architecture DSLs.
 
@@ -165,13 +167,13 @@ The master is intentionally exhaustive, but **exhaustive does not mean multiple 
 
 Rules:
 
-- every normative architectural fact has one canonical normative section or canonical machine-readable policy block;
+- every normative architectural fact has one canonical normative section or one canonical machine-readable policy file;
 - ADRs, history, quick snapshots, management summaries, `AGENTS.md`, Skills, and derived documents may repeat a rendering of the fact, but they are not independent authorities;
 - repeated prose must reference the canonical fact and, once the relevant generator/checker exists, must be generated or no-drift checked from it;
 - graph validation, documentation generation, agent instructions, and CLI error messages should consume the same canonical policy inputs where practical;
 - if two copies disagree, treat that as a documentation/build defect.
 
-**Implementation-status rule:** the master must not call a repeated artifact "generated" merely because generation is planned. Until a generator/no-drift checker actually exists in the repository, the repeated artifact is a **specified derived copy** and its unautomated sync is tracked as control-plane debt. P1 adoption requires installing the no-drift generation/check path for root agent instructions and other mechanically derivable policy summaries.
+**Implementation-status rule:** the master must not call a repeated artifact "generated" merely because generation is planned. Until a generator/no-drift checker actually exists in the repository, the repeated artifact is a **specified derived copy** and its unautomated sync is tracked as control-plane debt. P1 adoption requires installing the no-drift generation/check path for root agent instructions and other mechanically derivable policy summaries. Machine-read policy data is not rendered here at all: the dependency matrix and the control-plane stage contract live in `config/helix/*.json`, which the build and the CLI read directly, so there is no second copy to keep in sync.
 
 This lets the master remain exhaustive while normal agents consume smaller derived views.
 
@@ -1448,112 +1450,7 @@ Platform clarification:
 
 ## 9.0 Canonical machine-readable dependency policy
 
-**This block is the normative source for role-to-role dependency validation.** Human-readable tables below are rendered explanations.
-
-`helix-kmp` / build logic should extract or generate validator input from this block. Generated caches are allowed; manually edited duplicate policy files are not.
-
-<!-- HELIX_DEPENDENCY_POLICY_BEGIN -->
-```json
-{
-  "schema": 2,
-  "defaultDecision": "deny",
-  "roles": {
-    "app": {
-      "allow": [
-        "feature",
-        "ui",
-        "capability_api",
-        "capability_impl",
-        "foundation_api",
-        "foundation_runtime",
-        "platform",
-        "platform_api",
-        "platform_impl",
-        "storage"
-      ]
-    },
-    "feature": {
-      "allow": [
-        "ui",
-        "capability_api",
-        "foundation_api",
-        "platform",
-        "platform_api"
-      ]
-    },
-    "ui": {
-      "allow": [
-        "ui",
-        "foundation_api"
-      ]
-    },
-    "capability_api": {
-      "allow": [
-        "capability_api",
-        "foundation_api"
-      ]
-    },
-    "capability_impl": {
-      "allow": [
-        "capability_api",
-        "foundation_api",
-        "foundation_runtime",
-        "platform",
-        "platform_api"
-      ]
-    },
-    "foundation_api": {
-      "allow": [
-        "foundation_api"
-      ]
-    },
-    "foundation_runtime": {
-      "allow": [
-        "foundation_api",
-        "foundation_runtime"
-      ]
-    },
-    "platform": {
-      "allow": [
-        "foundation_api",
-        "foundation_runtime"
-      ]
-    },
-    "platform_api": {
-      "allow": [
-        "foundation_api"
-      ]
-    },
-    "platform_impl": {
-      "allow": [
-        "platform_api",
-        "foundation_api",
-        "foundation_runtime"
-      ]
-    },
-    "storage": {
-      "allow": [
-        "capability_impl",
-        "foundation_api",
-        "foundation_runtime"
-      ]
-    }
-  },
-  "conditionalAllows": [
-    {
-      "id": "DEP-FEATURE-FEATURE-PUBLIC-PRESENTATION-ONLY",
-      "from": "feature",
-      "to": "feature",
-      "predicate": {
-        "type": "target_public_api_and_source_import",
-        "targetPublicPackageSuffix": ".api",
-        "sourceMayImportOnlyTargetPackageSuffix": ".api"
-      }
-    }
-  ]
-}
-```
-<!-- HELIX_DEPENDENCY_POLICY_END -->
+The role-to-role dependency matrix is [`config/helix/dependency-policy.json`](../../config/helix/dependency-policy.json). That file is the single authority for role-to-role dependency validation: `checkModuleGraph` and the `helix-kmp` CLI read it directly, and no copy of it lives in this master. The sections below explain what it says; they are rendered explanations, not a second source.
 
 Policy semantics:
 
@@ -1568,7 +1465,7 @@ Policy semantics:
 
 Stable rule identifiers appear in CLI/CI failures and `doctor` output.
 
-This block governs **main/application dependency edges**. Test source sets may depend on `:testkit:*` through test configurations, and `:tooling:*` / `:build-logic` are validated as build/control-plane code rather than as runtime application dependencies.
+That policy governs **main/application dependency edges**. Test source sets may depend on `:testkit:*` through test configurations, and `:tooling:*` / `:build-logic` are validated as build/control-plane code rather than as runtime application dependencies.
 
 ## 9.1 Allowed matrix
 
@@ -4300,64 +4197,9 @@ The control plane makes the correct path easier than invention and makes illegal
 
 ### 22.1.1 Contract breadth is not day-one implementation breadth
 
-The complete command vocabulary is designed now, but implementation is staged from one canonical block.
+The complete command vocabulary is designed now, but implementation is staged from one canonical file.
 
-<!-- HELIX_CONTROL_PLANE_STAGES_BEGIN -->
-```json
-{
-  "schema": 1,
-  "P0": {
-    "gate": "before_first_real_cell",
-    "requirements": [
-      "role_convention_plugins",
-      "module_graph_rules",
-      "stable_rule_ids_and_actionable_failures",
-      "verify_fast_affected",
-      "phase_aware_root_agent_instructions",
-      "minimal_cell_and_capability_generator"
-    ],
-    "availableCommands": [
-      "create",
-      "verify"
-    ]
-  },
-  "P1": {
-    "gate": "before_adoption_complete",
-    "requirements": [
-      "thin_graph",
-      "thin_impact",
-      "thin_doctor",
-      "thin_context",
-      "gallery_index",
-      "agent_instruction_generation_or_no_drift_check"
-    ],
-    "availableCommands": [
-      "create",
-      "verify",
-      "graph",
-      "impact",
-      "doctor",
-      "context",
-      "gallery"
-    ]
-  },
-  "P2": {
-    "gate": "evidence_driven_after_adoption",
-    "requirements": [
-      "sophisticated_doctor_scoring",
-      "advanced_context_ranking",
-      "extraction_and_merge_codemods",
-      "architecture_kit_bulk_migrations",
-      "automated_repair"
-    ],
-    "availableCommands": [
-      "extract",
-      "migrate"
-    ]
-  }
-}
-```
-<!-- HELIX_CONTROL_PLANE_STAGES_END -->
+The stage table is [`config/helix/control-plane-stages.json`](../../config/helix/control-plane-stages.json): it is the single authority for what each stage gates, requires and makes available, and the `helix-kmp` CLI reads it. `tooling/helix-kmp/STAGE` names the stage this repository is currently at.
 
 Interpretation:
 
@@ -4724,7 +4566,7 @@ Keep root agent instructions concise and high-value.
 
 There is **one post-adoption/P1-complete copyable root template, Appendix A in [`templates/agents-and-skills.md`](templates/agents-and-skills.md)**. Do not install it during P0 unchanged, because P1 commands may not exist yet.
 
-The P1 agent-instruction generator/no-drift checker must read the canonical stage block in Section 22.1.1 and omit unavailable commands for earlier phases.
+The P1 agent-instruction generator/no-drift checker must read the canonical stage file `config/helix/control-plane-stages.json` and omit unavailable commands for earlier phases.
 
 Generation/check inputs:
 
@@ -5757,7 +5599,7 @@ Before publishing a new master edition:
 [ ] Four laws unchanged or explicitly ADR-updated
 [ ] Vocabulary has no accidental duplicate/competing terms
 [ ] Cell still clearly not a base class/module
-[ ] Canonical machine-readable dependency policy matches build validator and generated docs
+[ ] Canonical machine-readable dependency policy file is still the only copy of the role matrix, and the build validator and generated docs read it
 [ ] Enforcement uses strongest practical mechanism before structural tests
 [ ] Query/Command/ResourceObservation rules match generators/reference slice
 [ ] FeatureInstanceKey construction matches keyed-host/registry code
@@ -5767,7 +5609,7 @@ Before publishing a new master edition:
 [ ] Qualification table reflects exact project POCs
 [ ] Exact dependency pins are read from repository operational sources, not duplicated as "latest upstream" prose
 [ ] Upstream capability/source URLs were rechecked for qualification-sensitive changes
-[ ] P0/P1/P2 stage block is the only staging authority and agent instructions match implemented command availability
+[ ] The P0/P1/P2 stage file is the only staging authority and agent instructions match implemented command availability
 [ ] ADR Revisit when conditions reviewed
 [ ] CLI command/flag contract matches tooling, including fast/full verification tiers
 [ ] AI Skills/root agent template match current workflow

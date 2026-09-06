@@ -16,4 +16,4 @@ paraphrase it from memory.
 | A complete worked slice | `docs/architecture/reference-slice.md` (moved out of Section 30; 30.4 stays in the master) |
 
 In this repository: `:feature:posts` plus `:capability:posts-api` / `:capability:posts-impl` are
-the reference slice, and `config/helix/dependency-policy.json` is the enforced form of Section 9.
+the reference slice, and `config/helix/dependency-policy.json` is the authority Section 9 explains.

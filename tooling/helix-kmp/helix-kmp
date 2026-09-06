@@ -739,7 +739,7 @@ EOF
             gradle_args="$gradle_args $task"
         done
     done
-    gradle_args="$gradle_args checkModuleGraph checkHelixPolicySync"
+    gradle_args="$gradle_args checkModuleGraph"
     # shellcheck disable=SC2086
     run_gradle "$dry_run" $gradle_args
 }
@@ -792,8 +792,8 @@ Usage:
       --fast            ./gradlew verifyFast
       --fast --affected module-scoped verifyFastModule lifecycles for the modules touched since
                         <ref> (default origin/main) plus the working tree, followed by
-                        checkModuleGraph and checkHelixPolicySync. Falls back to the whole fast
-                        tier when build-logic, settings, the catalog or config/ changed.
+                        checkModuleGraph. Falls back to the whole fast tier when build-logic,
+                        settings, the catalog or config/ changed.
       --full            ./gradlew verifyFull
       --dry-run         print the Gradle command instead of running it.
       --agents          check generated AGENTS.md sections and Skill command availability.

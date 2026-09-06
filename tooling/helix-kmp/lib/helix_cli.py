@@ -27,7 +27,6 @@ RULE_TEXT = {
     "MOD-PATH-ROLE-MISMATCH": "A module path must match the role convention plugin it applies.",
     "MOD-ROLE-MISSING": "Every runtime module must apply exactly one Helix role convention plugin.",
     "MOD-ROLE-MULTIPLE": "A module may own exactly one Helix role.",
-    "POLICY-DRIFT": "The checked-in dependency policy must match the normative policy block.",
     "STORAGE-MIGRATION-DUPLICATE": "SQLDelight migration versions must be unique across schema-contributing modules.",
     "STORAGE-MIGRATION-NAME": "SQLDelight migration file names must be positive integers.",
 }
@@ -915,15 +914,10 @@ def command_gallery(repo: Repository, args: argparse.Namespace) -> int:
 
 
 def stage_contract(repo: Repository) -> tuple[str, dict[str, Any], dict[str, Any]]:
-    source = (repo.root / "docs/architecture/helix-kmp-source-of-truth.md").read_text(encoding="utf-8")
-    match = re.search(
-        r"<!-- HELIX_CONTROL_PLANE_STAGES_BEGIN -->\s*```json\s*(.*?)\s*```\s*<!-- HELIX_CONTROL_PLANE_STAGES_END -->",
-        source,
-        re.DOTALL,
-    )
-    if not match:
-        raise CliError("canonical control-plane stage block is missing")
-    stages = json.loads(match.group(1))
+    path = repo.root / "config/helix/control-plane-stages.json"
+    if not path.is_file():
+        raise CliError("canonical control-plane stage file is missing")
+    stages = json.loads(path.read_text(encoding="utf-8"))
     stage = (repo.root / "tooling/helix-kmp/STAGE").read_text(encoding="utf-8").strip()
     if stage not in stages:
         raise CliError(f"unknown control-plane stage {stage}")

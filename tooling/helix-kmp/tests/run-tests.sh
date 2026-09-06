@@ -358,7 +358,6 @@ GRADLE_TASKS="${HELIX_KMP_TEST_TASKS:-
 :feature:sample:detektAll
 :feature:sample-linked:detektAll
 checkModuleGraph
-checkHelixPolicySync
 }"
 
 log "gradle: $(echo $GRADLE_TASKS | tr '\n' ' ')"

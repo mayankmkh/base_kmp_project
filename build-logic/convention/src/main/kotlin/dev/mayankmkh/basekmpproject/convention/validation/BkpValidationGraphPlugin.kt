@@ -39,8 +39,6 @@ class BkpValidationGraphPlugin : Plugin<Project> {
         val dependencyPolicy =
             project.layout.projectDirectory.file("config/helix/dependency-policy.json")
         val exceptionRegistry = project.layout.projectDirectory.file("config/helix/exceptions.json")
-        val sourceOfTruth =
-            project.layout.projectDirectory.file("docs/architecture/helix-kmp-source-of-truth.md")
         val graph =
             project.tasks.register<CheckModuleGraphTask>("checkModuleGraph") {
                 group = "verification"
@@ -52,16 +50,8 @@ class BkpValidationGraphPlugin : Plugin<Project> {
                     project.layout.buildDirectory.file("reports/helix/module-graph.json")
                 )
             }
-        val policySync =
-            project.tasks.register<CheckHelixPolicySyncTask>("checkHelixPolicySync") {
-                group = "verification"
-                description = "Checks the derived Helix dependency policy against its master."
-                policyFile.set(dependencyPolicy)
-                sourceOfTruthFile.set(sourceOfTruth)
-                markerFile.set(project.layout.buildDirectory.file("reports/helix/policy-sync.txt"))
-            }
         project.tasks.named("check") {
-            dependsOn(graph, policySync)
+            dependsOn(graph)
         }
 
         // The task actions receive only encoded strings and file inputs. Cross-project Gradle

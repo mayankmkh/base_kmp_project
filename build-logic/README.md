@@ -264,10 +264,10 @@ it is indistinguishable from the declaration itself. Only the final set is obser
 Validation is split into two layers:
 
 1. Apply-time wiring: primary plugins wire baseline tooling/dependencies in `apply()`.
-2. Root graph checks: the root-applied `bkp.validation.graph` registers `checkModuleGraph` and
-   `checkHelixPolicySync`. Cross-project models are reduced to plain node/edge records after project
-   evaluation; task actions evaluate those records and scan declared source-file inputs without
-   retaining `Project` references.
+2. Root graph checks: the root-applied `bkp.validation.graph` registers `checkModuleGraph`.
+   Cross-project models are reduced to plain node/edge records after project evaluation; task
+   actions evaluate those records and scan declared source-file inputs without retaining `Project`
+   references.
 
 `afterEvaluate` is required, not incidental — the values being checked come from the `bkpModule`
 block in the module's build script, which runs after plugins apply. Validation is per project
@@ -295,7 +295,6 @@ The root graph tasks enforce these stable rules:
 | `STORAGE-MIGRATION-DUPLICATE` | SQLDelight migration versions are unique across schema-contributing modules |
 | `STORAGE-MIGRATION-NAME` | SQLDelight migration file names are positive integers |
 | `EXC-EXPIRED` | Time-bounded exception registry hygiene |
-| `POLICY-DRIFT` | Derived policy equals the marked master-source JSON |
 
 Findings use `[RULE-ID] subject -- problem. Fix: remedy` and the graph task always writes the
 schema-2 `build/reports/helix/module-graph.json`. Nodes contain `path`, `role`, `roles`,
@@ -320,7 +319,7 @@ Graph-backed commands refresh the report first unless `--no-refresh` is requeste
 | `doctor` | Findings, report metrics, exceptions, and up to 200 Git commits |
 | `context` | Target sources/tests and direct dependency public APIs only |
 | `gallery` | Feature public Composables and fixture declarations only |
-| `verify --agents` | Canonical stage block, policy, rule IDs, CLI help, Skills, generated AGENTS sections |
+| `verify --agents` | Canonical stage file, policy, rule IDs, CLI help, Skills, generated AGENTS sections |
 
 `extract` and `migrate` are P2 and are not implemented.
 
@@ -338,8 +337,8 @@ entry always fails with `EXC-EXPIRED`; blanket suppression is intentionally unav
 
 ## Verification tiers
 
-- `./gradlew verifyFast` runs JVM/common compile and tests, `detektAll`, `spotlessCheck`,
-  `checkModuleGraph`, and `checkHelixPolicySync`. Included-build convention tests are excluded.
+- `./gradlew verifyFast` runs JVM/common compile and tests, `detektAll`, `spotlessCheck`, and
+  `checkModuleGraph`. Included-build convention tests are excluded.
   `helix-kmp verify --fast --affected` runs the same tier narrowed to the modules changed against
   the merge base plus their dependents.
 - `./gradlew verifyFull` adds Android `assembleDebug`, both web development/production executable
@@ -409,5 +408,5 @@ Kotlin/Android test dependencies are configured by primary plugin type.
   `tooling/helix-kmp/templates/` and were derived by hand from `:feature:posts` and
   `:capability:posts-*`; nothing generates them from the plugins, so a change to a role plugin's
   defaults can leave them stale. `tooling/helix-kmp/tests/run-tests.sh` is what catches that: it
-  scaffolds throwaway modules and runs `jvmTest`, `spotlessCheck`, `detektAll`, `checkModuleGraph`
-  and `checkHelixPolicySync` against them. It is deliberately not part of `verifyFast`.
+  scaffolds throwaway modules and runs `jvmTest`, `spotlessCheck`, `detektAll` and
+  `checkModuleGraph` against them. It is deliberately not part of `verifyFast`.

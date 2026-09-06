@@ -143,7 +143,7 @@ A change is not complete until the verification tier for its blast radius is gre
 
 | Tier | Command | Covers |
 | --- | --- | --- |
-| Fast | `tooling/helix-kmp/helix-kmp verify --fast --affected` | Changed modules: JVM tests, `detektAll`, `spotlessCheck`, plus `checkModuleGraph` and `checkHelixPolicySync` |
+| Fast | `tooling/helix-kmp/helix-kmp verify --fast --affected` | Changed modules: JVM tests, `detektAll`, `spotlessCheck`, plus `checkModuleGraph` |
 | Fast, whole repo | `./gradlew verifyFast` | Every module's JVM/common tests and quality gates |
 | Full | `./gradlew verifyFull` | Fast, plus the Android debug APK, the web bundles and the iOS simulator framework |
 

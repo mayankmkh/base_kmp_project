@@ -40,8 +40,10 @@ Concretely:
    [`../../../README.md`](../../../README.md); the role/plugin/path mapping is in
    [`../helix-adoption-plan.md`](../helix-adoption-plan.md).
 2. **The dependency matrix is data, not prose.** [`config/helix/dependency-policy.json`](../../../config/helix/dependency-policy.json)
-   is the single source; `./gradlew checkModuleGraph` enforces it and `checkHelixPolicySync` keeps
-   the plugin's own view of it honest. Findings are formatted `[RULE-ID] subject -- problem. Fix: remedy`.
+   is the single source and `./gradlew checkModuleGraph` enforces it. (A `checkHelixPolicySync`
+   task also held it against a copy of the matrix in the master source; that copy and the task were
+   removed once the file became the only authority.) Findings are formatted
+   `[RULE-ID] subject -- problem. Fix: remedy`.
 3. **Presentation is Cells, not screens.** A Cell is `(id, instanceKey: FeatureInstanceKey, onOutput)`.
    Instance identity is explicit, so two placements of the same Cell never share state by accident,
    and a Feature's only way out is an Output the host interprets.

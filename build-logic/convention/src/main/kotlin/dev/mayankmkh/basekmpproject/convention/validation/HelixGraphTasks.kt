@@ -636,45 +636,6 @@ abstract class CheckModuleGraphTask : DefaultTask() {
     }
 }
 
-@CacheableTask
-abstract class CheckHelixPolicySyncTask : DefaultTask() {
-    @get:InputFile
-    @get:PathSensitive(PathSensitivity.RELATIVE)
-    abstract val policyFile: RegularFileProperty
-
-    @get:InputFile
-    @get:PathSensitive(PathSensitivity.RELATIVE)
-    abstract val sourceOfTruthFile: RegularFileProperty
-
-    @get:OutputFile abstract val markerFile: RegularFileProperty
-
-    @TaskAction
-    fun checkSync() {
-        val source = sourceOfTruthFile.get().asFile.readText()
-        val block = POLICY_BLOCK.find(source)?.groupValues?.get(1)?.trim()
-        val json = block?.removePrefix("```json")?.removeSuffix("```")?.trim()
-        val inFile = runCatching { parseObject(policyFile.get().asFile) }.getOrNull()
-        val inDocs = json?.let { runCatching { JsonSlurper().parseText(it) }.getOrNull() }
-        if (inFile == null || inDocs == null || inFile != inDocs) {
-            val line =
-                "[POLICY-DRIFT] config/helix/dependency-policy.json -- policy differs from the normative Section 9.0 JSON. Fix: copy the marked JSON block from the Helix source of truth verbatim"
-            logger.error(line)
-            throw GradleException("Helix policy synchronization failed with 1 finding(s).")
-        }
-        val marker = markerFile.get().asFile
-        marker.parentFile.mkdirs()
-        marker.writeText("policy synchronized\n")
-    }
-
-    companion object {
-        private val POLICY_BLOCK =
-            Regex(
-                "<!-- HELIX_DEPENDENCY_POLICY_BEGIN -->(.*?)<!-- HELIX_DEPENDENCY_POLICY_END -->",
-                RegexOption.DOT_MATCHES_ALL,
-            )
-    }
-}
-
 @Suppress("UNCHECKED_CAST")
 private fun parseObject(file: File): Map<String, Any?> =
     JsonSlurper().parse(file) as Map<String, Any?>

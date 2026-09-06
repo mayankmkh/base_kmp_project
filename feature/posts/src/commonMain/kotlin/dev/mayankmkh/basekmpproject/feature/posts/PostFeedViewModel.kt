@@ -8,7 +8,6 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostFeedOutput
-import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
@@ -39,7 +38,6 @@ internal sealed interface PostFeedAction {
 }
 
 internal class PostFeedViewModel(
-    instanceKey: FeatureInstanceKey,
     queries: PostsQueries,
     private val commands: PostsCommands,
 ) : ViewModel() {
@@ -57,10 +55,6 @@ internal class PostFeedViewModel(
                 SharingStarted.WhileSubscribed(5_000),
                 PostFeedState(),
             )
-
-    init {
-        require(instanceKey.value.isNotBlank())
-    }
 
     fun onAction(action: PostFeedAction) {
         when (action) {

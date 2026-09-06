@@ -15,6 +15,8 @@ import dev.mayankmkh.basekmpproject.feature.todos.api.todosFeatureModule
 import dev.mayankmkh.basekmpproject.foundation.network.DynamicHeaders
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
+import dev.mayankmkh.basekmpproject.foundation.network.createJson
+import dev.mayankmkh.basekmpproject.foundation.network.createPlatformHttpClientEngine
 import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStores
 import dev.mayankmkh.basekmpproject.foundation.preferences.preferenceStores
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
@@ -27,28 +29,32 @@ import dev.mayankmkh.basekmpproject.platform.connectivity.shared
 import dev.mayankmkh.basekmpproject.platform.securestorage.SecretStores
 import dev.mayankmkh.basekmpproject.platform.securestorage.secretStores
 import dev.mayankmkh.basekmpproject.storage.database.AppDatabaseDriverProvider
+import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger as KtorLogger
 import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.serialization.json.Json
+import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
+import org.koin.core.context.stopKoin
 import org.koin.core.logger.Level
 import org.koin.core.module.Module
-import org.koin.core.module.dsl.singleOf
 import org.koin.core.scope.Scope
 import org.koin.dsl.KoinAppDeclaration
 import org.koin.dsl.bind
 import org.koin.dsl.includes
 import org.koin.dsl.module
 import org.koin.dsl.onClose
+import org.koin.mp.KoinPlatform
 
 /**
  * Starts the application graph. [isDebug] is the entry point's own build signal; Koin's logger must
  * exist before the first module loads, so the app's [Logger] is built from it one step earlier.
+ * Production PreferenceStores and SecretStores may be built at most once per process, so tests
+ * replace those factories.
  */
-fun initKoin(isDebug: Boolean, config: KoinAppDeclaration? = null) {
+fun initKoin(isDebug: Boolean, config: KoinAppDeclaration? = null): KoinApplication {
     val environment = AppEnvironment(isDebug)
-    startKoin {
+    return startKoin {
         logger(
             KermitKoinLogger(environment.logger.withTag("koin")).apply {
                 level = environment.koinLevel
@@ -57,10 +63,16 @@ fun initKoin(isDebug: Boolean, config: KoinAppDeclaration? = null) {
         modules(appModules(environment))
 
         // Last, so what the caller declares wins: a later definition of the same type replaces the
-        // one already loaded. That is how a test swaps the `HttpClient` for one on a `MockEngine`
-        // without the app module knowing anything about tests.
+        // one already loaded. That is how a test swaps platform resource factories without the app
+        // module knowing anything about tests.
         includes(config)
     }
+}
+
+/** Cancels application work before Koin releases resources in unspecified callback order. */
+fun shutdownKoin() {
+    KoinPlatform.getKoinOrNull()?.getOrNull<ApplicationRuntimeScope>()?.close()
+    stopKoin()
 }
 
 /** The one place the build type turns into log verbosity; every gate below reads from here. */
@@ -77,15 +89,7 @@ internal class AppEnvironment(val isDebug: Boolean) {
 }
 
 private val jsonModule = module {
-    single {
-        Json {
-            ignoreUnknownKeys = true
-            isLenient = false
-            explicitNulls = false
-            encodeDefaults = false
-            coerceInputValues = true
-        }
-    }
+    single { createJson() }
 }
 
 private val dispatchersModule = module {
@@ -93,7 +97,6 @@ private val dispatchersModule = module {
 }
 
 private fun environmentModule(environment: AppEnvironment) = module {
-    single { environment }
     single { environment.logger }
 }
 
@@ -111,7 +114,8 @@ private val runtimeModule = module {
 
 /** The platform handle shared by storage and platform modules. */
 private val platformContextModule = module {
-    single { createPlatformContext() }
+    // startKoin applies includes(config) before eager creation, so Android's Context is present.
+    single(createdAtStart = true) { createPlatformContext() }
 }
 
 /** The factories every stored file is opened through; Capability implementations take them. */
@@ -128,14 +132,17 @@ private val storesModule = module {
  * override just the host without rebuilding the plugin stack. The `CredentialProvider` comes from
  * `identityCapabilityModule` through App composition.
  */
-private val networkModule = module {
-    single { NetworkConfig(baseUrl = apiBaseUrl, logLevel = get<AppEnvironment>().ktorLogLevel) }
+private fun networkModule(environment: AppEnvironment) = module {
+    single { NetworkConfig(baseUrl = apiBaseUrl, logLevel = environment.ktorLogLevel) }
     // Locale comes from the app language owner and app version from platform build metadata once
     // either is required by the backend; the sample API needs no changing headers today.
     single<DynamicHeaders> { DynamicHeaders.None }
-    singleOf(::KermitKtorLogger) bind KtorLogger::class
+    single<KtorLogger> { KermitKtorLogger(get()) }
+    // A client built over a supplied engine does not own it, so the engine closes with the graph.
+    single<HttpClientEngine> { createPlatformHttpClientEngine() } onClose { it?.close() }
     single {
         createHttpClient(
+            engine = get(),
             config = get(),
             credentialProvider = get(),
             headers = get(),
@@ -164,7 +171,12 @@ private val connectivityModule = module {
  * open, migrated driver.
  */
 private val databaseModule = module {
-    singleOf(::AppDatabaseDriverProvider) bind SqlDriverProvider::class
+    // onClose before bind: after bind the definition is typed by the contract, which has no close.
+    single { AppDatabaseDriverProvider(get()) } onClose
+        {
+            it?.close()
+        } bind
+        SqlDriverProvider::class
 }
 
 internal fun libModules(environment: AppEnvironment): List<Module> =
@@ -175,7 +187,7 @@ internal fun libModules(environment: AppEnvironment): List<Module> =
         runtimeModule,
         platformContextModule,
         storesModule,
-        networkModule,
+        networkModule(environment),
         connectivityModule,
         databaseModule,
     )

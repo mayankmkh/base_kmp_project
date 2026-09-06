@@ -10,7 +10,6 @@ public val __name__FeatureModule: Module = module {
     viewModel { parameters ->
         __NAME__ViewModel(
             id = parameters.get(),
-            instanceKey = parameters.get(),
             queries = get(),
             commands = get(),
         )

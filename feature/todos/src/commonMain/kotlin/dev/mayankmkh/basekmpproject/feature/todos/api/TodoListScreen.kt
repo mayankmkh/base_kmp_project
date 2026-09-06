@@ -15,10 +15,9 @@ import dev.mayankmkh.basekmpproject.feature.todos.TodosUiCommand
 import dev.mayankmkh.basekmpproject.foundation.presentation.CellPlacementId
 import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.foundation.presentation.featureViewModel
 import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
-import org.koin.compose.viewmodel.koinViewModel
-import org.koin.core.parameter.parametersOf
 
 @Composable
 public fun TodoListScreen(
@@ -26,10 +25,17 @@ public fun TodoListScreen(
     onOutput: (TodoListOutput) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel: TodoListViewModel =
-        koinViewModel(key = instanceKey.value, parameters = { parametersOf(instanceKey) })
+    val viewModel: TodoListViewModel = featureViewModel(instanceKey)
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val summaryInstanceKey =
+        remember(instanceKey) {
+            FeatureInstanceKey.forPlacement(
+                surface = instanceKey.value,
+                cellType = "todo-summary",
+                placement = CellPlacementId.fromHostStableId("header"),
+            )
+        }
 
     CollectWhileStarted(viewModel.outputs, onOutput)
     CollectWhileStarted(viewModel.uiCommands) { command ->
@@ -49,12 +55,7 @@ public fun TodoListScreen(
         summary = {
             // The Screen is the host, so it derives the Cell's placement from its own identity.
             TodoSummaryCell(
-                instanceKey =
-                    FeatureInstanceKey.forPlacement(
-                        surface = instanceKey.value,
-                        cellType = "todo-summary",
-                        placement = CellPlacementId.fromHostStableId("header"),
-                    ),
+                instanceKey = summaryInstanceKey,
                 onOutput = {},
             )
         },

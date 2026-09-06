@@ -23,7 +23,7 @@ internal fun Project.applyCompose() {
     configureKMPCompose()
 }
 
-private fun Project.enableExplicitApi() {
+internal fun Project.enableExplicitApi() {
     extensions.getByType<KotlinMultiplatformExtension>().explicitApi()
 }
 
@@ -58,6 +58,7 @@ class BkpKmpCapabilityImplPlugin : Plugin<Project> {
         with(target) {
             applyRoleBase(HelixRole.CAPABILITY_IMPL)
             addCapabilityImplRoleDependencies()
+            enableExplicitApi()
             pluginManager.withPlugin("app.cash.sqldelight") {
                 // A contributor sees only its own files, so repo-wide migration numbers look
                 // falsely gapped here. The composed sequence is verified in :storage:database.

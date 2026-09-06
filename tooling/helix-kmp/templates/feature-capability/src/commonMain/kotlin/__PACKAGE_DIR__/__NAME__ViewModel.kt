@@ -7,7 +7,6 @@ import __CAP_PACKAGE__.__CAP_NAME__Id
 import __CAP_PACKAGE__.__CAP_NAME__Queries
 import __CAP_PACKAGE__.__CAP_NAME__Record
 import __PACKAGE__.api.__NAME__Output
-import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
@@ -58,7 +57,6 @@ internal sealed interface __NAME__UiCommand {
 /** Owns this Cell instance's state for as long as the instance lives. */
 internal class __NAME__ViewModel(
     val id: String,
-    instanceKey: FeatureInstanceKey,
     queries: __CAP_NAME__Queries,
     private val commands: __CAP_NAME__Commands,
 ) : ViewModel() {
@@ -76,10 +74,6 @@ internal class __NAME__ViewModel(
                 SharingStarted.WhileSubscribed(5_000),
                 __NAME__State(id = id),
             )
-
-    init {
-        require(instanceKey.value.isNotBlank())
-    }
 
     // Each branch delegates to a short private function so that the formatting of this file does
     // not depend on how long the Feature's name happens to be.

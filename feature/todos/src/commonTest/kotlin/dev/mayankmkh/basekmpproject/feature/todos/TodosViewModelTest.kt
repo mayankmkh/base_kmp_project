@@ -11,7 +11,6 @@ import dev.mayankmkh.basekmpproject.capability.todos.api.UpdateTodoResult
 import dev.mayankmkh.basekmpproject.feature.todos.api.TodoDetailOutput
 import dev.mayankmkh.basekmpproject.feature.todos.api.TodoEditorOutput
 import dev.mayankmkh.basekmpproject.feature.todos.api.TodoListOutput
-import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
@@ -34,7 +33,7 @@ class TodosViewModelTest {
     fun `list maps observations opens routes and updates settings`() = runMainTest {
         val queries = FakeTodosQueries()
         val commands = FakeTodosCommands()
-        val viewModel = TodoListViewModel(listKey(), queries, commands)
+        val viewModel = TodoListViewModel(queries, commands)
 
         viewModel.state.test {
             awaitItem()
@@ -58,7 +57,7 @@ class TodosViewModelTest {
                 onSetCompleted = { _, _ -> Outcome.Failed(problem) }
                 onDelete = { Outcome.Failed(problem) }
             }
-        val viewModel = TodoListViewModel(listKey(), FakeTodosQueries(), commands)
+        val viewModel = TodoListViewModel(FakeTodosQueries(), commands)
 
         viewModel.uiCommands.test {
             viewModel.onAction(TodoListAction.Refresh)
@@ -83,7 +82,7 @@ class TodosViewModelTest {
                 }
                 onDelete = { Outcome.Completed(DeleteTodoResult.NotFound) }
             }
-        val viewModel = TodoListViewModel(listKey(), FakeTodosQueries(), commands)
+        val viewModel = TodoListViewModel(FakeTodosQueries(), commands)
 
         viewModel.uiCommands.test {
             viewModel.onAction(TodoListAction.SetCompleted(TodoId(1), true))
@@ -97,7 +96,7 @@ class TodosViewModelTest {
     @Test
     fun `successful list update and delete invoke their commands`() = runMainTest {
         val commands = FakeTodosCommands()
-        val viewModel = TodoListViewModel(listKey(), FakeTodosQueries(), commands)
+        val viewModel = TodoListViewModel(FakeTodosQueries(), commands)
 
         viewModel.onAction(TodoListAction.SetCompleted(TodoId(1), true))
         runCurrent()
@@ -112,7 +111,7 @@ class TodosViewModelTest {
     @Test
     fun `detail covers updated invalid failed and not found results`() = runMainTest {
         val commands = FakeTodosCommands()
-        val viewModel = TodoDetailViewModel(TodoId(1), detailKey(), FakeTodosQueries(), commands)
+        val viewModel = TodoDetailViewModel(TodoId(1), FakeTodosQueries(), commands)
 
         viewModel.state.test {
             awaitItem()
@@ -147,7 +146,7 @@ class TodosViewModelTest {
     @Test
     fun `detail delete covers deleted failed and not found results`() = runMainTest {
         val commands = FakeTodosCommands()
-        val viewModel = TodoDetailViewModel(TodoId(1), detailKey(), FakeTodosQueries(), commands)
+        val viewModel = TodoDetailViewModel(TodoId(1), FakeTodosQueries(), commands)
 
         viewModel.outputs.test {
             viewModel.onAction(TodoDetailAction.ConfirmDelete)
@@ -170,7 +169,7 @@ class TodosViewModelTest {
     @Test
     fun `detail refresh reports only the failed outcome`() = runMainTest {
         val commands = FakeTodosCommands()
-        val viewModel = TodoDetailViewModel(TodoId(1), detailKey(), FakeTodosQueries(), commands)
+        val viewModel = TodoDetailViewModel(TodoId(1), FakeTodosQueries(), commands)
 
         viewModel.uiCommands.test {
             viewModel.onAction(TodoDetailAction.Refresh)
@@ -186,7 +185,7 @@ class TodosViewModelTest {
     @Test
     fun `confirmed missing detail emits not found output`() = runMainTest {
         val queries = FakeTodosQueries()
-        val viewModel = TodoDetailViewModel(TodoId(99), detailKey(), queries, FakeTodosCommands())
+        val viewModel = TodoDetailViewModel(TodoId(99), queries, FakeTodosCommands())
 
         // The resource is observed only while the screen collects state, as the real Screen does.
         viewModel.state.test {
@@ -201,7 +200,7 @@ class TodosViewModelTest {
     @Test
     fun `editor covers created invalid and failed results`() = runMainTest {
         val commands = FakeTodosCommands()
-        val viewModel = TodoEditorViewModel(editorKey(), commands)
+        val viewModel = TodoEditorViewModel(commands)
         viewModel.onAction(TodoEditorAction.TitleChanged("Ship Todos"))
 
         viewModel.outputs.test {
@@ -226,7 +225,7 @@ class TodosViewModelTest {
     fun `the summary loads until the first synchronization answers, failure included`() =
         runMainTest {
             val queries = FakeTodosQueries(list = ResourceObservationFixtures.unsynchronized())
-            val viewModel = TodoSummaryViewModel(summaryKey(), queries)
+            val viewModel = TodoSummaryViewModel(queries)
 
             viewModel.state.test {
                 assertEquals(TodoSummaryState(), awaitItem())
@@ -236,12 +235,4 @@ class TodosViewModelTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
-
-    private fun listKey() = FeatureInstanceKey.forScreen("todos/list", "todo-list")
-
-    private fun summaryKey() = FeatureInstanceKey.forScreen("todos/summary", "todo-summary")
-
-    private fun detailKey() = FeatureInstanceKey.forScreen("todos/detail/1", "todo-detail")
-
-    private fun editorKey() = FeatureInstanceKey.forScreen("todos/editor", "todo-editor")
 }

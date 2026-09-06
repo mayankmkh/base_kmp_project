@@ -16,7 +16,7 @@ import __PACKAGE__.__NAME__UiCommand
 import __PACKAGE__.__NAME__ViewModel
 import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
-import org.koin.compose.viewmodel.koinViewModel
+import dev.mayankmkh.basekmpproject.foundation.presentation.featureViewModel
 import org.koin.core.parameter.parametersOf
 
 // The Helix Cell signature is `(id, instanceKey, onOutput)`: `id` says *what* is shown,
@@ -40,7 +40,7 @@ public fun __NAME__Cell(
     snackbarHostState: SnackbarHostState? = null,
 ) {
     val viewModel: __NAME__ViewModel =
-        koinViewModel(key = instanceKey.value, parameters = { parametersOf(id, instanceKey) })
+        featureViewModel(instanceKey, parameters = { parametersOf(id) })
     check(viewModel.id == id) {
         "FeatureInstanceKey '${instanceKey.value}' is already bound to id " +
             "'${viewModel.id}'; fold the id into the instance key"

@@ -15,6 +15,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TEMPLATE_ROOT="$SCRIPT_DIR/templates"
 SETTINGS_FILE="$REPO_ROOT/settings.gradle.kts"
 KOIN_APP_FILE="$REPO_ROOT/app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+KOIN_GRAPH_TEST_FILE="$REPO_ROOT/app/shared/src/jvmTest/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinGraphTest.kt"
 APP_SHARED_BUILD_FILE="$REPO_ROOT/app/shared/build.gradle.kts"
 GRADLEW="$REPO_ROOT/gradlew"
 
@@ -277,13 +278,21 @@ create_cell() {
     local feature="${1:-}"
     local cell="${2:-}"
     [ -n "$feature" ] && [ -n "$cell" ] ||
-        die "usage: helix-kmp create cell <feature> <CellName> [--dry-run]"
+        die "usage: helix-kmp create cell <feature> <CellName> [--capability <name>] [--dry-run]"
     shift 2
     require_module_name "$feature"
     require_type_name "$cell"
 
+    local capability=""
     while [ $# -gt 0 ]; do
         case "$1" in
+            --capability)
+                shift
+                capability="${1:-}"
+                [ -n "$capability" ] || die "--capability needs a capability name"
+                require_module_name "$capability"
+                ;;
+            --capability=*) capability="${1#*=}"; require_module_name "$capability" ;;
             --dry-run) DRY_RUN=1 ;;
             *) die "unknown flag for 'create cell': $1" ;;
         esac
@@ -306,7 +315,29 @@ create_cell() {
     render_tree "$TEMPLATE_ROOT/cell" "$module_dir" \
         "CELL=$cell" "cell=$cell_camel" "PACKAGE=$package" "PACKAGE_DIR=$package_dir"
 
-    register_cell_view_model "$module_dir" "$package_dir" "$feature" "$cell"
+    local cap_pascal="" cap_parameter_type=""
+    if [ -n "$capability" ]; then
+        local cap_camel cap_segment cap_package cap_accessor
+        cap_pascal="$(to_pascal "$capability")"
+        cap_camel="$(to_camel "$capability")"
+        cap_segment="$(to_package_segment "$capability")"
+        cap_package="$PACKAGE_ROOT.capability.$cap_segment.api"
+        cap_parameter_type="$cap_package.${cap_pascal}Id"
+        cap_accessor="$(to_camel "$capability-api")"
+        if [ ! -d "$REPO_ROOT/capability/$capability-api" ]; then
+            info "  note: :capability:$capability-api does not exist yet -- run 'helix-kmp create capability $capability'"
+        fi
+        info "  overlay: capability-backed Cell (:capability:$capability-api)"
+        render_tree "$TEMPLATE_ROOT/cell-capability" "$module_dir" \
+            "CELL=$cell" "cell=$cell_camel" "PACKAGE=$package" "PACKAGE_DIR=$package_dir" \
+            "CAP_NAME=$cap_pascal" "cap_name=$cap_camel" "CAP_PACKAGE=$cap_package"
+        add_feature_dependency "$module_dir" "projects.capability.$cap_accessor"
+    fi
+
+    register_cell_view_model "$module_dir" "$package_dir" "$feature" "$cell" "$cap_pascal"
+    if [ -n "$cap_parameter_type" ]; then
+        register_view_model_parameter "$package.${cell}ViewModel" "$cap_parameter_type"
+    fi
     next_steps ":feature:$feature"
 }
 
@@ -413,19 +444,54 @@ add_app_dependency() {
     info "  app/shared/build.gradle.kts += $accessor"
 }
 
+# Adds the Capability API edge a capability-backed Cell needs when the Feature does not have it.
+add_feature_dependency() {
+    local module_dir="$1" accessor="$2" build_file="$1/build.gradle.kts"
+    if grep -Eq "(api|implementation)\($accessor\)" "$build_file"; then
+        info "  feature already depends on $accessor"
+        return 0
+    fi
+    if [ "$DRY_RUN" = "1" ]; then
+        info "  would add $accessor to ${build_file#"$REPO_ROOT"/}"
+        return 0
+    fi
+
+    local tmp
+    tmp="$(mktemp "${TMPDIR:-/tmp}/helix-feature-dependency.XXXXXX")"
+    if ! awk -v new="                implementation(${accessor})" '
+        { print }
+        !inserted && $0 ~ /api\(projects\.foundation\.presentation\)/ {
+            print new
+            inserted = 1
+        }
+        END { if (!inserted) exit 1 }
+    ' "$build_file" > "$tmp"; then
+        rm -f "$tmp"
+        die "could not find the foundation presentation dependency in ${build_file#"$REPO_ROOT"/}"
+    fi
+    mv "$tmp" "$build_file"
+    info "  ${build_file#"$REPO_ROOT"/} += $accessor"
+}
+
 # Appends the Cell's keyed `viewModel { }` factory to the Feature's Koin module. The module file is
 # generated with a single trailing `}`; if a hand-edit has changed that shape the registration is
 # printed instead of guessed at.
 register_cell_view_model() {
-    local module_dir="$1" package_dir="$2" feature="$3" cell="$4"
+    local module_dir="$1" package_dir="$2" feature="$3" cell="$4" capability_type="$5"
     local feature_camel module_file
     feature_camel="$(to_camel "$feature")"
     module_file="$module_dir/src/commonMain/kotlin/$package_dir/api/${feature_camel}FeatureModule.kt"
 
     local snippet
-    snippet="    viewModel { parameters ->
-        ${cell}ViewModel(id = parameters.get(), instanceKey = parameters.get())
+    if [ -n "$capability_type" ]; then
+        snippet="    viewModel { parameters ->
+        ${cell}ViewModel(id = parameters.get(), queries = get())
     }"
+    else
+        snippet="    viewModel { parameters ->
+        ${cell}ViewModel(id = parameters.get())
+    }"
+    fi
 
     if [ ! -f "$module_file" ] || [ "$(tail -n 1 "$module_file")" != "}" ]; then
         info ""
@@ -453,6 +519,37 @@ register_cell_view_model() {
     add_import "$module_file" \
         "import $(echo "$package_dir" | tr '/' '.').${cell}ViewModel"
     info "  registered ${cell}ViewModel in ${feature_camel}FeatureModule"
+}
+
+# Keeps Koin's reflection verifier explicit about the parameters supplied by a generated factory.
+# Class names avoid widening the Feature's internal ViewModel or adding test-only app dependencies.
+register_view_model_parameter() {
+    local view_model_type="$1" parameter_type="$2"
+
+    if grep -Fq "\"${view_model_type}\"" "$KOIN_GRAPH_TEST_FILE"; then
+        info "  KoinGraphTest already verifies $view_model_type parameters"
+        return 0
+    fi
+    if [ "$DRY_RUN" = "1" ]; then
+        info "  would register $view_model_type runtime parameters in KoinGraphTest"
+        return 0
+    fi
+
+    local marker='                // helix:generated:view-model-parameters END'
+    local marker_line tmp
+    marker_line="$(grep -nF "$marker" "$KOIN_GRAPH_TEST_FILE" | cut -d: -f1)"
+    [ -n "$marker_line" ] || die "could not find the ViewModel parameter marker in KoinGraphTest"
+
+    tmp="$(mktemp "${TMPDIR:-/tmp}/helix-view-model-parameter.XXXXXX")"
+    head -n "$((marker_line - 1))" "$KOIN_GRAPH_TEST_FILE" > "$tmp"
+    printf '%s\n' \
+        '                viewModelParameters(' \
+        "                    \"${view_model_type}\"," \
+        "                    \"${parameter_type}\"," \
+        '                ),' >> "$tmp"
+    tail -n "+$marker_line" "$KOIN_GRAPH_TEST_FILE" >> "$tmp"
+    mv "$tmp" "$KOIN_GRAPH_TEST_FILE"
+    info "  KoinGraphTest += $view_model_type runtime parameters"
 }
 
 next_steps() {
@@ -672,10 +769,11 @@ Usage:
       both implementation(projects.capability.<name>Impl) and
       dependency(project(":capability:<name>-impl")) in storage/database/build.gradle.kts.
 
-  helix-kmp create cell <feature> <CellName> [--dry-run]
+  helix-kmp create cell <feature> <CellName> [--capability <name>] [--dry-run]
       Adds a Cell -- (id, instanceKey: FeatureInstanceKey, onOutput) -- with its keyed ViewModel,
       stateless Content, Output and tests to an existing Feature, and registers the ViewModel in
-      that Feature's Koin module.
+      that Feature's Koin module. With --capability, the id is that Capability's typed ID and the
+      ViewModel observes its Queries contract.
 
   helix-kmp verify --fast [--affected] [--base <ref>] [--dry-run]
   helix-kmp verify --full [--dry-run]

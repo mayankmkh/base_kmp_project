@@ -24,11 +24,10 @@ import dev.mayankmkh.basekmpproject.feature.todos.TodoEditorViewModel
 import dev.mayankmkh.basekmpproject.feature.todos.TodosUiCommand
 import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.foundation.presentation.featureViewModel
 import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.viewmodel.koinViewModel
-import org.koin.core.parameter.parametersOf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,8 +36,7 @@ public fun TodoEditorScreen(
     onOutput: (TodoEditorOutput) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel: TodoEditorViewModel =
-        koinViewModel(key = instanceKey.value, parameters = { parametersOf(instanceKey) })
+    val viewModel: TodoEditorViewModel = featureViewModel(instanceKey)
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     CollectWhileStarted(viewModel.outputs, onOutput)

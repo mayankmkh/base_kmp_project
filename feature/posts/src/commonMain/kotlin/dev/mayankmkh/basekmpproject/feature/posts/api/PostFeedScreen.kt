@@ -11,10 +11,9 @@ import dev.mayankmkh.basekmpproject.feature.posts.PostFeedViewModel
 import dev.mayankmkh.basekmpproject.feature.posts.PostsUiCommand
 import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.foundation.presentation.featureViewModel
 import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
-import org.koin.compose.viewmodel.koinViewModel
-import org.koin.core.parameter.parametersOf
 
 @Composable
 public fun PostFeedScreen(
@@ -22,11 +21,7 @@ public fun PostFeedScreen(
     onOutput: (PostFeedOutput) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel: PostFeedViewModel =
-        koinViewModel(
-            key = instanceKey.value,
-            parameters = { parametersOf(instanceKey) },
-        )
+    val viewModel: PostFeedViewModel = featureViewModel(instanceKey)
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 

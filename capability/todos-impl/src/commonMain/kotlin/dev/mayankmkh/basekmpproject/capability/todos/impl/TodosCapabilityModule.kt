@@ -11,7 +11,8 @@ public val todosCapabilityModule: Module = module {
     singleOf(::TodosLocalSource)
     singleOf(::TodosSettingsSource)
     single { TodosRemoteSource(get(), get()) }
-    single { TodosCapabilityImpl(get(), get(), get(), get(), get(), get()) } onClose { it?.close() }
+    singleOf(::TodosCapabilityImpl) onClose { it?.close() }
+    // Aliases expose contracts only; onClose belongs to the implementation definition above.
     single<TodosQueries> { get<TodosCapabilityImpl>() }
     single<TodosCommands> { get<TodosCapabilityImpl>() }
 }

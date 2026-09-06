@@ -17,9 +17,9 @@ import dev.mayankmkh.basekmpproject.feature.posts.PostDetailViewModel
 import dev.mayankmkh.basekmpproject.feature.posts.PostsUiCommand
 import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.foundation.presentation.featureViewModel
 import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
-import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
 /**
@@ -41,10 +41,7 @@ public fun PostDetailCell(
     snackbarHostState: SnackbarHostState? = null,
 ) {
     val viewModel: PostDetailViewModel =
-        koinViewModel(
-            key = instanceKey.value,
-            parameters = { parametersOf(postId, instanceKey) },
-        )
+        featureViewModel(instanceKey, parameters = { parametersOf(postId) })
     check(viewModel.postId == postId) {
         "FeatureInstanceKey '${instanceKey.value}' is already bound to post " +
             "${viewModel.postId.value}; fold the post id into the instance key"

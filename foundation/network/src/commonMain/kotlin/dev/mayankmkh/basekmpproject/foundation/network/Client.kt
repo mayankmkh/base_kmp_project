@@ -3,7 +3,6 @@ package dev.mayankmkh.basekmpproject.foundation.network
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
-import io.ktor.client.engine.HttpClientEngineFactory
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.HttpRequestRetry
@@ -37,9 +36,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.json.Json
 
-internal expect val platformEngineFactory: HttpClientEngineFactory<*>
+/** Creates this target's production HTTP engine. App composition owns the returned engine. */
+public expect fun createPlatformHttpClientEngine(): HttpClientEngine
 
-internal fun createJson(): Json = Json {
+public fun createJson(): Json = Json {
     ignoreUnknownKeys = true
     isLenient = false
     explicitNulls = false
@@ -47,22 +47,10 @@ internal fun createJson(): Json = Json {
     coerceInputValues = true
 }
 
-@Suppress("LongParameterList")
-public fun createHttpClient(
-    config: NetworkConfig,
-    credentialProvider: CredentialProvider = AnonymousCredentialProvider,
-    headers: DynamicHeaders = DynamicHeaders.None,
-    clientLogger: Logger = Logger.EMPTY,
-    json: Json = createJson(),
-): HttpClient =
-    HttpClient(platformEngineFactory) {
-        installNetworking(config, credentialProvider, headers, clientLogger, json)
-    }
-
 /**
- * The same client on an engine the caller names; tests pass `MockEngine` and get the real plugin
- * stack over canned responses. Kept in `main` because a KMP test source set is not visible outside
- * its own module.
+ * The client over an engine the caller names: App composition supplies the platform engine and
+ * tests pass `MockEngine` to get the real plugin stack over canned responses. A client built this
+ * way does not own its engine, so whoever supplies the engine also closes it.
  */
 @Suppress("LongParameterList")
 public fun createHttpClient(

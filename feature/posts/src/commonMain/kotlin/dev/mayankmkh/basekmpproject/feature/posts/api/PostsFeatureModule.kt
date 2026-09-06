@@ -7,9 +7,8 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 public val postsFeatureModule: Module = module {
-    viewModel { parameters ->
+    viewModel {
         PostFeedViewModel(
-            instanceKey = parameters.get(),
             queries = get(),
             commands = get(),
         )
@@ -17,7 +16,6 @@ public val postsFeatureModule: Module = module {
     viewModel { parameters ->
         PostDetailViewModel(
             postId = parameters.get(),
-            instanceKey = parameters.get(),
             queries = get(),
             commands = get(),
         )

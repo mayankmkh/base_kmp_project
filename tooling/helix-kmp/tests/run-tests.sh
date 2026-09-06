@@ -2,7 +2,7 @@
 #
 # End-to-end test for the helix-kmp control plane (stage P1).
 #
-# Scaffolds a throwaway Capability, two Features and a Cell, compiles and checks them with the
+# Scaffolds a throwaway Capability, two Features and two Cells, compiles and checks them with the
 # repository's own quality gates, then removes every trace. The test fails if `git status --short`
 # is not byte-identical before and after, so a failed run cannot leave sample modules behind.
 #
@@ -22,6 +22,7 @@ REPO_ROOT="$(cd "$TOOL_DIR/../.." && pwd)"
 CLI="$TOOL_DIR/helix-kmp"
 SETTINGS_FILE="$REPO_ROOT/settings.gradle.kts"
 KOIN_APP_FILE="$REPO_ROOT/app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+KOIN_GRAPH_TEST_FILE="$REPO_ROOT/app/shared/src/jvmTest/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinGraphTest.kt"
 APP_SHARED_BUILD_FILE="$REPO_ROOT/app/shared/build.gradle.kts"
 AGENTS_FILE="$REPO_ROOT/AGENTS.md"
 
@@ -30,6 +31,7 @@ AGENTS_FILE="$REPO_ROOT/AGENTS.md"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/helix-kmp-tests.XXXXXX")"
 SETTINGS_BACKUP="$WORK_DIR/settings.gradle.kts"
 KOIN_APP_BACKUP="$WORK_DIR/KoinApp.kt"
+KOIN_GRAPH_TEST_BACKUP="$WORK_DIR/KoinGraphTest.kt"
 APP_SHARED_BUILD_BACKUP="$WORK_DIR/app-shared-build.gradle.kts"
 AGENTS_BACKUP="$WORK_DIR/AGENTS.md"
 STATUS_BEFORE="$WORK_DIR/status-before.txt"
@@ -69,6 +71,9 @@ cleanup() {
     fi
     if [ -f "$KOIN_APP_BACKUP" ]; then
         cp "$KOIN_APP_BACKUP" "$KOIN_APP_FILE"
+    fi
+    if [ -f "$KOIN_GRAPH_TEST_BACKUP" ]; then
+        cp "$KOIN_GRAPH_TEST_BACKUP" "$KOIN_GRAPH_TEST_FILE"
     fi
     if [ -f "$APP_SHARED_BUILD_BACKUP" ]; then
         cp "$APP_SHARED_BUILD_BACKUP" "$APP_SHARED_BUILD_FILE"
@@ -125,6 +130,7 @@ expect_cell_shape() {
 # --------------------------------------------------------------------------
 cp "$SETTINGS_FILE" "$SETTINGS_BACKUP"
 cp "$KOIN_APP_FILE" "$KOIN_APP_BACKUP"
+cp "$KOIN_GRAPH_TEST_FILE" "$KOIN_GRAPH_TEST_BACKUP"
 cp "$APP_SHARED_BUILD_FILE" "$APP_SHARED_BUILD_BACKUP"
 cp "$AGENTS_FILE" "$AGENTS_BACKUP"
 git -C "$REPO_ROOT" status --short > "$STATUS_BEFORE"
@@ -287,6 +293,15 @@ expect_grep "projects.capability.sampleApi" "feature/sample-linked/build.gradle.
 expect_grep "SampleQueries" "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/SampleLinkedViewModel.kt"
 expect_grep "import dev.mayankmkh.basekmpproject.feature.samplelinked.api.sampleLinkedFeatureModule" "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
 expect_grep '^        sampleLinkedFeatureModule,$' "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+
+log "create cell sample-linked Summary --capability sample"
+"$CLI" create cell sample-linked Summary --capability sample
+expect_file "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/api/SummaryCell.kt"
+expect_cell_shape "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/api/SummaryCell.kt" id
+expect_grep "id: SampleId" "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/api/SummaryCell.kt"
+expect_grep "SampleQueries" "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/SummaryViewModel.kt"
+expect_grep "SummaryViewModel" "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/api/sampleLinkedFeatureModule.kt"
+expect_grep 'feature.samplelinked.SummaryViewModel' "app/shared/src/jvmTest/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinGraphTest.kt"
 
 log "settings.gradle.kts"
 expect_grep '":capability:sample-api",' "settings.gradle.kts"

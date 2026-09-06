@@ -25,10 +25,10 @@ import dev.mayankmkh.basekmpproject.feature.todos.TodoDetailViewModel
 import dev.mayankmkh.basekmpproject.feature.todos.TodosUiCommand
 import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
+import dev.mayankmkh.basekmpproject.foundation.presentation.featureViewModel
 import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,10 +40,7 @@ public fun TodoDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val viewModel: TodoDetailViewModel =
-        koinViewModel(
-            key = instanceKey.value,
-            parameters = { parametersOf(todoId, instanceKey) },
-        )
+        featureViewModel(instanceKey, parameters = { parametersOf(todoId) })
     check(viewModel.todoId == todoId) {
         "FeatureInstanceKey '${instanceKey.value}' is already bound to todo " +
             "${viewModel.todoId.value}; fold the todo id into the instance key"

@@ -44,7 +44,6 @@ kotlin {
                 implementation(projects.foundation.presentation)
                 implementation(projects.ui.designSystem)
 
-                implementation(projects.capability.identityApi)
                 implementation(projects.capability.identityImpl)
                 implementation(projects.capability.postsApi)
                 implementation(projects.capability.postsImpl)
@@ -79,6 +78,7 @@ kotlin {
                 // JVM-only: Koin's graph verification reflects over constructors, so there is no
                 // `commonTest` home for it even though the artifact is multiplatform.
                 implementation(libs.koin.test)
+                implementation(projects.capability.identityApi)
 
                 // Lets the navigation test drive the real object graph without a network: the
                 // `HttpClient` binding is overridden with one on a `MockEngine`.

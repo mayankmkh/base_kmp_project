@@ -1,6 +1,6 @@
 package dev.mayankmkh.basekmpproject.foundation.network
 
-import io.ktor.client.engine.HttpClientEngineFactory
+import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.js.Js
 
-internal actual val platformEngineFactory: HttpClientEngineFactory<*> = Js
+public actual fun createPlatformHttpClientEngine(): HttpClientEngine = Js.create()

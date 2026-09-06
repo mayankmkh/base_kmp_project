@@ -18,7 +18,6 @@ import dev.mayankmkh.basekmpproject.feature.todos.api.TodoDetailOutput
 import dev.mayankmkh.basekmpproject.feature.todos.api.TodoEditorOutput
 import dev.mayankmkh.basekmpproject.feature.todos.api.TodoListOutput
 import dev.mayankmkh.basekmpproject.feature.todos.api.TodoSummaryOutput
-import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
@@ -82,7 +81,6 @@ internal sealed interface TodosUiCommand {
 }
 
 internal class TodoListViewModel(
-    instanceKey: FeatureInstanceKey,
     queries: TodosQueries,
     private val commands: TodosCommands,
 ) : ViewModel() {
@@ -102,10 +100,6 @@ internal class TodoListViewModel(
                 observation.toListState(settings, deleting, mutating)
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodoListState())
-
-    init {
-        require(instanceKey.value.isNotBlank())
-    }
 
     fun onAction(action: TodoListAction) {
         when (action) {
@@ -214,7 +208,6 @@ internal sealed interface TodoDetailAction {
 
 internal class TodoDetailViewModel(
     val todoId: TodoId,
-    instanceKey: FeatureInstanceKey,
     queries: TodosQueries,
     private val commands: TodosCommands,
 ) : ViewModel() {
@@ -245,10 +238,6 @@ internal class TodoDetailViewModel(
                 current.toDetailState(draftTitle, isSubmitting, currentViolations, deleting)
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodoDetailState())
-
-    init {
-        require(instanceKey.value.isNotBlank())
-    }
 
     fun onAction(action: TodoDetailAction) {
         when (action) {
@@ -351,10 +340,7 @@ internal sealed interface TodoEditorAction {
     data object Submit : TodoEditorAction
 }
 
-internal class TodoEditorViewModel(
-    instanceKey: FeatureInstanceKey,
-    private val commands: TodosCommands,
-) : ViewModel() {
+internal class TodoEditorViewModel(private val commands: TodosCommands) : ViewModel() {
     private val mutableState = MutableStateFlow(TodoEditorState())
     private val uiCommandChannel = Channel<TodosUiCommand>(Channel.BUFFERED)
     private val outputChannel = Channel<TodoEditorOutput>(Channel.BUFFERED)
@@ -362,10 +348,6 @@ internal class TodoEditorViewModel(
     val state: StateFlow<TodoEditorState> = mutableState
     val uiCommands: Flow<TodosUiCommand> = uiCommandChannel.receiveAsFlow()
     val outputs: Flow<TodoEditorOutput> = outputChannel.receiveAsFlow()
-
-    init {
-        require(instanceKey.value.isNotBlank())
-    }
 
     fun onAction(action: TodoEditorAction) {
         when (action) {
@@ -417,10 +399,7 @@ internal sealed interface TodoSummaryAction {
     data object OpenTodos : TodoSummaryAction
 }
 
-internal class TodoSummaryViewModel(
-    instanceKey: FeatureInstanceKey,
-    queries: TodosQueries,
-) : ViewModel() {
+internal class TodoSummaryViewModel(queries: TodosQueries) : ViewModel() {
     private val outputChannel = Channel<TodoSummaryOutput>(Channel.BUFFERED)
     val outputs: Flow<TodoSummaryOutput> = outputChannel.receiveAsFlow()
     val state: StateFlow<TodoSummaryState> =
@@ -434,10 +413,6 @@ internal class TodoSummaryViewModel(
                 )
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodoSummaryState())
-
-    init {
-        require(instanceKey.value.isNotBlank())
-    }
 
     fun onAction(action: TodoSummaryAction) {
         when (action) {

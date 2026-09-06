@@ -3,7 +3,6 @@ package __PACKAGE__
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import __PACKAGE__.api.__NAME__Output
-import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,10 +35,7 @@ internal sealed interface __NAME__UiCommand {
 // and map `ResourceObservation` into the State -- `:feature:posts` (`PostDetailViewModel`) is the
 // reference. A Feature depends on `:capability:*-api` only, never on an `-impl` module.
 /** Owns this Cell instance's state for as long as the instance lives. */
-internal class __NAME__ViewModel(
-    val id: String,
-    instanceKey: FeatureInstanceKey,
-) : ViewModel() {
+internal class __NAME__ViewModel(val id: String) : ViewModel() {
     private val mutableState = MutableStateFlow(__NAME__State(id = id))
     private val uiCommandChannel = Channel<__NAME__UiCommand>(Channel.BUFFERED)
     private val outputChannel = Channel<__NAME__Output>(Channel.BUFFERED)
@@ -47,10 +43,6 @@ internal class __NAME__ViewModel(
     val state: StateFlow<__NAME__State> = mutableState.asStateFlow()
     val uiCommands: Flow<__NAME__UiCommand> = uiCommandChannel.receiveAsFlow()
     val outputs: Flow<__NAME__Output> = outputChannel.receiveAsFlow()
-
-    init {
-        require(instanceKey.value.isNotBlank())
-    }
 
     // Each branch delegates to a short private function so that the formatting of this file does
     // not depend on how long the Feature's name happens to be.

@@ -8,11 +8,12 @@ import dev.mayankmkh.basekmpproject.app.shared.di.initKoin
 import dev.mayankmkh.basekmpproject.app.shared.nav.restoreAppRoute
 import dev.mayankmkh.basekmpproject.app.shared.nav.saveAppRoute
 import dev.mayankmkh.basekmpproject.app.shared.rememberAppBackStack
+import kotlinx.browser.window
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
-    // The console belongs to the host page and the Network tab is the request log.
-    initKoin(isDebug = false)
+    // Development webpack serves localhost; deployed production bundles use their real host.
+    initKoin(isDebug = window.location.hostname == "localhost")
     ComposeViewport {
         val backStack = rememberAppBackStack()
         ChronologicalBrowserNavigation(

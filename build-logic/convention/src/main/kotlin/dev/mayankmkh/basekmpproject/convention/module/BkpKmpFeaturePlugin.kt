@@ -11,6 +11,7 @@ class BkpKmpFeaturePlugin : Plugin<Project> {
             applyRoleBase(HelixRole.FEATURE)
             applyCompose()
             addFeatureRoleDependencies()
+            enableExplicitApi()
         }
     }
 }

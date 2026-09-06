@@ -423,7 +423,7 @@ class ClientTest {
             createHttpClient(engine, config).get("thing")
 
             assertNull(engine.requestHistory.single().headers[HttpHeaders.Authorization])
-            createHttpClient(config).close()
+            createPlatformHttpClientEngine().close()
         }
 
     private fun client(

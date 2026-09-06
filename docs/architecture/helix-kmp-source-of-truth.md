@@ -3944,11 +3944,22 @@ Historical qualification:
 
 Current public compiler-plugin releases have improved Kotlin 2.4.x support, but the project should not upgrade merely from public claims: rerun the internal KMP graph/build qualification suite on the exact version combination.
 
-### Why not Metro / kotlin-inject / Dagger+Anvil now
+The planned compile-time step is Koin's `io.insert-koin.compiler.plugin` 1.1.0. It validates the
+plain Koin DSL without KSP or annotations and supports Kotlin 2.3.20 through 2.4.x. Adopt it in a
+separate change after requalifying the pinned toolchain and all required targets.
+
+### Why not Metro / Dagger+Anvil now
 
 Compile-time DI has attractive local diagnostics. The current Koin baseline is already integrated/qualified enough that switching would trade working familiarity for new tooling without deleting enough required architecture.
 
-Revisit if Koin graph/compiler validation becomes unreliable or another KMP DI option materially reduces owned complexity.
+`kotlin-inject-anvil` is not a live contingency because upstream declares maintenance mode. The
+written contingency is Metro 1.4.2, published to Maven Central on 2026-08-14. It is a compiler
+plugin with no KSP step, provides wasmJs and iOS runtimes, and offers
+`metrox-viewmodel-compose` for Compose Multiplatform, including wasmJs.
+
+Revisit Metro if the Koin compiler plugin cannot be qualified on the pinned Kotlin version or
+blocks a Kotlin upgrade for more than one minor release. Revisit the DI choice more broadly if
+another KMP option materially reduces owned construction and verification complexity.
 
 ## 18.8 Kermit and OpenTelemetry
 
@@ -5604,11 +5615,11 @@ problem in project code; see ADR-43.
 
 **Decision:** keep Koin as the DI mechanism while qualified; composition belongs at App/implementation roots and business/data code avoids service-locator access.
 
-**Why:** it is already integrated/familiar and current compiler/graph validation provides useful safety without requiring a DI migration solely for ideology.
+**Why:** it is already integrated/familiar, and the current JVM runtime graph verification plus a root-resolution test provide useful safety without requiring a DI migration solely for ideology. Compile-time validation is the next step described in §18.7.
 
-**Alternatives explored:** Metro, kotlin-inject, Dagger/Anvil-style compile-time DI.
+**Alternatives explored:** Metro, kotlin-inject, Dagger/Anvil-style compile-time DI. `kotlin-inject-anvil` is now in maintenance mode and is not a live contingency.
 
-**Revisit when:** exact-version graph/compiler validation is unreliable, upgrade friction becomes chronic, or an alternative materially removes construction/verification complexity across required KMP targets.
+**Revisit when:** Koin's compiler plugin cannot be qualified on the pinned Kotlin version, blocks a Kotlin upgrade for more than one minor release, or an alternative materially removes construction/verification complexity across required KMP targets. Metro 1.4.2 is the written contingency; adopting Koin's compiler plugin remains a separate requalification change.
 
 ## ADR-24 - Semantic observability seams, not vendor APIs
 

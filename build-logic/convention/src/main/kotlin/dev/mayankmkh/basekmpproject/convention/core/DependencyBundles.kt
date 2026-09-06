@@ -18,8 +18,8 @@ internal fun Project.addCapabilityImplRoleDependencies() {
 
 private fun Project.addKoinDependencies(includeComposeViewModel: Boolean) {
     dependencies {
-        "commonMainImplementation"(platform(libs.findLibrary("koin.bom").get()))
-        "commonMainImplementation"(libs.findLibrary("koin.core").get())
+        "commonMainApi"(platform(libs.findLibrary("koin.bom").get()))
+        "commonMainApi"(libs.findLibrary("koin.core").get())
         if (includeComposeViewModel) {
             "commonMainImplementation"(libs.findLibrary("koin.compose.viewmodel").get())
         }

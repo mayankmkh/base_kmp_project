@@ -72,16 +72,18 @@ public sealed interface CredentialRefreshResult {
 
 public object AnonymousCredentialProvider : CredentialProvider
 
+/** This target's production engine. App composition owns and closes it. */
+public expect fun createPlatformHttpClientEngine(): HttpClientEngine
+
+/** The client over an engine the caller names; tests pass `MockEngine`. */
 public fun createHttpClient(
+    engine: HttpClientEngine,
     config: NetworkConfig,
     credentialProvider: CredentialProvider = AnonymousCredentialProvider,
     headers: DynamicHeaders = DynamicHeaders.None,
     clientLogger: Logger = Logger.EMPTY,
     json: Json = createJson(),
 ): HttpClient
-
-/** Same client on an engine the caller names; tests pass `MockEngine`. */
-public fun createHttpClient(engine: HttpClientEngine, /* same parameters */): HttpClient
 
 /** Per-request opt-ins. Both default to off. */
 public fun HttpRequestBuilder.authenticated()

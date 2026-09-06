@@ -7,7 +7,6 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostDetailOutput
-import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ResourceObservation
@@ -41,7 +40,6 @@ internal sealed interface PostDetailAction {
 
 internal class PostDetailViewModel(
     val postId: PostId,
-    instanceKey: FeatureInstanceKey,
     queries: PostsQueries,
     private val commands: PostsCommands,
 ) : ViewModel() {
@@ -59,10 +57,6 @@ internal class PostDetailViewModel(
                 SharingStarted.WhileSubscribed(5_000),
                 PostDetailState(),
             )
-
-    init {
-        require(instanceKey.value.isNotBlank())
-    }
 
     fun onAction(action: PostDetailAction) {
         when (action) {

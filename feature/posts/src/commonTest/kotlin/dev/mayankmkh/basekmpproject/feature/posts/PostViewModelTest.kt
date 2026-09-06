@@ -4,7 +4,6 @@ import app.cash.turbine.test
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostDetailOutput
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostFeedOutput
-import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
@@ -21,7 +20,7 @@ class PostViewModelTest {
     @Test
     fun `feed observation becomes render state and open action emits output`() = runMainTest {
         val queries = FakePostsQueries()
-        val viewModel = PostFeedViewModel(feedKey(), queries, FakePostsCommands())
+        val viewModel = PostFeedViewModel(queries, FakePostsCommands())
 
         viewModel.state.test {
             assertEquals(PostFeedState(), awaitItem())
@@ -43,7 +42,7 @@ class PostViewModelTest {
                 FakePostsCommands().apply {
                     onRefreshFeed = { Outcome.Failed(problem) }
                 }
-            val viewModel = PostFeedViewModel(feedKey(), queries, commands)
+            val viewModel = PostFeedViewModel(queries, commands)
 
             viewModel.state.test state@{
                 awaitItem()
@@ -80,7 +79,7 @@ class PostViewModelTest {
                 }
             }
         val post = PostsFixtures.post(2)
-        val viewModel = PostDetailViewModel(post.id, detailKey(), queries, commands)
+        val viewModel = PostDetailViewModel(post.id, queries, commands)
 
         viewModel.state.test {
             assertEquals(PostDetailState(), awaitItem())
@@ -104,7 +103,7 @@ class PostViewModelTest {
         runMainTest {
             val queries = FakePostsQueries()
             val post = PostsFixtures.post(2)
-            val viewModel = PostDetailViewModel(post.id, detailKey(), queries, FakePostsCommands())
+            val viewModel = PostDetailViewModel(post.id, queries, FakePostsCommands())
 
             viewModel.state.test {
                 awaitItem()
@@ -123,7 +122,7 @@ class PostViewModelTest {
     fun `detail maps confirmed absence without treating it as a failure`() = runMainTest {
         val queries = FakePostsQueries()
         val post = PostsFixtures.post(2)
-        val viewModel = PostDetailViewModel(post.id, detailKey(), queries, FakePostsCommands())
+        val viewModel = PostDetailViewModel(post.id, queries, FakePostsCommands())
 
         viewModel.state.test {
             awaitItem()
@@ -136,8 +135,4 @@ class PostViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
-
-    private fun feedKey() = FeatureInstanceKey.forScreen("posts/feed", "post-feed")
-
-    private fun detailKey() = FeatureInstanceKey.forScreen("posts/detail/2", "post-detail")
 }

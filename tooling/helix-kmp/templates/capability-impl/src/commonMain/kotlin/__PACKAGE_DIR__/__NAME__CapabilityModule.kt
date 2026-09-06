@@ -22,7 +22,8 @@ public val __name__CapabilityModule: Module = module {
         }
     }
     singleOf(::__NAME__LocalSource)
-    single { __NAME__CapabilityImpl(get(), get(), get(), get(), get()) } onClose { it?.close() }
+    singleOf(::__NAME__CapabilityImpl) onClose { it?.close() }
+    // Aliases expose contracts only; onClose belongs to the implementation definition above.
     single<__NAME__Queries> { get<__NAME__CapabilityImpl>() }
     single<__NAME__Commands> { get<__NAME__CapabilityImpl>() }
 }

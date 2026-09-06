@@ -11,7 +11,6 @@ import org.koin.dsl.module
 public val todosFeatureModule: Module = module {
     viewModel { parameters ->
         TodoListViewModel(
-            instanceKey = parameters.get(),
             queries = get(),
             commands = get(),
         )
@@ -19,21 +18,14 @@ public val todosFeatureModule: Module = module {
     viewModel { parameters ->
         TodoDetailViewModel(
             todoId = parameters.get(),
-            instanceKey = parameters.get(),
             queries = get(),
             commands = get(),
         )
     }
-    viewModel { parameters ->
-        TodoEditorViewModel(
-            instanceKey = parameters.get(),
-            commands = get(),
-        )
+    viewModel {
+        TodoEditorViewModel(commands = get())
     }
-    viewModel { parameters ->
-        TodoSummaryViewModel(
-            instanceKey = parameters.get(),
-            queries = get(),
-        )
+    viewModel {
+        TodoSummaryViewModel(queries = get())
     }
 }

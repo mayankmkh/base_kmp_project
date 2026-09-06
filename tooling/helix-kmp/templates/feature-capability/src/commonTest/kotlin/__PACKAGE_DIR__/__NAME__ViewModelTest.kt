@@ -7,7 +7,6 @@ import __CAP_PACKAGE__.__CAP_NAME__Id
 import __CAP_PACKAGE__.__CAP_NAME__Queries
 import __CAP_PACKAGE__.__CAP_NAME__Record
 import __PACKAGE__.api.__NAME__Output
-import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.Problem
 import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind.OFFLINE
@@ -108,7 +107,6 @@ class __NAME__ViewModelTest {
     private fun viewModel(capability: Fake__CAP_NAME__) =
         __NAME__ViewModel(
             id = "__name__-1",
-            instanceKey = FeatureInstanceKey.forScreen("__name__/1", "__name__"),
             queries = capability,
             commands = capability,
         )

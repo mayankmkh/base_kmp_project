@@ -19,6 +19,9 @@ import dev.mayankmkh.basekmpproject.foundation.presentation.featureViewModel
 import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
 
+/** Cell type of [TodoListScreen]. */
+public const val TodoListCellType: String = "todo-list"
+
 @Composable
 public fun TodoListScreen(
     instanceKey: FeatureInstanceKey,
@@ -32,7 +35,7 @@ public fun TodoListScreen(
         remember(instanceKey) {
             FeatureInstanceKey.forPlacement(
                 surface = instanceKey.value,
-                cellType = "todo-summary",
+                cellType = TodoSummaryCellType,
                 placement = CellPlacementId.fromHostStableId("header"),
             )
         }

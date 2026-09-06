@@ -5,19 +5,25 @@ package dev.mayankmkh.basekmpproject.app.shared.ui
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import dev.mayankmkh.basekmpproject.app.shared.nav.AppNavigationState
 import dev.mayankmkh.basekmpproject.app.shared.nav.PostDetailRoute
 import dev.mayankmkh.basekmpproject.app.shared.nav.PostFeedRoute
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostId
+import dev.mayankmkh.basekmpproject.feature.posts.api.PostDetailCellType
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostDetailOutput
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostDetailScreen
+import dev.mayankmkh.basekmpproject.feature.posts.api.PostFeedCellType
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostFeedOutput
 import dev.mayankmkh.basekmpproject.feature.posts.api.PostFeedScreen
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 
 private const val PostsSceneKey = "posts-list-detail"
+
+private val PostFeedInstanceKey =
+    FeatureInstanceKey.forScreen(PostFeedRoute.instanceSurface, PostFeedCellType)
 
 internal fun EntryProviderScope<NavKey>.postsEntries(navigationState: AppNavigationState) {
     entry<PostFeedRoute>(metadata = ListDetailSceneStrategy.listPane(sceneKey = PostsSceneKey)) {
@@ -33,7 +39,7 @@ internal fun EntryProviderScope<NavKey>.postsEntries(navigationState: AppNavigat
 @Composable
 private fun PostFeedEntry(navigationState: AppNavigationState) {
     PostFeedScreen(
-        instanceKey = FeatureInstanceKey.forScreen("posts/feed", "post-feed"),
+        instanceKey = PostFeedInstanceKey,
         onOutput = { output ->
             when (output) {
                 is PostFeedOutput.OpenPost ->
@@ -47,7 +53,10 @@ private fun PostFeedEntry(navigationState: AppNavigationState) {
 private fun PostDetailEntry(route: PostDetailRoute, navigationState: AppNavigationState) {
     PostDetailScreen(
         postId = PostId(route.id),
-        instanceKey = FeatureInstanceKey.forScreen("posts/detail/${route.id}", "post-detail"),
+        instanceKey =
+            remember(route) {
+                FeatureInstanceKey.forScreen(route.instanceSurface, PostDetailCellType)
+            },
         onOutput = { output ->
             when (output) {
                 PostDetailOutput.Back -> navigationState.goBack()

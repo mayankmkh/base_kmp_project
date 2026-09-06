@@ -59,6 +59,11 @@ to_package_segment() {
     echo "$1" | tr -d '-'
 }
 
+# `SampleThing` -> `sample-thing` (the Cell type string a generated Cell declares)
+to_kebab() {
+    echo "$1" | sed -e 's|\([a-z0-9]\)\([A-Z]\)|\1-\2|g' | tr '[:upper:]' '[:lower:]'
+}
+
 package_dir() {
     echo "$1" | tr '.' '/'
 }
@@ -193,7 +198,8 @@ create_feature() {
 
     info "create feature :feature:$name"
     render_tree "$TEMPLATE_ROOT/feature" "$module_dir" \
-        "NAME=$pascal" "name=$camel" "PACKAGE=$package" "PACKAGE_DIR=$package_dir"
+        "NAME=$pascal" "name=$camel" "PACKAGE=$package" "PACKAGE_DIR=$package_dir" \
+        "CELL_TYPE=$(to_kebab "$pascal")"
 
     if [ -n "$capability" ]; then
         local cap_pascal cap_camel cap_segment cap_package cap_accessor
@@ -302,18 +308,20 @@ create_cell() {
     local module_dir="$REPO_ROOT/feature/$feature"
     [ -d "$module_dir" ] || die "feature/$feature does not exist -- create the feature first"
 
-    local segment package package_dir cell_camel
+    local segment package package_dir cell_camel cell_kebab
     segment="$(to_package_segment "$feature")"
     package="$PACKAGE_ROOT.feature.$segment"
     package_dir="$(package_dir "$package")"
     cell_camel="$(to_camel "$cell")"
+    cell_kebab="$(to_kebab "$cell")"
 
     local cell_file="$module_dir/src/commonMain/kotlin/$package_dir/api/${cell}Cell.kt"
     [ -e "$cell_file" ] && die "${cell}Cell already exists in feature/$feature"
 
     info "create cell $cell in :feature:$feature"
     render_tree "$TEMPLATE_ROOT/cell" "$module_dir" \
-        "CELL=$cell" "cell=$cell_camel" "PACKAGE=$package" "PACKAGE_DIR=$package_dir"
+        "CELL=$cell" "cell=$cell_camel" "PACKAGE=$package" "PACKAGE_DIR=$package_dir" \
+        "CELL_TYPE=$cell_kebab"
 
     local cap_pascal="" cap_parameter_type=""
     if [ -n "$capability" ]; then
@@ -330,6 +338,7 @@ create_cell() {
         info "  overlay: capability-backed Cell (:capability:$capability-api)"
         render_tree "$TEMPLATE_ROOT/cell-capability" "$module_dir" \
             "CELL=$cell" "cell=$cell_camel" "PACKAGE=$package" "PACKAGE_DIR=$package_dir" \
+            "CELL_TYPE=$cell_kebab" \
             "CAP_NAME=$cap_pascal" "cap_name=$cap_camel" "CAP_PACKAGE=$cap_package"
         add_feature_dependency "$module_dir" "projects.capability.$cap_accessor"
     fi

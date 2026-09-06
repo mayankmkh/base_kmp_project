@@ -29,6 +29,9 @@ import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
+/** Cell type of [TodoEditorScreen]. */
+public const val TodoEditorCellType: String = "todo-editor"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 public fun TodoEditorScreen(

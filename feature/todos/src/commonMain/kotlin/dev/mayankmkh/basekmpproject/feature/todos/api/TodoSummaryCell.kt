@@ -10,6 +10,9 @@ import dev.mayankmkh.basekmpproject.foundation.presentation.CollectWhileStarted
 import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.presentation.featureViewModel
 
+/** Cell type of [TodoSummaryCell]. */
+public const val TodoSummaryCellType: String = "todo-summary"
+
 /**
  * Independently hostable counts with presentation identity separate from Todo resource identity.
  */

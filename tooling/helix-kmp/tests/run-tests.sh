@@ -133,14 +133,16 @@ expect_module_registered() {
 }
 
 # The canonical Cell shape (source-of-truth §30.4): fills width, never owns its size or scrolling,
-# and fails fast when a host reuses a placement key for a different id. The templates are
-# hand-derived from `:feature:posts`, so both the reference and the generated Cells are checked.
+# fails fast when a host reuses a placement key for a different id, and declares its own Cell type
+# next to itself. The templates are hand-derived from `:feature:posts`, so both the reference and
+# the generated Cells are checked.
 expect_cell_shape() {
-    local file="$1" id="$2"
+    local file="$1" id="$2" cell_type="$3"
     expect_no_grep "fillMaxSize" "$file"
     expect_no_grep "verticalScroll" "$file"
     expect_grep "contentPadding: PaddingValues = PaddingValues()," "$file"
     expect_grep "check(viewModel.$id == $id)" "$file"
+    expect_grep "public const val .*CellType: String = \"$cell_type\"" "$file"
 }
 
 # --------------------------------------------------------------------------
@@ -291,7 +293,7 @@ expect_grep 'implementation(projects.capability.sampleImpl)' "app/shared/build.g
 log "create feature sample"
 "$CLI" create feature sample
 expect_file "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/SampleCell.kt"
-expect_cell_shape "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/SampleCell.kt" id
+expect_cell_shape "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/SampleCell.kt" id sample
 expect_file "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/SampleScreen.kt"
 expect_file "feature/sample/src/jvmTest/kotlin/dev/mayankmkh/basekmpproject/feature/sample/SampleContentTest.kt"
 expect_grep "import dev.mayankmkh.basekmpproject.feature.sample.api.sampleFeatureModule" "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
@@ -301,21 +303,22 @@ expect_grep 'implementation(projects.feature.sample)' "app/shared/build.gradle.k
 log "create cell sample Detail"
 "$CLI" create cell sample Detail
 expect_file "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/DetailCell.kt"
-expect_cell_shape "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/DetailCell.kt" id
-expect_cell_shape "feature/posts/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/posts/api/PostDetailCell.kt" postId
+expect_cell_shape "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/DetailCell.kt" id detail
+expect_cell_shape "feature/posts/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/posts/api/PostDetailCell.kt" postId post-detail
 expect_grep "DetailViewModel" "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/sampleFeatureModule.kt"
 
 log "create feature sample-linked --capability sample"
 "$CLI" create feature sample-linked --capability sample
 expect_grep "projects.capability.sampleApi" "feature/sample-linked/build.gradle.kts"
 expect_grep "SampleQueries" "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/SampleLinkedViewModel.kt"
+expect_cell_shape "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/api/SampleLinkedCell.kt" id sample-linked
 expect_grep "import dev.mayankmkh.basekmpproject.feature.samplelinked.api.sampleLinkedFeatureModule" "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
 expect_module_registered sampleLinkedFeatureModule
 
 log "create cell sample-linked Summary --capability sample"
 "$CLI" create cell sample-linked Summary --capability sample
 expect_file "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/api/SummaryCell.kt"
-expect_cell_shape "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/api/SummaryCell.kt" id
+expect_cell_shape "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/api/SummaryCell.kt" id summary
 expect_grep "id: SampleId" "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/api/SummaryCell.kt"
 expect_grep "SampleQueries" "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/SummaryViewModel.kt"
 expect_grep "SummaryViewModel" "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/api/sampleLinkedFeatureModule.kt"

@@ -14,6 +14,9 @@ import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.presentation.featureViewModel
 import org.koin.core.parameter.parametersOf
 
+/** Cell type of [__CELL__Cell]. */
+public const val __CELL__CellType: String = "__CELL_TYPE__"
+
 /** Independently hostable stateful presentation unit backed by the __CAP_NAME__ Capability. */
 @Composable
 public fun __CELL__Cell(

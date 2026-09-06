@@ -13,6 +13,9 @@ import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.presentation.featureViewModel
 import org.koin.core.parameter.parametersOf
 
+/** Cell type of [__CELL__Cell]. */
+public const val __CELL__CellType: String = "__CELL_TYPE__"
+
 // The Helix Cell signature is `(id, instanceKey, onOutput)`: `id` says *what* is shown,
 // `instanceKey` says *which instance* owns the state, and `onOutput` is the only way out of the
 // Feature. Two hosts may show this Cell at once as long as they pass different instance keys.

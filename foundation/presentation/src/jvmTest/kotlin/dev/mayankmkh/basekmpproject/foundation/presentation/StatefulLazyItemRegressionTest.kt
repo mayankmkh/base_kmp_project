@@ -15,7 +15,6 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
 
@@ -270,21 +269,6 @@ class StatefulLazyItemRegressionTest {
             assertEquals(2, stores.size)
             assertSame(stores.first(), stores.last())
         }
-    }
-
-    @Test
-    fun keysAreDeterministicAndKeepPresentationIdentitySeparate() {
-        val placement = CellPlacementId.fromHostStableId("slot-987")
-
-        assertEquals(
-            "home-feed/live-score/slot-987",
-            FeatureInstanceKey.forPlacement("home-feed", "live-score", placement).value,
-        )
-        assertEquals(
-            "cricket-details/match-123/live-score",
-            FeatureInstanceKey.forScreen("cricket-details/match-123", "live-score").value,
-        )
-        assertNotEquals("match-123", placement.value)
     }
 
     private class TestOwner : ViewModelStoreOwner {

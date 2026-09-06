@@ -19,6 +19,9 @@ import dev.mayankmkh.basekmpproject.foundation.presentation.FeatureInstanceKey
 import dev.mayankmkh.basekmpproject.foundation.presentation.featureViewModel
 import org.koin.core.parameter.parametersOf
 
+/** Cell type of [__NAME__Cell]. */
+public const val __NAME__CellType: String = "__CELL_TYPE__"
+
 // The Helix Cell signature is `(id, instanceKey, onOutput)`: `id` says *what* is shown,
 // `instanceKey` says *which instance* owns the state, and `onOutput` is the only way out of the
 // Feature. A Cell fills the available width, sizes its height to its content, and never scrolls

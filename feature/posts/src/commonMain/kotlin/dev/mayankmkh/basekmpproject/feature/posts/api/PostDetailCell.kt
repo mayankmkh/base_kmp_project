@@ -22,6 +22,9 @@ import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
 import org.koin.core.parameter.parametersOf
 
+/** Cell type of [PostDetailCell]. */
+public const val PostDetailCellType: String = "post-detail"
+
 /**
  * Independently hostable post detail presentation.
  *

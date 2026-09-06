@@ -1377,7 +1377,11 @@ data class LiveScoreCellSpec(
 ) : CellSpec
 ```
 
-`CellSpec` is deliberately **not sealed**: Kotlin sealed direct subtypes must live in the same module/package, which would prevent independently compiled Feature modules from implementing a shared registry contract.
+A registry resolves the renderer by the spec's concrete class, so there is exactly one spec class per Cell type.
+Specs should be data classes so a host can diff successive lists.
+`instanceKey` must be built with `FeatureInstanceKey.forPlacement` and never `forScreen`, because a registry surface is a host with placements.
+
+`CellSpec` is deliberately **not sealed** (ADR-40): Kotlin sealed direct subtypes must live in the same module/package, which would prevent independently compiled Feature modules from implementing a shared registry contract.
 
 `CellSpec` does not turn Cell into a base-class architecture.
 
@@ -2857,6 +2861,15 @@ Result:
 
 `FeatureInstanceKey` is not an arbitrary string convention.
 
+Every segment after the leading surface/route is validated by one helper:
+
+```kotlin
+private fun requireSegment(label: String, value: String) {
+    require(value.isNotBlank()) { "$label cannot be blank" }
+    require('/' !in value) { "$label cannot contain '/'" }
+}
+```
+
 The host owns a distinct placement identifier:
 
 ```kotlin
@@ -2866,7 +2879,7 @@ value class CellPlacementId private constructor(
 ) {
     companion object {
         fun fromHostStableId(value: String): CellPlacementId {
-            require(value.isNotBlank())
+            requireSegment("A Cell placement ID", value)
             return CellPlacementId(value)
         }
     }
@@ -2892,8 +2905,11 @@ value class FeatureInstanceKey private constructor(val value: String) {
             surface: String,
             cellType: String,
             placement: CellPlacementId,
-        ): FeatureInstanceKey =
-            FeatureInstanceKey("$surface/$cellType/${placement.value}")
+        ): FeatureInstanceKey {
+            require(surface.isNotBlank())
+            requireSegment("A Cell type", cellType)
+            return FeatureInstanceKey("$surface/$cellType/${placement.value}")
+        }
     }
 }
 ```
@@ -2904,10 +2920,11 @@ Rules:
 - two instances of the same Cell type on one surface require different `CellPlacementId`s;
 - a `MatchId`, `ArticleId`, `ResourceKey`, list index, or other domain/resource identifier cannot be passed directly because the factory requires `CellPlacementId`;
 - hosts derive `CellPlacementId` from their own stable placement/slot identity, not from the ResourceKey;
+- the Cell type and the placement must not contain `/`; the leading surface or route is the prefix and may. Both factories enforce it, and `CellPlacementId` enforces it for placements;
 - construct the `FeatureInstanceKey` once in the host and pass/reuse that exact value;
 - debug registry/lazy hosts **must detect duplicate active `FeatureInstanceKey`s** within one owner/surface and fail loudly in development/test builds.
 
-The string delimiter remains an implementation detail; the typed placement semantics are normative.
+The `/` delimiter is fixed and segments may not contain it; the typed placement semantics are normative.
 
 ## 12.9 State survival ladder
 

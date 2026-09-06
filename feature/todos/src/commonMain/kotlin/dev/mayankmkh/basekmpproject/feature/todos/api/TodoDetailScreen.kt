@@ -31,6 +31,9 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
 
+/** Cell type of [TodoDetailScreen]. */
+public const val TodoDetailCellType: String = "todo-detail"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 public fun TodoDetailScreen(

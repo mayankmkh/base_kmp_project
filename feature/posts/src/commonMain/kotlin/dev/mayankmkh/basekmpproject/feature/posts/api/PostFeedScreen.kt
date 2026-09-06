@@ -15,6 +15,9 @@ import dev.mayankmkh.basekmpproject.foundation.presentation.featureViewModel
 import dev.mayankmkh.basekmpproject.ui.designsystem.messageResource
 import org.jetbrains.compose.resources.getString
 
+/** Cell type of [PostFeedScreen]. */
+public const val PostFeedCellType: String = "post-feed"
+
 @Composable
 public fun PostFeedScreen(
     instanceKey: FeatureInstanceKey,

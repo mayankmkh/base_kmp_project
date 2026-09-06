@@ -27,10 +27,15 @@ internal fun Project.enableExplicitApi() {
     extensions.getByType<KotlinMultiplatformExtension>().explicitApi()
 }
 
+internal fun Project.applyKoinCompiler() {
+    apply(plugin = "io.insert-koin.compiler.plugin")
+}
+
 class BkpKmpAppPlugin : Plugin<Project> {
     override fun apply(target: Project) =
         with(target) {
             applyRoleBase(HelixRole.APP)
+            applyKoinCompiler()
             applyCompose()
             addFeatureRoleDependencies()
         }
@@ -57,6 +62,7 @@ class BkpKmpCapabilityImplPlugin : Plugin<Project> {
     override fun apply(target: Project) =
         with(target) {
             applyRoleBase(HelixRole.CAPABILITY_IMPL)
+            applyKoinCompiler()
             addCapabilityImplRoleDependencies()
             enableExplicitApi()
             pluginManager.withPlugin("app.cash.sqldelight") {

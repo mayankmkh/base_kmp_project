@@ -9,6 +9,7 @@ class BkpKmpFeaturePlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
             applyRoleBase(HelixRole.FEATURE)
+            applyKoinCompiler()
             applyCompose()
             addFeatureRoleDependencies()
             enableExplicitApi()

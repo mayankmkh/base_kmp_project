@@ -11,6 +11,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.kotlin.powerAssert) apply false
+    alias(libs.plugins.koin.compiler) apply false
     alias(libs.plugins.spotless) apply false
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.gms) apply false

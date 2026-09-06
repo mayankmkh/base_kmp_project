@@ -54,6 +54,8 @@ class KoinGraphTest {
     @OptIn(KoinExperimentalAPI::class)
     @Test
     fun `every declared dependency resolves`() {
+        // Compile-time validation checks typed wiring, while verify() keeps runtime graph coverage
+        // and the root-resolution test runs definition bodies.
         // One including module rather than `List<Module>.verifyAll`, which verifies each module on
         // its own: capability and feature modules depend on bindings the app modules declare, so
         // isolated verification would report holes the running app does not have.

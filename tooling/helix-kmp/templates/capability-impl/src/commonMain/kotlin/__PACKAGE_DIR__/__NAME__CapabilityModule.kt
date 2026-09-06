@@ -6,9 +6,9 @@ import __API_PACKAGE__.__NAME__Id
 import __API_PACKAGE__.__NAME__Queries
 import __API_PACKAGE__.__NAME__Record
 import org.koin.core.module.Module
-import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import org.koin.dsl.onClose
+import org.koin.plugin.module.dsl.single
 
 /** The only public declaration in this module. Load it from the app's composition root. */
 public val __name__CapabilityModule: Module = module {
@@ -21,8 +21,8 @@ public val __name__CapabilityModule: Module = module {
                 Ok(Create__NAME__RemoteAnswer.Created(__NAME__Record(__NAME__Id("created"), label)))
         }
     }
-    singleOf(::__NAME__LocalSource)
-    singleOf(::__NAME__CapabilityImpl) onClose { it?.close() }
+    single<__NAME__LocalSource>()
+    single<__NAME__CapabilityImpl>() onClose { it?.close() }
     // Aliases expose contracts only; onClose belongs to the implementation definition above.
     single<__NAME__Queries> { get<__NAME__CapabilityImpl>() }
     single<__NAME__Commands> { get<__NAME__CapabilityImpl>() }

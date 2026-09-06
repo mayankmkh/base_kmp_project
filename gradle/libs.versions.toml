@@ -34,6 +34,7 @@ firebaseCrashlyticsPlugin = "3.0.7"
 firebasePerfPlugin = "2.0.2"
 gmsPlugin = "4.5.0"
 koinBom = "4.2.2"
+koinCompiler = "1.1.0"
 kotlin = "2.4.10"
 kotlinResult = "2.3.1"
 kotlinx-coroutines = "1.11.0"
@@ -173,6 +174,7 @@ firebase-crashlytics-gradlePlugin = { group = "com.google.firebase", name = "fir
 firebase-performance-gradlePlugin = { group = "com.google.firebase", name = "perf-plugin", version.ref = "firebasePerfPlugin" }
 gms-gradlePlugin = { group = "com.google.gms", name = "google-services", version.ref = "gmsPlugin" }
 jetbrains-compose-gradlePlugin = { group = "org.jetbrains.compose", name = "compose-gradle-plugin", version.ref = "composeMultiplatform" }
+koin-compiler-gradlePlugin = { group = "io.insert-koin", name = "koin-compiler-gradle-plugin", version.ref = "koinCompiler" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlin-powerAssert-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-power-assert", version.ref = "kotlin" }
 spotless-gradlePlugin = { group = "com.diffplug.spotless", name = "spotless-plugin-gradle", version.ref = "spotless" }
@@ -210,6 +212,7 @@ kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref =
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kotlin-powerAssert = { id = "org.jetbrains.kotlin.plugin.power-assert", version.ref = "kotlin" }
+koin-compiler = { id = "io.insert-koin.compiler.plugin", version.ref = "koinCompiler" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
 

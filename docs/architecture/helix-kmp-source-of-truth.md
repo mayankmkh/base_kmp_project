@@ -3927,7 +3927,8 @@ This is a recommended anti-drift mechanism, not a universal Helix law.
 
 ## 18.7 Koin and Koin compiler/graph validation
 
-**Choice:** Koin for DI, with constructor injection and full-graph verification/compiler validation where qualified.
+**Choice:** Koin for DI, with constructor injection, compiler validation for typed definitions, and
+runtime verification of the assembled graph.
 
 Rules:
 
@@ -3936,17 +3937,39 @@ Rules:
 - avoid `KoinComponent`/global `get()` in business/data classes;
 - Features depend on interfaces/product types, not implementation selection.
 
-Historical qualification:
+Qualification on 2026-09-06:
 
-- application graph verification passed;
-- the exact earlier Kotlin 2.4.10/tooling combination emitted an "unverified Kotlin version" warning because the tested adapter level lagged;
-- this was classified as dependency/toolchain risk, not an architecture failure.
+- `io.insert-koin.compiler.plugin` 1.1.0 compiles on Kotlin 2.4.10 for the JVM, Android, wasmJs,
+  and iOS simulator targets. Every compilation it touches emits one version warning, verbatim:
 
-Current public compiler-plugin releases have improved Kotlin 2.4.x support, but the project should not upgrade merely from public claims: rerun the internal KMP graph/build qualification suite on the exact version combination.
+  ```text
+  w: Koin compiler plugin: Kotlin 2.4.10 is newer than the newest tested version (2.4.0) — proceeding with the 2.4.0 adapter. If compilation fails, check for a koin-compiler-plugin update. Supported versions: 2.3.20, 2.4.0.
+  ```
 
-The planned compile-time step is Koin's `io.insert-koin.compiler.plugin` 1.1.0. It validates the
-plain Koin DSL without KSP or annotations and supports Kotlin 2.3.20 through 2.4.x. Adopt it in a
-separate change after requalifying the pinned toolchain and all required targets.
+  Under `-PwarningsAsErrors=true` that warning is reported as `e:` and fails every module the plugin
+  is applied to. The property is not usable on this repository anyway: `:foundation:resource` already
+  fails it on an unrelated unresolved opt-in marker, so the default builds are the qualified ones.
+- The convention plugins apply it only to `bkp.kmp.app`, `bkp.kmp.feature`, and
+  `bkp.kmp.capability.impl`, the roles that own Koin definitions or the application entry point.
+  Desktop and web app launchers call `initKoin` but declare no Koin DSL, so their roles do not apply
+  it.
+- Koin 1.1.0 does not validate leaf compilations independently. Feature and Capability Impl typed
+  definitions publish hints and are validated only when the `:app:shared` compilation reaches its
+  `startKoin { }` entry point.
+- The entry point passes `appModules(environment)` as a runtime-computed module list. The plugin
+  therefore reports `KOIN-W003` and cannot prove exact module reachability. Its fail-open DSL pass
+  still validates typed constructor definitions from the discovered graph. Removing
+  `single<TodosSettingsSource>()` fails the `:app:shared` compilation with `KOIN-D001`, naming the
+  missing type, `TodosCapabilityImpl`'s `settingsSource` parameter, and `todosCapabilityModule`.
+- A classic definition lambda remains opaque. Removing the `HttpClientEngine` definition does not
+  diagnose the inferred `engine = get()` inside the `HttpClient` factory. Koin's runtime `verify()`
+  test and root-resolution test therefore remain required; the latter also runs definition bodies,
+  which the compiler never does.
+
+No KSP or `koin-annotations` dependency is used. Typed definitions import the compiler DSL from
+`org.koin.plugin.module.dsl` under its own name: `single<T>()` takes no lambda, so it never competes
+with `Module.single { }` and needs no import alias. Aliases, runtime parameters, environment-based
+definitions, custom factories, and lifecycle hooks that do work stay in the classic lambda DSL.
 
 ### Why not Metro / Dagger+Anvil now
 
@@ -5613,13 +5636,21 @@ problem in project code; see ADR-43.
 
 ## ADR-23 - Koin with constructor injection and graph/compiler validation
 
-**Decision:** keep Koin as the DI mechanism while qualified; composition belongs at App/implementation roots and business/data code avoids service-locator access.
+**Decision:** keep Koin as the DI mechanism while qualified; apply Koin compiler plugin 1.1.0 to
+App, Feature, and Capability Impl roles; use its typed DSL for pure constructor definitions; keep
+composition at App/implementation roots and service-locator access out of business/data code.
 
-**Why:** it is already integrated/familiar, and the current JVM runtime graph verification plus a root-resolution test provide useful safety without requiring a DI migration solely for ideology. Compile-time validation is the next step described in §18.7.
+**Why:** compile-time constructor-graph validation is now in place for typed definitions on Kotlin
+2.4.10 and all required KMP targets. The dynamic App module list and classic custom-body lambdas are
+not fully knowable to the plugin, so JVM runtime graph verification and root resolution remain as
+complementary safety rather than migration leftovers. See §18.7 for the qualification evidence.
 
 **Alternatives explored:** Metro, kotlin-inject, Dagger/Anvil-style compile-time DI. `kotlin-inject-anvil` is now in maintenance mode and is not a live contingency.
 
-**Revisit when:** Koin's compiler plugin cannot be qualified on the pinned Kotlin version, blocks a Kotlin upgrade for more than one minor release, or an alternative materially removes construction/verification complexity across required KMP targets. Metro 1.4.2 is the written contingency; adopting Koin's compiler plugin remains a separate requalification change.
+**Revisit when:** Koin's compiler plugin stops compiling on the pinned Kotlin version, blocks a
+Kotlin upgrade for more than one minor release, or an alternative materially removes the remaining
+runtime-only construction and verification complexity across required KMP targets. Metro 1.4.2 is
+the written contingency.
 
 ## ADR-24 - Semantic observability seams, not vendor APIs
 

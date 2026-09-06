@@ -4,8 +4,8 @@ import dev.mayankmkh.basekmpproject.capability.identity.api.IdentityCommands
 import dev.mayankmkh.basekmpproject.capability.identity.api.IdentityQueries
 import dev.mayankmkh.basekmpproject.foundation.network.CredentialProvider
 import org.koin.core.module.Module
-import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
+import org.koin.plugin.module.dsl.single
 
 /**
  * Loads the Identity Capability. Its [CredentialProvider] binding supplies the neutral network
@@ -14,8 +14,8 @@ import org.koin.dsl.module
  * Feature.
  */
 public val identityCapabilityModule: Module = module {
-    singleOf(::CredentialStore)
-    singleOf(::IdentityCapabilityImpl)
+    single<CredentialStore>()
+    single<IdentityCapabilityImpl>()
     // Aliases expose contracts only; lifecycle hooks belong to implementation definitions.
     single<IdentityQueries> { get<IdentityCapabilityImpl>() }
     single<IdentityCommands> { get<IdentityCapabilityImpl>() }

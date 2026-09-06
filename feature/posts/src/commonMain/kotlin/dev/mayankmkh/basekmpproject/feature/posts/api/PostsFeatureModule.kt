@@ -5,14 +5,10 @@ import dev.mayankmkh.basekmpproject.feature.posts.PostFeedViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
+import org.koin.plugin.module.dsl.viewModel
 
 public val postsFeatureModule: Module = module {
-    viewModel {
-        PostFeedViewModel(
-            queries = get(),
-            commands = get(),
-        )
-    }
+    viewModel<PostFeedViewModel>()
     viewModel { parameters ->
         PostDetailViewModel(
             postId = parameters.get(),

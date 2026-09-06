@@ -7,14 +7,10 @@ import dev.mayankmkh.basekmpproject.feature.todos.TodoSummaryViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
+import org.koin.plugin.module.dsl.viewModel
 
 public val todosFeatureModule: Module = module {
-    viewModel { parameters ->
-        TodoListViewModel(
-            queries = get(),
-            commands = get(),
-        )
-    }
+    viewModel<TodoListViewModel>()
     viewModel { parameters ->
         TodoDetailViewModel(
             todoId = parameters.get(),
@@ -22,10 +18,6 @@ public val todosFeatureModule: Module = module {
             commands = get(),
         )
     }
-    viewModel {
-        TodoEditorViewModel(commands = get())
-    }
-    viewModel {
-        TodoSummaryViewModel(queries = get())
-    }
+    viewModel<TodoEditorViewModel>()
+    viewModel<TodoSummaryViewModel>()
 }

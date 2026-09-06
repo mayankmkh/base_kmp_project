@@ -66,10 +66,10 @@ parents without build scripts.
 | Android library (non-KMP) | `bkp.android.lib` | no consumers today |
 | Android test module | `bkp.android.test` | |
 | Base KMP library | `bkp.kmp.lib` | Internal base only; a module that applies it alone has no role |
-| Helix KMP app root | `bkp.kmp.app` | Compose, lifecycle ViewModel, and Koin |
-| Helix Feature | `bkp.kmp.feature` | Compose, lifecycle ViewModel, and Koin; no project dependencies |
+| Helix KMP app root | `bkp.kmp.app` | Compose, lifecycle ViewModel, Koin, and the Koin compiler plugin |
+| Helix Feature | `bkp.kmp.feature` | Compose, lifecycle ViewModel, Koin, and the Koin compiler plugin; no project dependencies |
 | Helix UI | `bkp.kmp.ui` | Compose and strict explicit API |
-| Capability API / Impl | `bkp.kmp.capability.api` / `.impl` | API is explicit; Impl receives Koin core |
+| Capability API / Impl | `bkp.kmp.capability.api` / `.impl` | API is explicit; Impl receives Koin core and its compiler plugin |
 | Foundation API / Runtime | `bkp.kmp.foundation.api` / `.runtime` | API is explicit and Compose is opt-in |
 | Platform cohesive / API / Impl | `bkp.kmp.platform` / `.api` / `.impl` | API uses strict explicit API |
 | Storage | `bkp.kmp.storage` | Assembles capability-owned schemas and owns physical database lifecycles |
@@ -353,6 +353,7 @@ The convention core owns reusable bundles in
 
 `bkp.kmp.feature` and `bkp.kmp.app` add lifecycle ViewModel/ViewModel Compose plus the Koin BOM,
 core, and Compose ViewModel integration. `bkp.kmp.capability.impl` adds only the Koin BOM and core.
+Those three roles also apply the Koin compiler plugin; roles without Koin definitions do not.
 No role plugin adds project-to-project dependencies: since phase 3 every module names its own
 project dependencies, and the old `FeatureBundle` is gone along with `bkp.kmp.lib.compose` and
 `bkp.kmp.feature.compose`.

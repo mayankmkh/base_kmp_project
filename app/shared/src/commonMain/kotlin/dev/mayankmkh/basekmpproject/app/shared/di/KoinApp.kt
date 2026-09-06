@@ -45,6 +45,7 @@ import org.koin.dsl.includes
 import org.koin.dsl.module
 import org.koin.dsl.onClose
 import org.koin.mp.KoinPlatform
+import org.koin.plugin.module.dsl.single
 
 /**
  * Starts the application graph. [isDebug] is the entry point's own build signal; Koin's logger must
@@ -172,7 +173,7 @@ private val connectivityModule = module {
  */
 private val databaseModule = module {
     // onClose before bind: after bind the definition is typed by the contract, which has no close.
-    single { AppDatabaseDriverProvider(get()) } onClose
+    single<AppDatabaseDriverProvider>() onClose
         {
             it?.close()
         } bind

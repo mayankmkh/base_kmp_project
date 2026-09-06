@@ -176,6 +176,19 @@ class TodosCapabilityImplTest {
         assertEquals(expected, source.observe().first())
     }
 
+    @Test
+    fun `updating one setting keeps the rest of the stored document`() = runTest {
+        val source = TodosSettingsSource(inMemoryPreferenceStores())
+        source.update(TodoSettings(hideCompleted = true, sort = TodoSort.TITLE))
+
+        source.update(source.observe().first().copy(hideCompleted = false))
+
+        assertEquals(
+            TodoSettings(hideCompleted = false, sort = TodoSort.TITLE),
+            source.observe().first(),
+        )
+    }
+
     private fun capability(
         engine: MockEngine,
         local: TodosLocalSource = createInMemoryTodosLocalSource(),

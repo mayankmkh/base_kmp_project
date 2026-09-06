@@ -207,6 +207,21 @@ that the other's writes never reach, so `observe` on one would miss `set` on the
 
 ## 7. Documents and serialisation
 
+**Value or flags.** A Capability whose stored state is one value with a fixed set of fields opens a
+document; independent flags with independent lifetimes stay preferences. Todos settings are the
+value case: `hideCompleted` and `sort` are read together, written together and mean nothing apart,
+so `TodosSettingsSource` opens `PrefFile("todos.settings")` as a document and one `update` replaces
+the whole value. Flags such as "the user dismissed the tip" and "the last sync failed" are the other
+case: different code paths write them at different times, and a shared document would make every
+writer rewrite state it does not own.
+
+The document type is a `@Serializable` DTO internal to the Capability implementation, with a default
+on every field so a file written by a build that knew fewer fields still decodes. It is not the
+Capability's API model: a `capability_api` module carries no serialisation dependency, so the
+implementation maps between the two. An API enum still needs no annotation there, because the
+serialisation plugin generates the enum's serializer where the DTO references it, and
+`coerceInputValues` turns a constant the running build does not know into the field's default.
+
 `DocumentStore<T>` is a typed DataStore over an `OkioSerializer<T>` that encodes with
 kotlinx.serialization JSON. The `Json` instance is the module's own and is not configurable:
 

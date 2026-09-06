@@ -4104,9 +4104,11 @@ Koin diagnostics   the same logger, on every target
 Features           do not log at all
 ```
 
-`initKoin` requires the entry point's own debug signal; Koin's logger must exist before the first
-module loads, so the app's `Logger` is built one step earlier and every verbosity gate (Kermit,
-Koin, Ktor) derives from that one decision.
+`initKoin` requires the entry point's own debug signal. It enters the graph as a Koin property, the
+graph builds the one `AppEnvironment` from it, and Koin's own logger is installed from that
+environment after the modules load, so every verbosity gate (Kermit, Koin, Ktor) derives from one
+decision and one instance. Koin's own "loaded N definitions" line is emitted before that logger
+exists; see §18.7.
 
 Tags: a module that owns a logging seam tags the logger in its own entry point (`CommandBridge`,
 `preferenceStores`, `secretStores`); the app tags the loggers it hands to third-party adapters

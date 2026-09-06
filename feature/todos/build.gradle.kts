@@ -22,10 +22,5 @@ kotlin {
                 implementation(projects.testkit.common)
             }
         }
-        jvmTest {
-            dependencies {
-                implementation(libs.koin.test)
-            }
-        }
     }
 }

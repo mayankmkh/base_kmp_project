@@ -77,7 +77,6 @@ public class CommandBridge(logger: Logger, private val tag: String) {
         problem: Problem,
         failure: NetworkFailure,
     ) {
-        // Built inside the lambda so a filtered severity costs nothing.
         val message = {
             logEvent(
                 "network_failure",

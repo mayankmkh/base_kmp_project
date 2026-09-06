@@ -13,7 +13,7 @@ paraphrase it from memory.
 | Instance identity and who owns state for how long | 12. Runtime ownership and identity |
 | Designing grouped Queries and intent Commands | 13. Capability API and business model |
 | Fixtures, owner-seam tests, what to test where | 20. Testing and quality architecture |
-| A complete worked slice | 30. Canonical Cricket reference slice |
+| A complete worked slice | `docs/architecture/reference-slice.md` (moved out of Section 30; 30.4 stays in the master) |
 
 In this repository: `:feature:posts` plus `:capability:posts-api` / `:capability:posts-impl` are
 the reference slice, and `config/helix/dependency-policy.json` is the enforced form of Section 9.

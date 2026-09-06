@@ -13,7 +13,6 @@ import kotlinx.coroutines.sync.withLock
  * `:storage:database`.
  */
 public fun interface SqlDriverProvider {
-    /** Returns the application's shared SQL driver. */
     public suspend fun driver(): SqlDriver
 }
 

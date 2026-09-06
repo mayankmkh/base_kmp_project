@@ -1,9 +1,13 @@
 # Helix adoption evidence report
 
-Evidence contract: master source §22.13. Completion checklist: §29.7. Plan and per-phase
+> **Status: frozen.** This is the evidence record for the Helix adoption of 2026-09-02, with
+> follow-up command results appended through 2026-09-06. No new evidence is added to it; an open
+> item that is later closed is marked resolved in place. Work after that date records its evidence
+> in a dated file under [`docs/history/`](../history/), one file per piece of work.
+
+Evidence contract: master source §22.13. Completion checklist: [§29.7 in
+`../history/helix-adoption-model.md`](../history/helix-adoption-model.md#297-adoption-completion). Plan and per-phase
 decisions: [helix-adoption-plan.md](helix-adoption-plan.md) §5–§6. Date: 2026-09-02.
-The adoption was committed on 2026-09-02 as seven commits on `main`; those commits remain
-unpushed. This report now also records the subsequent P1 control-plane working-tree change.
 
 ## Command results (2026-09-06)
 
@@ -194,7 +198,8 @@ Owner of every module is the repository (single-owner template); no CODEOWNERS c
 
 ## Architecture classification used
 
-Helix KMP Baseline v1 / Master 1.3 one-time adoption (§29). Roles applied per module via
+Helix KMP Baseline v1 / Master 1.3 one-time adoption
+([§29, now `../history/helix-adoption-model.md`](../history/helix-adoption-model.md)). Roles applied per module via
 `bkp.kmp.<role>` convention plugins; dependency policy is the verbatim §9.0 JSON in
 `config/helix/dependency-policy.json` (schema 2) with an empty `config/helix/exceptions.json`.
 The `:feature:posts` slice is classified as a Snapshot Resource Feature over a grouped
@@ -284,8 +289,9 @@ reset is what keeps `WhileSubscribed` teardown off an absent JVM `Main` dispatch
 
 Everything downstream of `:shared:*` was affected: all four app shells, the iOS Xcode build
 phase, the Koin composition root (`app/shared/.../di/KoinApp.kt`), the Nav3 route set. No
-external consumer exists. The `MIGRATION_REPORT.md` from 2026-08-14 is kept as history with
-a header stating its paths are stale. The P1 `helix-kmp impact` command now automates the
+external consumer exists. The CocoaPods migration report from 2026-08-14 is kept as history at
+[`docs/history/2026-08-14-cocoapods-to-embed-and-sign.md`](../history/2026-08-14-cocoapods-to-embed-and-sign.md),
+with a header stating its paths are stale. The P1 `helix-kmp impact` command now automates the
 module/file/type reverse-dependency slice; this narrative remains the adoption-time impact record.
 
 ## Public API/ABI changes
@@ -322,7 +328,7 @@ iOS simulator framework link.
 - `config/helix/exceptions.json` is empty. The single policy deviation lives in code, not in
   an exception: the validator allows `app → app` edges so the target shells can depend on
   `:app:shared` (plan §6 phase 4 and ADR 0001 explain why).
-- **§29.7 P1 control-plane gate is met**: thin `graph`, `impact`, `doctor`, `context`, and
+- **[§29.7](../history/helix-adoption-model.md#297-adoption-completion) P1 control-plane gate is met**: thin `graph`, `impact`, `doctor`, `context`, and
   gallery-index commands are implemented, and `verify --agents` regenerates/checks marked
   `AGENTS.md` sections plus Skill command availability. Resource Inspector hooks remain unmet.
 - No Live Resource exists in the slice, so "one Live Resource shares correctly" is satisfied
@@ -330,8 +336,6 @@ iOS simulator framework link.
   live stream.
 - `RefreshQos` is recorded at the command boundary but every priority executes immediately;
   there is no refresh scheduler.
-- The seven adoption commits are local to `main` and remain unpushed; this P1 work is intentionally
-  left as working-tree changes for review.
 - The iOS link against the static `SharedApp` framework had been broken since the SQLDelight
   native driver landed on 2026-09-01 (undefined `sqlite3_*` symbols); the Xcode project was last
   touched on 2026-08-15 and never gained `-lsqlite3`. Found while verifying the `app/ios/` move
@@ -432,14 +436,14 @@ Recorded, not fixed (follow-ups, none blocks Feature development):
   days.
 - `KeyedOwnerHost` reconciles a set diff against remembered known keys in `SideEffect`; lifecycle's
   provider defers a requested clear while an item remains composed and completes it on disposal.
-- `StoreResource` serialises overlapping refreshes behind a mutex rather than sharing the
-  in-flight fetch.
 - `PUBLIC_TOP_LEVEL` matching in the graph task is line-based; a one-line
   `@Composable public fun` would not be detected (ktfmt keeps annotations on their own line).
 - `helix-kmp` iterates changed files with unquoted word splitting (paths with spaces).
 - Role→path, rule-ID and verify-tier tables are repeated across `AGENTS.md`, `README.md`,
   `build-logic/README.md` and the adoption plan; `build-logic/README.md` also describes the
   root-task walk inaccurately. "One source per fact" is not yet met for these tables.
+  **Resolved 2026-09-06:** the tables were consolidated into `build-logic/README.md` and the
+  adoption plan now points there.
 - Unused version-catalog aliases (`koin-compose`, `kotlinx-coroutines-android`, `truth`,
   `androidx-lifecycle-runtimeTesting`, possibly the `compose-*` entries).
 

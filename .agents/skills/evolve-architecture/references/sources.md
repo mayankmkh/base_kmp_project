@@ -8,7 +8,7 @@ Master source: `docs/architecture/helix-kmp-source-of-truth.md`.
 | What the control plane is meant to become | 22. The Helix KMP control plane (22.1.1 is the P0/P1/P2 staging) |
 | Evidence that a boundary is wrong, and the `doctor` model | 23. Architecture evolution and `doctor` |
 | How an architecture decision is recorded and revisited | 24. ADR and qualification governance |
-| Decisions already taken | 25. Current ADR catalog |
+| Decisions already taken | `docs/architecture/decisions.md` (the ADR catalog, moved out of Section 25) |
 | What Helix deliberately does not try to be | 36. Non-goals |
 | Symptoms that should trigger this workflow | 35. Architecture red flags |
 

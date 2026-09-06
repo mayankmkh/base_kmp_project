@@ -27,6 +27,33 @@ internal `bkp.kmp.lib` base, which owns targets, Kotlin configuration, power-ass
 baseline, quality/lint, and local DSL validation. `bkp.kmp.lib` records no role of its own, so a
 module that stops at the base — rather than applying a role plugin on top — fails `MOD-ROLE-MISSING`.
 
+### Role, plugin and path
+
+Every runtime role, the plugin that declares it, and the path a module holding that role must live
+at. `MOD-PATH-ROLE-MISMATCH` fails a module whose role plugin does not match its path.
+
+| Role | Plugin id | Path |
+|---|---|---|
+| `app` | `bkp.kmp.app` (shared KMP root), `bkp.android.app[.compose]`, `bkp.desktop.app`, `bkp.web.app` (shells) | `:app:*` |
+| `feature` | `bkp.kmp.feature` | `:feature:*` |
+| `ui` | `bkp.kmp.ui` | `:ui:*` |
+| `capability_api` | `bkp.kmp.capability.api` | `:capability:*-api` |
+| `capability_impl` | `bkp.kmp.capability.impl` | `:capability:*-impl` |
+| `foundation_api` | `bkp.kmp.foundation.api` | `:foundation:*` |
+| `foundation_runtime` | `bkp.kmp.foundation.runtime` | `:foundation:*` |
+| `platform` | `bkp.kmp.platform` | `:platform:*` (no `-api`/`-impl` suffix) |
+| `platform_api` | `bkp.kmp.platform.api` | `:platform:*-api` |
+| `platform_impl` | `bkp.kmp.platform.impl` | `:platform:*-impl` |
+| `storage` | `bkp.kmp.storage` | `:storage:*` |
+| `testkit` | `bkp.kmp.testkit` | `:testkit:*` |
+| not a runtime role | none | `:tooling:*`, `build-logic` |
+
+Every role except `testkit` is a key in the role matrix in
+[`config/helix/dependency-policy.json`](../config/helix/dependency-policy.json); `testkit` is a
+carve-out consumable from any role. Explicit API mode (master source §21.5) is on for
+`bkp.kmp.feature`, `bkp.kmp.ui`, `bkp.kmp.capability.api`, `bkp.kmp.capability.impl`,
+`bkp.kmp.foundation.api` and `bkp.kmp.platform.api`.
+
 ### Current module map
 
 | Module | Role plugin | Purpose |
@@ -46,16 +73,18 @@ module that stops at the base — rather than applying a role plugin on top — 
 | `:capability:identity-impl` | `bkp.kmp.capability.impl` | credential persistence and the `CredentialProvider` binding |
 | `:capability:posts-api` | `bkp.kmp.capability.api` | grouped `PostsQueries` / intent `PostsCommands` and their models |
 | `:capability:posts-impl` | `bkp.kmp.capability.impl` | Snapshot-backed posts resources; only `postsCapabilityModule` is public |
+| `:capability:todos-api` | `bkp.kmp.capability.api` | grouped `TodosQueries` / intent `TodosCommands`, their models and settings |
+| `:capability:todos-impl` | `bkp.kmp.capability.impl` | Snapshot-backed todos resources and the typed settings document; only `todosCapabilityModule` is public |
 | `:feature:posts` | `bkp.kmp.feature` | feed/detail Screens and the reference Cell, public only under `…feature.posts.api` |
+| `:feature:todos` | `bkp.kmp.feature` | list/detail/editor Screens and the summary Cell, public only under `…feature.todos.api` |
 | `:testkit:common` | `bkp.kmp.testkit` | dispatcher helpers, posts fakes, and resource-observation fixtures |
 | `:app:shared` | `bkp.kmp.app` | the composition root: Koin startup, Nav3 routes, `RootContent`, and the `SharedApp` Apple framework |
 | `:app:android` | `bkp.android.app.compose` | Android shell and flavors; role `app` |
 | `:app:desktop` | `bkp.desktop.app` | Compose Desktop shell; role `app` |
 | `:app:web` | `bkp.web.app` | `wasmJs` browser shell, embeddable in a host page; role `app` |
 
-Every module in the map carries a Helix role and is validated on its path. Nothing is grandfathered:
-the adoption-era `:shared:*` tree is gone, and `:app` and `:capability` exist only as structural
-parents without build scripts.
+Every module in the map carries a Helix role and is validated on its path. `:app` and
+`:capability` exist only as structural parents without build scripts, so they carry no role.
 
 ### Plugin selection guide
 
@@ -258,7 +287,7 @@ The root graph tasks enforce these stable rules:
 | Rule | Enforcement |
 |---|---|
 | `MOD-ROLE-MISSING`, `MOD-ROLE-MULTIPLE` | Exactly one recorded Helix role |
-| `MOD-PATH-ROLE-MISMATCH` | Role-to-path table from the adoption plan |
+| `MOD-PATH-ROLE-MISMATCH` | [Role-to-path table](#role-plugin-and-path) above |
 | `DEP-ROLE-DENIED` | Default-deny matrix in `config/helix/dependency-policy.json` |
 | `DEP-FEATURE-FEATURE-PUBLIC-PRESENTATION-ONLY` | Feature imports from a peer stay below `.api` |
 | `FEATURE-PUBLIC-SURFACE-OUTSIDE-API` | Feature top-level public declarations live in `api/` |
@@ -272,13 +301,12 @@ Findings use `[RULE-ID] subject -- problem. Fix: remedy` and the graph task alwa
 schema-2 `build/reports/helix/module-graph.json`. Nodes contain `path`, `role`, `roles`,
 repo-relative `projectDir`, declared `targets`, and repo-relative `publicApiDirs`; edges contain
 `from`, `to`, and normalized `configuration` (`api`, `implementation`, or `other`); findings keep
-their stable rule fields. Every module with a build script is role-validated —
-grandfathering was removed in phase 4. Two carve-outs remain, both inside the role matrix rather than
-around it: `:testkit:*` may be consumed from any role, and an `app` → `app` edge is allowed because
-`:app:shared` and the target shells are one composition root spread across four modules
-(master source §8.2); `GRAPH-CYCLE-PHYSICAL` still holds those shells to a DAG. `:tooling:*` sits
-outside the runtime graph, and structural parents such as `:app` carry no build script, so neither
-reaches the role rules.
+their stable rule fields. Every module with a build script is role-validated. Two carve-outs
+remain, both inside the role matrix rather than around it: `:testkit:*` may be consumed from any
+role, and an `app` → `app` edge is allowed because `:app:shared` and the target shells are one
+composition root spread across four modules (master source §8.2); `GRAPH-CYCLE-PHYSICAL` still
+holds those shells to a DAG. `:tooling:*` sits outside the runtime graph, and structural parents
+such as `:app` carry no build script, so neither reaches the role rules.
 
 ## Control-plane stage P1
 
@@ -312,6 +340,8 @@ entry always fails with `EXC-EXPIRED`; blanket suppression is intentionally unav
 
 - `./gradlew verifyFast` runs JVM/common compile and tests, `detektAll`, `spotlessCheck`,
   `checkModuleGraph`, and `checkHelixPolicySync`. Included-build convention tests are excluded.
+  `helix-kmp verify --fast --affected` runs the same tier narrowed to the modules changed against
+  the merge base plus their dependents.
 - `./gradlew verifyFull` adds Android `assembleDebug`, both web development/production executable
   distributions, and the shared app's debug iOS-simulator framework link. The web convention orders
   every production `wasmJs*` task after the development ones, because both variants sync into one
@@ -354,9 +384,7 @@ The convention core owns reusable bundles in
 `bkp.kmp.feature` and `bkp.kmp.app` add lifecycle ViewModel/ViewModel Compose plus the Koin BOM,
 core, and Compose ViewModel integration. `bkp.kmp.capability.impl` adds only the Koin BOM and core.
 Those three roles also apply the Koin compiler plugin; roles without Koin definitions do not.
-No role plugin adds project-to-project dependencies: since phase 3 every module names its own
-project dependencies, and the old `FeatureBundle` is gone along with `bkp.kmp.lib.compose` and
-`bkp.kmp.feature.compose`.
+No role plugin adds project-to-project dependencies; every module names its own.
 
 ### Compose bundle
 

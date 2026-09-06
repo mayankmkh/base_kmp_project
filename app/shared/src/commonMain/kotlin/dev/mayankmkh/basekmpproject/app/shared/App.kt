@@ -67,11 +67,3 @@ internal val navigationSavedStateConfiguration = SavedStateConfiguration {
         }
     }
 }
-
-/*
-@Preview
-@Composable
-fun AppAndroidPreview() {
-    App()
-}
-*/

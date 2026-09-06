@@ -37,9 +37,9 @@ Concretely:
 
 1. **Roles are physical.** Every Gradle module has exactly one role, declared by applying exactly
    one `bkp.kmp.*` convention plugin, and its path must agree with its role. The module map is in
-   [`../../README.md`](../../README.md); the role/plugin/path mapping is in
+   [`../../../README.md`](../../../README.md); the role/plugin/path mapping is in
    [`../helix-adoption-plan.md`](../helix-adoption-plan.md).
-2. **The dependency matrix is data, not prose.** [`config/helix/dependency-policy.json`](../../config/helix/dependency-policy.json)
+2. **The dependency matrix is data, not prose.** [`config/helix/dependency-policy.json`](../../../config/helix/dependency-policy.json)
    is the single source; `./gradlew checkModuleGraph` enforces it and `checkHelixPolicySync` keeps
    the plugin's own view of it honest. Findings are formatted `[RULE-ID] subject -- problem. Fix: remedy`.
 3. **Presentation is Cells, not screens.** A Cell is `(id, instanceKey: FeatureInstanceKey, onOutput)`.
@@ -101,7 +101,7 @@ and it makes blast radius global by construction (Section 5.11).
 
 **Costs, honestly**
 
-- More modules. Sixteen today for a starter, and Gradle configuration time grows with them.
+- More modules, and Gradle configuration time grows with them.
 - More ceremony for small work: a Cell needs a ViewModel, a Content, an Output and a Koin
   registration even when it shows one string.
 - The rules can be wrong. When they are, the answer is an ADR and a boundary change, which is

@@ -22,7 +22,7 @@ not obvious.
 
 2. **Load the target context and explain any rule finding.** Findings are formatted
    `[RULE-ID] subject -- problem. Fix: remedy`. The rule IDs and what each means are listed in
-   `docs/architecture/helix-adoption-plan.md`.
+   `build-logic/README.md`.
 
    ```bash
    tooling/helix-kmp/helix-kmp context <target>

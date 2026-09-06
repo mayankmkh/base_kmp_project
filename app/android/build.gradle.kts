@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.bkp.android.app.compose)
-    //    alias(libs.plugins.bkp.android.app.firebase)
     alias(libs.plugins.kotlin.serialization)
 }
 

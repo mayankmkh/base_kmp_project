@@ -56,9 +56,9 @@ and migration recipes are not built, so boundary edits remain manual and reviewe
    ```
 
 8. **Update the sources of truth that the change invalidates:** the dependency policy in
-   `config/helix/dependency-policy.json`, the role/path tables in
-   `docs/architecture/helix-adoption-plan.md`, `build-logic/README.md` if a convention plugin
-   changed, the module map in `README.md`, and the CLI templates in `tooling/helix-kmp/templates/`
+   `config/helix/dependency-policy.json`, the role/path and rule-ID tables plus the convention-plugin
+   behaviour in `build-logic/README.md`, the module map in `README.md`, and the CLI templates in
+   `tooling/helix-kmp/templates/`
    if the shape they scaffold is no longer the shape you want. After touching a template, run
    `tooling/helix-kmp/tests/run-tests.sh`.
 

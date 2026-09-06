@@ -325,7 +325,7 @@ None. No Kotlin source file referenced CocoaPods.
 
 ### Created
 
-- `MIGRATION_REPORT.md` — this file
+- `docs/history/2026-08-14-cocoapods-to-embed-and-sign.md` — this file (created at the repository root as `MIGRATION_REPORT.md`, moved here later)
 
 ### Deleted
 

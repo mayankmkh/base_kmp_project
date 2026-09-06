@@ -13,5 +13,5 @@ Master source: `docs/architecture/helix-kmp-source-of-truth.md`.
 | What the enforcement rules check and why | 21. Mechanical architecture enforcement |
 
 In this repository: rule IDs and their meaning are tabulated in
-`docs/architecture/helix-adoption-plan.md`, and `./gradlew checkModuleGraph` writes
+`build-logic/README.md`, and `./gradlew checkModuleGraph` writes
 `build/reports/helix/module-graph.json`.

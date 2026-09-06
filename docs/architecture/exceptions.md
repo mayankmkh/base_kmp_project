@@ -77,6 +77,6 @@ legitimate outcome: it turns an invisible deadline into a visible failure.
 
 ## Related
 
-- Rule IDs and what each one means: [`helix-adoption-plan.md`](helix-adoption-plan.md)
+- Rule IDs and what each one means: [`build-logic/README.md`](../../build-logic/README.md#validation-lifecycle)
 - The dependency matrix itself: [`config/helix/dependency-policy.json`](../../config/helix/dependency-policy.json)
 - Governance model in full: master source, Section 24

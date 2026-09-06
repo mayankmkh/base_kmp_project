@@ -21,7 +21,10 @@ The path and the role must agree; `./gradlew checkModuleGraph` enforces both.
 | `:capability:identity-impl` | capability_impl | Credential persistence and session ownership; supplies `CredentialProvider` |
 | `:capability:posts-api` | capability_api | `PostsQueries`, `PostsCommands`, and the `Post` / `PostFeed` product models |
 | `:capability:posts-impl` | capability_impl | Snapshot/network implementation and the posts-owned SQLDelight schema; `internal` but for its Koin module |
+| `:capability:todos-api` | capability_api | `TodosQueries`, `TodosCommands`, the `Todo` model and its settings |
+| `:capability:todos-impl` | capability_impl | Snapshot/network implementation, the todos-owned SQLDelight schema and the typed settings document |
 | `:feature:posts` | feature | The posts Screens, Cells, ViewModels and Outputs |
+| `:feature:todos` | feature | The todos list, detail and editor Screens, the summary Cell, ViewModels and Outputs |
 | `:foundation:network` | foundation_runtime | Ktor client setup, opt-in auth/retry, request IDs and `NetworkFailure` mapping |
 | `:foundation:preferences` | foundation_runtime | Typed preferences and JSON document stores over DataStore |
 | `:foundation:presentation` | foundation_api | `FeatureInstanceKey`, `CellPlacementId`, `CellSpec` |
@@ -118,6 +121,10 @@ The schema-2 report stores `nodes[{path,role,roles,projectDir,targets,publicApiD
 `edges[{from,to,configuration}]`, and `findings[]`. `graph --json` adds `reverseEdges` without
 changing the Gradle-owned report. Run `tooling/helix-kmp/helix-kmp help` for all flags.
 
+Only the evidence-earned P2 extraction and migration codemods remain unbuilt; Resource Inspector
+hooks and a Live Resource reference slice are also future work rather than part of this thin
+command layer.
+
 ## Running it
 
 ```bash
@@ -136,7 +143,16 @@ simulator framework.
 | Document | What it answers |
 | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | The working rules, in the form an agent needs them |
-| [`docs/architecture/helix-kmp-source-of-truth.md`](docs/architecture/helix-kmp-source-of-truth.md) | Helix KMP in full -- the master source |
+| [`docs/architecture/helix-kmp-source-of-truth.md`](docs/architecture/helix-kmp-source-of-truth.md) | Helix KMP in full -- the normative master source |
+| [`docs/architecture/decisions.md`](docs/architecture/decisions.md) | The ADR catalog -- every `ADR-NN` decision, why, and when to revisit it |
+| [`docs/architecture/reference-slice.md`](docs/architecture/reference-slice.md) | The canonical reference slice, end to end |
+| [`docs/architecture/background.md`](docs/architecture/background.md) | Outcome metrics, external influences and the reference URLs behind the choices |
+| [`docs/architecture/templates/agents-and-skills.md`](docs/architecture/templates/agents-and-skills.md) | Copyable root `AGENTS.md` and workflow Skill templates |
+| [`docs/guides/contributing-without-android-expertise.md`](docs/guides/contributing-without-android-expertise.md) | Changing product behaviour without owning the platform seams |
+| [`docs/guides/qa-operating-model.md`](docs/guides/qa-operating-model.md) | How QA reproduces, isolates and reports against Helix |
+| [`docs/guides/documentation-derivation.md`](docs/guides/documentation-derivation.md) | How audience documents are derived from the master source |
+| [`docs/history/helix-design-history.md`](docs/history/helix-design-history.md) | How the architecture was arrived at, and what was rejected on the way |
+| [`docs/history/helix-adoption-model.md`](docs/history/helix-adoption-model.md) | The retired one-time starter adoption model |
 | [`docs/architecture/helix-adoption-plan.md`](docs/architecture/helix-adoption-plan.md) | How this repository adopted it, phase by phase, with status |
 | [`docs/architecture/adr/0001-helix-adoption.md`](docs/architecture/adr/0001-helix-adoption.md) | Why Helix, what was rejected, and what it costs |
 | [`docs/architecture/exceptions.md`](docs/architecture/exceptions.md) | How to add, expire and remove a rule exception |
@@ -144,9 +160,3 @@ simulator framework.
 | [`docs/architecture/preferences.md`](docs/architecture/preferences.md) | How preferences, documents and secrets are stored on every target |
 | [`build-logic/README.md`](build-logic/README.md) | The convention plugins, the DSL and the enforcement tasks |
 | [`config/helix/dependency-policy.json`](config/helix/dependency-policy.json) | The dependency matrix itself -- the single source |
-
-## Status
-
-The control plane is at stage **P1**. Only the evidence-earned P2 extraction and migration
-codemods remain unbuilt; Resource Inspector hooks and a Live Resource reference slice are also
-future work rather than part of this thin command layer.

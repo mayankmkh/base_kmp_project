@@ -624,3 +624,6 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
+
+# Claude Code agent worktrees (local scratch checkouts)
+.claude/worktrees/

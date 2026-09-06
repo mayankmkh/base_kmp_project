@@ -29,6 +29,7 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import dev.mayankmkh.basekmpproject.app.shared.App
 import dev.mayankmkh.basekmpproject.app.shared.di.initKoin
+import dev.mayankmkh.basekmpproject.app.shared.di.processSurfaceOverrides
 import dev.mayankmkh.basekmpproject.app.shared.di.shutdownKoin
 import dev.mayankmkh.basekmpproject.app.shared.nav.AppNavigationState
 import dev.mayankmkh.basekmpproject.app.shared.nav.PostDetailRoute
@@ -36,12 +37,7 @@ import dev.mayankmkh.basekmpproject.app.shared.nav.PostFeedRoute
 import dev.mayankmkh.basekmpproject.app.shared.nav.TodoDetailRoute
 import dev.mayankmkh.basekmpproject.app.shared.nav.rememberAppNavigationState
 import dev.mayankmkh.basekmpproject.app.shared.navigationSavedStateConfiguration
-import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStores
-import dev.mayankmkh.basekmpproject.foundation.preferences.inMemoryPreferenceStores
-import dev.mayankmkh.basekmpproject.platform.securestorage.SecretStores
-import dev.mayankmkh.basekmpproject.platform.securestorage.inMemorySecretStores
 import dev.mayankmkh.basekmpproject.ui.designsystem.theme.BaseKmpProjectTheme
-import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -55,7 +51,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
-import org.koin.dsl.module
 
 /**
  * The whole app, over its real object graph.
@@ -78,13 +73,9 @@ class RootContentTest {
         System.setProperty("user.home", testUserHome.toString())
         initKoin(isDebug = true) {
             modules(
-                module {
-                    single<HttpClientEngine> {
-                        MockEngine { request -> respondApi(request.url.encodedPath) }
-                    }
-                    single<PreferenceStores> { inMemoryPreferenceStores() }
-                    single<SecretStores> { inMemorySecretStores() }
-                }
+                processSurfaceOverrides(
+                    MockEngine { request -> respondApi(request.url.encodedPath) }
+                )
             )
         }
     }

@@ -6,16 +6,13 @@ import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodosCommands
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodosQueries
-import dev.mayankmkh.basekmpproject.foundation.network.AnonymousCredentialProvider
 import dev.mayankmkh.basekmpproject.foundation.network.CredentialProvider
 import dev.mayankmkh.basekmpproject.foundation.preferences.PreferenceStores
-import dev.mayankmkh.basekmpproject.foundation.preferences.inMemoryPreferenceStores
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.SqlDriverProvider
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.securestorage.SecretStores
-import dev.mayankmkh.basekmpproject.platform.securestorage.inMemorySecretStores
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
@@ -39,82 +36,80 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.koin.core.Koin
 import org.koin.core.annotation.KoinExperimentalAPI
-import org.koin.dsl.koinApplication
+import org.koin.core.annotation.KoinInternalApi
+import org.koin.core.module.Module
 import org.koin.dsl.module
 import org.koin.test.verify.ParameterTypeInjection
 import org.koin.test.verify.injectedParameters
 import org.koin.test.verify.verify
 
+/**
+ * The graph `initKoin` starts, checked at runtime.
+ *
+ * Every test here starts the real entry point rather than assembling a module list of its own: the
+ * list is written out literally inside `initKoin` so the Koin compiler plugin can read it, and a
+ * second copy in test code would be the thing that drifts.
+ */
 class KoinGraphTest {
-    // The graph is the same either way; a debug environment keeps the logger's own configuration
-    // under test rather than a filtered one.
-    private val environment = AppEnvironment(isDebug = true)
-
     @OptIn(KoinExperimentalAPI::class)
     @Test
     fun `every declared dependency resolves`() {
-        // Compile-time validation checks typed wiring, while verify() keeps runtime graph coverage
-        // and the root-resolution test runs definition bodies.
-        // One including module rather than `List<Module>.verifyAll`, which verifies each module on
-        // its own: capability and feature modules depend on bindings the app modules declare, so
-        // isolated verification would report holes the running app does not have.
-        module { includes(appModules(environment)) }
-            .verify(extraTypes = LAMBDA_CONSTRUCTOR_ARGUMENTS, injections = VIEW_MODEL_PARAMETERS)
+        // Compile-time validation covers typed definitions graph-wide, and the root-resolution
+        // test below runs the classic definition bodies. Verification is what still reaches the
+        // constructors behind a lambda definition, ViewModels with runtime parameters included.
+        val application = initKoin(isDebug = true)
+        try {
+            loadedDefinitions(application.koin)
+                .verify(
+                    extraTypes = LAMBDA_CONSTRUCTOR_ARGUMENTS,
+                    injections = VIEW_MODEL_PARAMETERS,
+                )
+        } finally {
+            shutdownKoin()
+        }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `every application root resolves through definition bodies`() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
-        try {
-            val application = koinApplication {
-                modules(
-                    appModules(environment) +
-                        module {
-                            single<PreferenceStores> { inMemoryPreferenceStores() }
-                            single<SecretStores> { inMemorySecretStores() }
-                            single<HttpClientEngine> { MockEngine { respondOk() } }
-                        }
-                )
+        val application =
+            initKoin(isDebug = true) {
+                modules(processSurfaceOverrides(MockEngine { respondOk() }))
             }
-            try {
-                with(application.koin) {
-                    get<PostsQueries>()
-                    get<PostsCommands>()
-                    get<TodosQueries>()
-                    get<TodosCommands>()
-                    val identity = get<IdentityQueries>()
-                    assertSame<Any>(identity, get<CredentialProvider>())
-                    get<ConnectivityMonitor>()
-                    get<SqlDriverProvider>()
-                    get<PreferenceStores>()
-                    get<SecretStores>()
-                    get<HttpClient>()
-                    get<ApplicationRuntimeScope>()
-                    get<PlatformContext>()
-                }
-            } finally {
-                application.close()
+        try {
+            with(application.koin) {
+                get<PostsQueries>()
+                get<PostsCommands>()
+                get<TodosQueries>()
+                get<TodosCommands>()
+                val identity = get<IdentityQueries>()
+                assertSame<Any>(identity, get<CredentialProvider>())
+                get<ConnectivityMonitor>()
+                get<SqlDriverProvider>()
+                get<PreferenceStores>()
+                get<SecretStores>()
+                get<HttpClient>()
+                get<ApplicationRuntimeScope>()
+                get<PlatformContext>()
             }
         } finally {
+            shutdownKoin()
             Dispatchers.resetMain()
         }
     }
 
     @Test
     fun `closing koin closes the http client, its engine and the sql driver`() = runTest {
-        // The library modules alone, with an anonymous provider in place of the Identity module,
-        // so resolving the client opens no secure storage on the test machine.
+        // The real HTTP engine, so closing it is what the assertions watch; the stored-data
+        // factories stay in memory so resolving the client opens nothing on the test machine.
         val originalUserHome = System.getProperty("user.home")
         val testUserHome = Files.createTempDirectory("base-kmp-koin-close-test")
         System.setProperty("user.home", testUserHome.toString())
-        val application = koinApplication {
-            modules(
-                libModules(environment) +
-                    module { single<CredentialProvider> { AnonymousCredentialProvider } }
-            )
-        }
+        val application =
+            initKoin(isDebug = true) { modules(processSurfaceOverrides(engine = null)) }
         try {
             val client = application.koin.get<HttpClient>()
             val engine = application.koin.get<HttpClientEngine>()
@@ -123,17 +118,26 @@ class KoinGraphTest {
             driver.execute(null, "SELECT 1", 0).value
             assertTrue(client.isActive)
 
-            application.close()
+            shutdownKoin()
 
             assertFalse(client.isActive)
             assertFalse(engine.isActive)
             assertFails { driverProvider.driver() }
         } finally {
-            application.close()
+            shutdownKoin()
             System.setProperty("user.home", originalUserHome)
             testUserHome.toFile().deleteRecursively()
         }
     }
+
+    /**
+     * One module holding every factory the running instance loaded. Verification reads a module's
+     * mappings, and this is the only way to hand it the started graph without naming the modules a
+     * second time.
+     */
+    @OptIn(KoinInternalApi::class)
+    private fun loadedDefinitions(koin: Koin): Module =
+        module {}.apply { mappings.putAll(koin.instanceRegistry.instances) }
 
     private companion object {
         // Verification reflects over each bound type's constructor and never runs a definition
@@ -144,6 +148,8 @@ class KoinGraphTest {
                 CoroutineDispatcher::class,
                 CoroutineExceptionHandler::class,
                 LoggerConfig::class,
+                // The build signal reaches `AppEnvironment` as a Koin property, not a definition.
+                Boolean::class,
                 // `NetworkConfig` fields are filled from the app environment and defaults.
                 Url::class,
                 Duration::class,

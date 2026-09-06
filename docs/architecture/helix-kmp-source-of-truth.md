@@ -3937,43 +3937,87 @@ Rules:
 - avoid `KoinComponent`/global `get()` in business/data classes;
 - Features depend on interfaces/product types, not implementation selection.
 
-Qualification on 2026-09-06:
+Current state, qualified on 2026-09-06:
 
-- `io.insert-koin.compiler.plugin` 1.1.0 compiles on Kotlin 2.4.10 for the JVM, Android, wasmJs,
-  and iOS simulator targets. Every compilation it touches emits one version warning, verbatim:
+- The entry point's module list is literal. `startKoin` in `KoinApp.kt` names every module, one
+  bare identifier per line, and nothing else. That literal list is what the Koin compiler plugin
+  reads: with it, the plugin resolves the whole graph and validates **every typed definition in
+  every module reachable from the entry point**. Any function call, spread, variable, or inline
+  `module { }` in that argument list makes the list dynamic again; the plugin reports `KOIN-W003`
+  and silently falls back to a fail-open pass over whatever it happened to discover, while every
+  gate still passes. `KoinApplicationModulesRuleTest` (§21.4) holds the shape.
+- The one runtime value the graph cannot compute for itself, the build flag, enters as a Koin
+  property (`app.isDebug`) rather than as a definition written inside the entry point, which would
+  make the list dynamic. `environmentModule` builds the single `AppEnvironment` from that property.
+  Koin's own logger is the one consumer that exists before the graph does; it is installed one step
+  later, from the environment the graph built, so the process keeps one `AppEnvironment` and one
+  app `Logger`. The price is Koin's own "loaded N definitions" line, emitted while its logger is
+  still the empty default.
+- What the compiler validates: typed definitions, `single<T>()` and `viewModel<T>()`, across the
+  whole graph. Removing `single<TodosSettingsSource>()` from `todosCapabilityModule` fails
+  `:app:shared:compileKotlinJvm`, verbatim:
+
+  ```text
+  e: [Koin][KOIN-D001] Missing dependency: dev.mayankmkh.basekmpproject.capability.todos.impl.TodosSettingsSource
+    required by: dsl:dev.mayankmkh.basekmpproject.capability.todos.impl.TodosCapabilityImpl (parameter 'settingsSource')
+    in module: dev.mayankmkh.basekmpproject.capability.todos.impl.todosCapabilityModule
+  ```
+
+- What it does not validate: anything inside a definition lambda. Plugin 1.1.0 never looks into a
+  lambda body, `single { create(::fn) }` included, so rewriting a lambda in that shape buys
+  nothing. Removing the `HttpClientEngine` definition still compiles clean; `KoinGraphTest` is what
+  fails, verbatim:
+
+  ```text
+  org.koin.test.verify.MissingKoinDefinitionException: Missing definition for '[field:'engine' - type:'io.ktor.client.engine.HttpClientEngine']' in definition '[Singleton: 'io.ktor.client.HttpClient']'.
+  ```
+
+  Runtime parameters (`viewModel { parameters -> ... }`) are outside the compiler's reach for the
+  same reason.
+- The convention plugins apply the plugin only to `bkp.kmp.app`, `bkp.kmp.feature`, and
+  `bkp.kmp.capability.impl`, the roles that own Koin definitions or the application entry point.
+  Desktop and web app launchers call `initKoin` but declare no Koin DSL, so their roles do not apply
+  it.
+- Koin 1.1.0 does not validate leaf compilations independently: they print
+  `w: [Koin] compile-safety validation skipped -- no Koin entry point in this compilation.` Feature
+  and Capability Impl typed definitions publish hints and are checked only when the `:app:shared`
+  compilation reaches its `startKoin { }` entry point.
+- One warning remains, on every compilation the plugin touches, verbatim:
 
   ```text
   w: Koin compiler plugin: Kotlin 2.4.10 is newer than the newest tested version (2.4.0) — proceeding with the 2.4.0 adapter. If compilation fails, check for a koin-compiler-plugin update. Supported versions: 2.3.20, 2.4.0.
   ```
 
-  Under `-PwarningsAsErrors=true` that warning is reported as `e:` and fails every module the plugin
-  is applied to. The property is not usable on this repository anyway: `:foundation:resource` already
-  fails it on an unrelated unresolved opt-in marker, so the default builds are the qualified ones.
-- The convention plugins apply it only to `bkp.kmp.app`, `bkp.kmp.feature`, and
-  `bkp.kmp.capability.impl`, the roles that own Koin definitions or the application entry point.
-  Desktop and web app launchers call `initKoin` but declare no Koin DSL, so their roles do not apply
-  it.
-- Koin 1.1.0 does not validate leaf compilations independently. Feature and Capability Impl typed
-  definitions publish hints and are validated only when the `:app:shared` compilation reaches its
-  `startKoin { }` entry point.
-- The entry point passes `appModules(environment)` as a runtime-computed module list. The plugin
-  therefore reports `KOIN-W003` and cannot prove exact module reachability. Its fail-open DSL pass
-  still validates typed constructor definitions from the discovered graph. Removing
-  `single<TodosSettingsSource>()` fails the `:app:shared` compilation with `KOIN-D001`, naming the
-  missing type, `TodosCapabilityImpl`'s `settingsSource` parameter, and `todosCapabilityModule`.
-- A classic definition lambda remains opaque. Removing the `HttpClientEngine` definition does not
-  diagnose the inferred `engine = get()` inside the `HttpClient` factory. Koin's runtime `verify()`
-  test and root-resolution test therefore remain required; the latter also runs definition bodies,
-  which the compiler never does.
+  It stays. The plugin offers options to silence it, and silencing a "this toolchain is untested"
+  notice is exactly the wrong trade: the next Kotlin bump is when it matters. Under
+  `-PwarningsAsErrors=true` it is reported as `e:` and fails every module the plugin is applied to.
+  The property is not usable on this repository anyway: `:foundation:resource` already fails it on
+  an unrelated unresolved opt-in marker, so the default builds are the qualified ones.
+
+Runtime checks stay, because they cover what the compiler cannot. `KoinGraphTest` starts the real
+entry point and reads back the definitions the running instance loaded, so there is no second
+module list to drift: `verify()` reaches the constructors behind lambda definitions, ViewModels
+with runtime parameters included, and the root-resolution test runs the definition bodies
+themselves, which the compiler never does.
 
 No KSP or `koin-annotations` dependency is used. Typed definitions import the compiler DSL from
 `org.koin.plugin.module.dsl` under its own name: `single<T>()` takes no lambda, so it never competes
 with `Module.single { }` and needs no import alias. Aliases, runtime parameters, environment-based
 definitions, custom factories, and lifecycle hooks that do work stay in the classic lambda DSL.
 
-### Why not Metro / Dagger+Anvil now
+### Why not Koin Annotations or Metro now
 
-Compile-time DI has attractive local diagnostics. The current Koin baseline is already integrated/qualified enough that switching would trade working familiarity for new tooling without deleting enough required architecture.
+This is measured, not assumed. Koin Annotations and Metro 1.4.2 were both built out on this
+repository and this toolchain on 2026-09-06, as working spikes rather than paper comparisons. Both
+close the remaining compile-time gap: whole-graph validation that includes custom providers, and in
+Metro's case runtime parameters as well. Both were declined for the same three reasons. They put
+the injector back into business classes (`@Single`, `@Inject`) or into hand-written graph
+interfaces, which is precisely what "avoid `KoinComponent`/global `get()` in business/data classes"
+exists to prevent. They remove `onClose` on a definition in favour of a hand-written close registry,
+turning a declared lifetime into bookkeeping. And both add generated indirection that a reader, or
+an agent, has to hold in their head before they can follow a wire. What they would have added on
+top of the current setup is already covered: the runtime root-resolution test executes every
+definition body over the real graph.
 
 `kotlin-inject-anvil` is not a live contingency because upstream declares maintenance mode. The
 written contingency is Metro 1.4.2, published to Maven Central on 2026-08-14. It is a compiler
@@ -4636,7 +4680,8 @@ Reserve source rules for constraints the stronger layers cannot fully express:
 6. `foundation_api` modules do not expose/runtime-depend on forbidden lower product/runtime mechanisms in their public surface;
 7. intentionally quarantined framework/runtime imports do not leak outside approved packages;
 8. no hard-coded `Dispatchers.*` or global coroutine-scope construction in Feature/business code where injected policy applies;
-9. every preferences file and secret store name a Capability opens is unique across the app and prefixed with that Capability's name (`StoreNamesRuleTest`).
+9. every preferences file and secret store name a Capability opens is unique across the app and prefixed with that Capability's name (`StoreNamesRuleTest`);
+10. the module list `startKoin` loads is literal module names, one per line, so the Koin compiler plugin keeps validating typed definitions across the whole graph (`KoinApplicationModulesRuleTest`, §18.7).
 
 Graph/visibility rules remain primary for Feature -> Impl, UI -> Koin/Capability, Capability API -> infrastructure, and Capability Impl -> Feature/UI/other Impl.
 
@@ -5638,19 +5683,29 @@ problem in project code; see ADR-43.
 
 **Decision:** keep Koin as the DI mechanism while qualified; apply Koin compiler plugin 1.1.0 to
 App, Feature, and Capability Impl roles; use its typed DSL for pure constructor definitions; keep
-composition at App/implementation roots and service-locator access out of business/data code.
+the entry point's module list a literal list of module names so the plugin validates the whole
+graph; keep composition at App/implementation roots and service-locator access out of business/data
+code.
 
-**Why:** compile-time constructor-graph validation is now in place for typed definitions on Kotlin
-2.4.10 and all required KMP targets. The dynamic App module list and classic custom-body lambdas are
-not fully knowable to the plugin, so JVM runtime graph verification and root resolution remain as
-complementary safety rather than migration leftovers. See §18.7 for the qualification evidence.
+**Why:** the literal module list buys whole-graph compile-time validation of every typed definition
+on Kotlin 2.4.10 and all required KMP targets, at the cost of one rule test that holds the list
+literal. What the plugin still cannot see is the inside of a definition lambda, so JVM runtime
+verification and root resolution remain as complementary safety rather than migration leftovers.
+Classes stay free of DI annotations and lifetimes stay declared on the definition through `onClose`.
+See §18.7 for the qualification evidence and the verbatim diagnostics.
 
-**Alternatives explored:** Metro, kotlin-inject, Dagger/Anvil-style compile-time DI. `kotlin-inject-anvil` is now in maintenance mode and is not a live contingency.
+**Alternatives explored:** Koin Annotations and Metro 1.4.2 were both built as working spikes on
+this toolchain on 2026-09-06 and measured, not compared on paper; both give whole-graph validation
+including custom providers, and both were declined because they move the injector into business
+classes or graph interfaces, replace `onClose` with a hand-written close registry, and add
+generated indirection for coverage the runtime root-resolution test already provides. Also
+considered: kotlin-inject and Dagger/Anvil-style compile-time DI. `kotlin-inject-anvil` is in
+maintenance mode and is not a live contingency.
 
 **Revisit when:** Koin's compiler plugin stops compiling on the pinned Kotlin version, blocks a
 Kotlin upgrade for more than one minor release, or an alternative materially removes the remaining
-runtime-only construction and verification complexity across required KMP targets. Metro 1.4.2 is
-the written contingency.
+runtime-only construction and verification complexity across required KMP targets without moving
+the injector into business classes. Metro 1.4.2 is the written contingency.
 
 ## ADR-24 - Semantic observability seams, not vendor APIs
 

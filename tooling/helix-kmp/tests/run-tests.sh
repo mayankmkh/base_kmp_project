@@ -114,6 +114,24 @@ expect_no_grep() {
     fi
 }
 
+# `startKoin` loads a literal list of module names, one per line, because the Koin compiler plugin
+# stops validating typed definitions across the graph as soon as that list is computed. A generated
+# module counts as registered only when its line sits between `modules(` and that call's closing
+# `)`, so the block is sliced out before the match.
+expect_module_registered() {
+    local module_name="$1" block
+    block="$(awk '
+        $0 == "    modules(" { inside = 1; next }
+        inside && $0 == "    )" { exit }
+        inside { print }
+    ' "$KOIN_APP_FILE")"
+    if printf '%s\n' "$block" | grep -qx "        ${module_name},"; then
+        log "  ok: KoinApp.kt loads $module_name inside the literal modules( call"
+    else
+        fail "KoinApp.kt does not load $module_name inside the literal modules( call"
+    fi
+}
+
 # The canonical Cell shape (source-of-truth §30.4): fills width, never owns its size or scrolling,
 # and fails fast when a host reuses a placement key for a different id. The templates are
 # hand-derived from `:feature:posts`, so both the reference and the generated Cells are checked.
@@ -267,7 +285,7 @@ expect_file "capability/sample-api/src/commonMain/kotlin/dev/mayankmkh/basekmppr
 expect_file "capability/sample-impl/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/capability/sample/impl/SampleCapabilityModule.kt"
 expect_file "capability/sample-impl/src/commonTest/kotlin/dev/mayankmkh/basekmpproject/capability/sample/impl/SampleCapabilityImplTest.kt"
 expect_grep "import dev.mayankmkh.basekmpproject.capability.sample.impl.sampleCapabilityModule" "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
-expect_grep '^        sampleCapabilityModule,$' "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+expect_module_registered sampleCapabilityModule
 expect_grep 'implementation(projects.capability.sampleImpl)' "app/shared/build.gradle.kts"
 
 log "create feature sample"
@@ -277,7 +295,7 @@ expect_cell_shape "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmppro
 expect_file "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/SampleScreen.kt"
 expect_file "feature/sample/src/jvmTest/kotlin/dev/mayankmkh/basekmpproject/feature/sample/SampleContentTest.kt"
 expect_grep "import dev.mayankmkh.basekmpproject.feature.sample.api.sampleFeatureModule" "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
-expect_grep '^        sampleFeatureModule,$' "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+expect_module_registered sampleFeatureModule
 expect_grep 'implementation(projects.feature.sample)' "app/shared/build.gradle.kts"
 
 log "create cell sample Detail"
@@ -292,7 +310,7 @@ log "create feature sample-linked --capability sample"
 expect_grep "projects.capability.sampleApi" "feature/sample-linked/build.gradle.kts"
 expect_grep "SampleQueries" "feature/sample-linked/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/samplelinked/SampleLinkedViewModel.kt"
 expect_grep "import dev.mayankmkh.basekmpproject.feature.samplelinked.api.sampleLinkedFeatureModule" "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
-expect_grep '^        sampleLinkedFeatureModule,$' "app/shared/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/app/shared/di/KoinApp.kt"
+expect_module_registered sampleLinkedFeatureModule
 
 log "create cell sample-linked Summary --capability sample"
 "$CLI" create cell sample-linked Summary --capability sample

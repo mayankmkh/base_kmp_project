@@ -37,7 +37,6 @@ import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.core.logger.Level
-import org.koin.core.module.Module
 import org.koin.core.scope.Scope
 import org.koin.dsl.KoinAppDeclaration
 import org.koin.dsl.bind
@@ -48,27 +47,54 @@ import org.koin.mp.KoinPlatform
 import org.koin.plugin.module.dsl.single
 
 /**
- * Starts the application graph. [isDebug] is the entry point's own build signal; Koin's logger must
- * exist before the first module loads, so the app's [Logger] is built from it one step earlier.
+ * Starts the application graph.
+ *
+ * The module list is written out one literal name per line and nothing else. A call, a spread, a
+ * variable or an inline `module { }` here would be opaque to the Koin compiler plugin: it reports
+ * `KOIN-W003` and silently stops checking typed definitions across the whole graph.
+ * `KoinApplicationModulesRuleTest` holds that shape.
+ *
+ * [isDebug] is the entry point's own build signal and the one runtime value the graph cannot
+ * compute for itself, so it enters as a Koin property rather than as a definition declared here.
  * Production PreferenceStores and SecretStores may be built at most once per process, so tests
- * replace those factories.
+ * replace those factories through [config].
  */
-fun initKoin(isDebug: Boolean, config: KoinAppDeclaration? = null): KoinApplication {
-    val environment = AppEnvironment(isDebug)
-    return startKoin {
-        logger(
-            KermitKoinLogger(environment.logger.withTag("koin")).apply {
-                level = environment.koinLevel
-            }
-        )
-        modules(appModules(environment))
+fun initKoin(isDebug: Boolean, config: KoinAppDeclaration? = null): KoinApplication = startKoin {
+    properties(mapOf(IsDebugProperty to isDebug))
+    modules(
+        environmentModule,
+        jsonModule,
+        dispatchersModule,
+        runtimeModule,
+        platformContextModule,
+        storesModule,
+        networkModule,
+        connectivityModule,
+        databaseModule,
+        identityCapabilityModule,
+        postsCapabilityModule,
+        postsFeatureModule,
+        todosCapabilityModule,
+        todosFeatureModule,
+    )
 
-        // Last, so what the caller declares wins: a later definition of the same type replaces the
-        // one already loaded. That is how a test swaps platform resource factories without the app
-        // module knowing anything about tests.
-        includes(config)
-    }
+    // Last, so what the caller declares wins: a later definition of the same type replaces the
+    // one already loaded. That is how a test swaps platform resource factories without the app
+    // module knowing anything about tests.
+    includes(config)
+
+    // Koin's own logger is the one consumer that cannot be served from the graph before the graph
+    // exists, so it is installed one step later rather than from a second [AppEnvironment] built
+    // here. The process keeps one environment and one app [Logger]; the price is Koin's own
+    // "loaded N definitions" line, which is emitted while its logger is still the empty default.
+    val environment = koin.get<AppEnvironment>()
+    logger(
+        KermitKoinLogger(environment.logger.withTag("koin")).apply { level = environment.koinLevel }
+    )
 }
+
+/** The build signal, carried as a property because a definition here would be a dynamic module. */
+internal const val IsDebugProperty: String = "app.isDebug"
 
 /** Cancels application work before Koin releases resources in unspecified callback order. */
 fun shutdownKoin() {
@@ -97,8 +123,9 @@ private val dispatchersModule = module {
     single { AppDispatchers() }
 }
 
-private fun environmentModule(environment: AppEnvironment) = module {
-    single { environment.logger }
+private val environmentModule = module {
+    single { AppEnvironment(getProperty(IsDebugProperty)) }
+    single { get<AppEnvironment>().logger }
 }
 
 private val runtimeModule = module {
@@ -133,8 +160,8 @@ private val storesModule = module {
  * override just the host without rebuilding the plugin stack. The `CredentialProvider` comes from
  * `identityCapabilityModule` through App composition.
  */
-private fun networkModule(environment: AppEnvironment) = module {
-    single { NetworkConfig(baseUrl = apiBaseUrl, logLevel = environment.ktorLogLevel) }
+private val networkModule = module {
+    single { NetworkConfig(baseUrl = apiBaseUrl, logLevel = get<AppEnvironment>().ktorLogLevel) }
     // Locale comes from the app language owner and app version from platform build metadata once
     // either is required by the backend; the sample API needs no changing headers today.
     single<DynamicHeaders> { DynamicHeaders.None }
@@ -179,32 +206,6 @@ private val databaseModule = module {
         } bind
         SqlDriverProvider::class
 }
-
-internal fun libModules(environment: AppEnvironment): List<Module> =
-    listOf(
-        environmentModule(environment),
-        jsonModule,
-        dispatchersModule,
-        runtimeModule,
-        platformContextModule,
-        storesModule,
-        networkModule(environment),
-        connectivityModule,
-        databaseModule,
-    )
-
-private val productModules =
-    listOf(
-        identityCapabilityModule,
-        postsCapabilityModule,
-        postsFeatureModule,
-        todosCapabilityModule,
-        todosFeatureModule,
-    )
-
-// One list so `KoinGraphTest` verifies the graph `initKoin` starts.
-internal fun appModules(environment: AppEnvironment): List<Module> =
-    libModules(environment) + productModules
 
 /**
  * Where log lines go on this target. Kermit's `platformLogWriter()` is tuned for local development,

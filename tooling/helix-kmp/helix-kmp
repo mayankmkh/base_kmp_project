@@ -365,8 +365,10 @@ add_import() {
     mv "$tmp" "$file"
 }
 
-# Registers a generated public module in the app composition root. `productModules` deliberately
-# keeps one entry per line so this insertion is stable and idempotent.
+# Registers a generated public module in the app composition root. The `modules(` call inside
+# `startKoin` is a literal list of module names, one per line: that is what lets the Koin compiler
+# plugin validate typed definitions across the whole graph, so the entry is appended in place
+# rather than through any list-building helper. `KoinApplicationModulesRuleTest` holds the shape.
 register_product_module() {
     local import_line="$1" module_name="$2"
 
@@ -384,17 +386,17 @@ register_product_module() {
     local tmp
     tmp="$(mktemp "${TMPDIR:-/tmp}/helix-product-module.XXXXXX")"
     if ! awk -v entry="        ${module_name}," '
-        $0 == "private val productModules =" { product_modules = 1 }
-        product_modules && $0 == "    )" {
+        $0 == "    modules(" { module_list = 1 }
+        module_list && $0 == "    )" {
             print entry
             inserted = 1
-            product_modules = 0
+            module_list = 0
         }
         { print }
         END { if (!inserted) exit 1 }
     ' "$KOIN_APP_FILE" > "$tmp"; then
         rm -f "$tmp"
-        die "could not find the multiline productModules list in KoinApp.kt"
+        die "could not find the literal modules( list in KoinApp.kt"
     fi
     mv "$tmp" "$KOIN_APP_FILE"
     info "  KoinApp.kt += $module_name"

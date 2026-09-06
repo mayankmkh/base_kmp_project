@@ -47,10 +47,7 @@ class StoreNamesRuleTest {
 
     /** Pairs of capability name (the `-impl` module's name without the suffix) and source file. */
     private fun capabilityImplSources(): List<Pair<String, File>> {
-        val root =
-            generateSequence(File(System.getProperty("user.dir")).absoluteFile) { it.parentFile }
-                .first { File(it, "settings.gradle.kts").exists() }
-        return File(root, "capability")
+        return File(repoRoot(), "capability")
             .listFiles { file -> file.isDirectory && file.name.endsWith("-impl") }
             .orEmpty()
             .flatMap { module ->

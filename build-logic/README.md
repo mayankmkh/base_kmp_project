@@ -79,7 +79,7 @@ carve-out consumable from any role. Explicit API mode (master source §21.5) is 
 | `:feature:todos` | `bkp.kmp.feature` | list/detail/editor Screens and the summary Cell, public only under `…feature.todos.api` |
 | `:testkit:common` | `bkp.kmp.testkit` | dispatcher helpers, posts fakes, and resource-observation fixtures |
 | `:app:shared` | `bkp.kmp.app` | the composition root: Koin startup, Nav3 routes, `RootContent`, and the `SharedApp` Apple framework |
-| `:app:android` | `bkp.android.app.compose` | Android shell and flavors; role `app` |
+| `:app:android` | `bkp.android.app.compose` | Android shell and environment flavors; role `app` |
 | `:app:desktop` | `bkp.desktop.app` | Compose Desktop shell; role `app` |
 | `:app:web` | `bkp.web.app` | `wasmJs` browser shell, embeddable in a host page; role `app` |
 
@@ -162,7 +162,7 @@ plugins {
 
 bkpModule {
     features {
-        demoProdFlavors()
+        environmentFlavors()
     }
 }
 ```
@@ -174,16 +174,23 @@ convention did not.
 
 | Feature | Valid on |
 |---|---|
-| `demoProdFlavors()` | `bkp.android.app*` |
+| `environmentFlavors()` | `bkp.android.app*` |
 | `compose()` | `bkp.kmp.foundation.api` |
 
-`demoProdFlavors()` registers `demo` and `prod` product flavors; without it the app stays on plain
-`debug`/`release`. It is read in AGP's `finalizeDsl`, which runs after the module's `bkpModule`
-block but still before variants are created — the last point at which flavors can be registered.
-Reading it in `apply()` would always see it unset, and `afterEvaluate` is too late for DSL changes.
-Anything that needs the flavors to exist while the build script is still being evaluated (a
-`demoImplementation` dependency, a `productFlavors { }` block of its own) will not find them; no
-module does that today.
+`environmentFlavors()` registers the `staging` and `prod` product flavors on an `environment`
+dimension; without it the app stays on plain `debug`/`release`. Each flavor carries its own
+`BuildConfig.APP_ENVIRONMENT`, whose value is the flavor name, and `staging` suffixes the
+application id with `.staging` so both installs sit on one device with separate storage. The two
+axes are independent, so all four variants are meaningful: `stagingDebug`, `stagingRelease`,
+`prodDebug`, `prodRelease`. The flavor name must match a `BuildEnvironment.id` in `:app:shared`;
+see [`docs/architecture/environments.md`](../docs/architecture/environments.md).
+
+It is read in AGP's `finalizeDsl`, which runs after the module's `bkpModule` block but still before
+variants are created — the last point at which flavors can be registered. Reading it in `apply()`
+would always see it unset, and `afterEvaluate` is too late for DSL changes. Anything that needs the
+flavors to exist while the build script is still being evaluated (a `stagingImplementation`
+dependency, a `productFlavors { }` block of its own) will not find them; no module does that
+today.
 
 ### Firebase boundary
 
@@ -277,7 +284,7 @@ module instead of after the whole build has configured.
 
 Local configuration still fails when:
 
-- `demoProdFlavors()` is called outside a `bkp.android.app*` module
+- `environmentFlavors()` is called outside a `bkp.android.app*` module
 - `bkp.android.app.firebase` is applied without a `bkp.android.app*` primary
 - a KMP module declares no targets
 - a KMP module has a target that was created outside `bkpTargets { }`

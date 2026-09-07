@@ -1,6 +1,7 @@
 package dev.mayankmkh.basekmpproject.app.shared.di
 
 import co.touchlab.kermit.LoggerConfig
+import dev.mayankmkh.basekmpproject.app.shared.config.BuildEnvironment
 import dev.mayankmkh.basekmpproject.capability.identity.api.IdentityQueries
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsCommands
 import dev.mayankmkh.basekmpproject.capability.posts.api.PostsQueries
@@ -60,7 +61,7 @@ class KoinGraphTest {
         // Compile-time validation covers typed definitions graph-wide, and the root-resolution
         // test below runs the classic definition bodies. Verification is what still reaches the
         // constructors behind a lambda definition, ViewModels with runtime parameters included.
-        val application = initKoin(isDebug = true)
+        val application = initKoin(isDebug = true, environment = BuildEnvironment.Staging)
         try {
             loadedDefinitions(application.koin)
                 .verify(
@@ -77,7 +78,7 @@ class KoinGraphTest {
     fun `every application root resolves through definition bodies`() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         val application =
-            initKoin(isDebug = true) {
+            initKoin(isDebug = true, environment = BuildEnvironment.Staging) {
                 modules(processSurfaceOverrides(MockEngine { respondOk() }))
             }
         try {
@@ -115,7 +116,7 @@ class KoinGraphTest {
     fun `no two graph types share a simple name`() {
         // `shutdownKoin` resolves the application runtime scope, which needs a main dispatcher.
         Dispatchers.setMain(UnconfinedTestDispatcher())
-        val application = initKoin(isDebug = true)
+        val application = initKoin(isDebug = true, environment = BuildEnvironment.Staging)
         val typesByWebIndexKey = mutableMapOf<String, MutableSet<KClass<*>>>()
         try {
             application.koin.instanceRegistry.instances.values
@@ -157,7 +158,9 @@ class KoinGraphTest {
         val testUserHome = Files.createTempDirectory("base-kmp-koin-close-test")
         System.setProperty("user.home", testUserHome.toString())
         val application =
-            initKoin(isDebug = true) { modules(processSurfaceOverrides(engine = null)) }
+            initKoin(isDebug = true, environment = BuildEnvironment.Staging) {
+                modules(processSurfaceOverrides(engine = null))
+            }
         try {
             val client = application.koin.get<HttpClient>()
             val engine = application.koin.get<HttpClientEngine>()
@@ -196,8 +199,9 @@ class KoinGraphTest {
                 CoroutineDispatcher::class,
                 CoroutineExceptionHandler::class,
                 LoggerConfig::class,
-                // The build signal reaches `AppEnvironment` as a Koin property, not a definition.
+                // The build signals reach `AppEnvironment` as Koin properties, not definitions.
                 Boolean::class,
+                BuildEnvironment::class,
                 // `NetworkConfig` fields are filled from the app environment and defaults.
                 Url::class,
                 Duration::class,

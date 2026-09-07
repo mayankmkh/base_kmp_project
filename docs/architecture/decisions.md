@@ -439,3 +439,37 @@ owner's fact rather than something each of a dozen local sources is handed and c
 **Revisit when:** a Capability needs its own durable store on a different lane from the application
 database, at which point the lane belongs to that store's provider rather than to a single shared
 one.
+
+## ADR-46 - The environment is a build fact each platform carries in its own way
+
+**Decision:** the app ships two environments, staging and production, as `BuildEnvironment` in
+`:app:shared`. Each platform entry point reads which one it is from that platform's own build
+mechanism -- an Android product flavor, an Xcode build configuration, a desktop JVM system
+property, the web host page's meta tag -- and hands it to `initKoin` beside `isDebug`, where it
+enters the graph as the `app.environment` Koin property. The environment is independent of
+debug/release, decides the base URL and the storage identity, and is never a runtime setting.
+Mechanics: [`environments.md`](environments.md).
+
+**Why:** the environment is exactly the second instance of the problem `isDebug` already solved --
+a fact the graph cannot compute for itself, which the entry point owns -- so it takes the same
+route rather than inventing a parallel one. Using each platform's native mechanism means Android
+can build both environments in one invocation and Xcode can switch schemes without re-running
+Gradle, which a single shared Gradle property could not do. Deriving the application id from the
+environment is what keeps the two installs from reading each other's databases, preferences and
+secrets; without it, side-by-side installs silently share storage on desktop and web.
+
+**Alternatives considered:**
+
+- One Gradle property (`-Pbkp.environment=`) stamped into a generated Kotlin constant for every
+  target. Rejected: uniform, but one build then produces one environment, so Android loses
+  side-by-side variants and every iOS scheme switch becomes a Gradle re-run and a relink.
+- A debug-only in-app switcher persisted in preferences. Rejected: it makes the environment a
+  runtime value that product code could read, release builds have to pin it anyway, and the
+  storage identity can no longer follow from it.
+- Reusing the vestigial `demo`/`prod` `contentType` flavors as the axis. Rejected on naming alone:
+  two flavors named `prod` on different dimensions. Those flavors had no source sets and nothing
+  read them, so they became the environment dimension rather than sitting beside it.
+
+**Revisit when:** a third environment appears that is not simply another host -- one that needs its
+own source set or its own dependency -- or when the app gains a legitimate reason for QA to
+repoint a build without reinstalling it.

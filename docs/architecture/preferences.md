@@ -398,10 +398,13 @@ The ownership table in [`network.md`](network.md) §2 changes its "Credential pe
 `:app:shared` declares `preferenceStores(context, logger)` and `secretStores(context, logger)` as
 Koin singletons in one `storesModule`, and supplies the context they take through
 `expect fun Scope.createPlatformContext(): PlatformContext`. Android constructs it with the app
-`Context` and `ApplicationId`. iOS, desktop JVM and wasmJs construct it with `ApplicationId`.
-The constant remains next to `apiBaseUrl` in `config/Environment.kt`. The Android application id
-and the iOS bundle identifier stay what the platform build files say. `ApplicationId` is the stable
-name the app uses for its own storage and must never change once a build has shipped.
+`Context` and the application id; iOS, desktop JVM and wasmJs construct it with the application id
+alone. That id is the environment's, not a single constant: `BuildEnvironment.applicationId` in
+`config/BuildEnvironment.kt` gives staging a `.staging` suffix and production the bare id, matching
+what the Android flavor and the iOS xcconfig do to the applicationId and the bundle identifier, so
+the two environments never read each other's stores. It is the stable name the app uses for its own
+storage and must never change once a build has shipped — see
+[`environments.md`](environments.md).
 
 ## 11. Testing
 

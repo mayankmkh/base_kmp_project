@@ -1,0 +1,11 @@
+#include "Config.xcconfig"
+
+// Which deployment a configuration built from this file talks to. `Info.plist` carries it into the
+// bundle as `AppEnvironment`, `iOSApp.swift` reads it back, and the value must match a
+// `BuildEnvironment.id` in the shared module -- an unknown id fails at launch.
+APP_ENVIRONMENT=staging
+
+// Staging installs beside production rather than replacing it, which needs its own bundle
+// identifier -- and therefore its own container, so neither build reads the other's storage.
+PRODUCT_BUNDLE_IDENTIFIER=$(BASE_BUNDLE_IDENTIFIER).staging
+APP_DISPLAY_NAME=$(BASE_APP_DISPLAY_NAME) Staging

@@ -1,0 +1,4 @@
+#include "Config.xcconfig"
+
+// The shipping deployment; identity comes from Config.xcconfig unchanged.
+APP_ENVIRONMENT=prod

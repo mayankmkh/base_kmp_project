@@ -128,13 +128,21 @@ command layer.
 ## Running it
 
 ```bash
-./gradlew :app:android:installDebug                     # Android, on a connected device or emulator
+./gradlew :app:android:installProdDebug                 # Android, on a connected device or emulator
 ./gradlew :app:desktop:run                              # Desktop (JVM)
 ./gradlew :app:web:wasmJsBrowserDevelopmentRun          # Web, dev server with hot reload
 ./gradlew :app:desktop:packageDistributionForCurrentOS  # Desktop installer (dmg / msi / deb)
 ```
 
-iOS builds from Xcode against the static framework produced by `:app:shared`; open `app/ios/` and run (the target links `-lsqlite3` for the SQLDelight native driver).
+Every app ships a **staging** and a **production** build, chosen by each platform's own mechanism:
+an Android flavor (`installStagingDebug`), an Xcode scheme (`iosApp-Staging`), a desktop Gradle
+property (`-Pbkp.environment=staging`), a web `<meta name="app-environment">`. The two installs
+carry different application ids and never share storage. See
+[`docs/architecture/environments.md`](docs/architecture/environments.md).
+
+iOS builds from Xcode against the static framework produced by `:app:shared`; open `app/ios/`, pick
+the `iosApp-Staging` or `iosApp-Production` scheme, and run (the target links `-lsqlite3` for the
+SQLDelight native driver).
 Nothing in the Gradle loop above builds iOS except `./gradlew verifyFull`, which links the
 simulator framework.
 
@@ -146,6 +154,7 @@ simulator framework.
 | [`docs/architecture/helix-kmp-source-of-truth.md`](docs/architecture/helix-kmp-source-of-truth.md) | Helix KMP in full -- the normative master source |
 | [`docs/architecture/decisions.md`](docs/architecture/decisions.md) | The ADR catalog -- every `ADR-NN` decision, why, and when to revisit it |
 | [`docs/architecture/reference-slice.md`](docs/architecture/reference-slice.md) | The canonical reference slice, end to end |
+| [`docs/architecture/environments.md`](docs/architecture/environments.md) | Staging and production: what differs, and how each platform selects one |
 | [`docs/architecture/background.md`](docs/architecture/background.md) | Outcome metrics, external influences and the reference URLs behind the choices |
 | [`docs/architecture/templates/agents-and-skills.md`](docs/architecture/templates/agents-and-skills.md) | Copyable root `AGENTS.md` and workflow Skill templates |
 | [`docs/guides/contributing-without-android-expertise.md`](docs/guides/contributing-without-android-expertise.md) | Changing product behaviour without owning the platform seams |

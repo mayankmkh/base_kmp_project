@@ -82,7 +82,7 @@ class BkpValidationGraphPluginTest {
     }
 
     @Test
-    fun `demoProdFlavors outside an android app is rejected`() {
+    fun `environmentFlavors outside an android app is rejected`() {
         val result =
             TestProject(projectDir)
                 .withBuildScript(
@@ -94,7 +94,7 @@ class BkpValidationGraphPluginTest {
             }
 
             bkpModule {
-                features { demoProdFlavors() }
+                features { environmentFlavors() }
             }
             """
                 )
@@ -102,7 +102,7 @@ class BkpValidationGraphPluginTest {
 
         assertContains(
             result.output,
-            "demoProdFlavors() is only supported for bkp.android.app* plugins",
+            "environmentFlavors() is only supported for bkp.android.app* plugins",
         )
     }
 

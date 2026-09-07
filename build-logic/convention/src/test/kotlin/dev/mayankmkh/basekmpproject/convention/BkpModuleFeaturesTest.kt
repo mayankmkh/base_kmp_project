@@ -14,21 +14,21 @@ class BkpModuleFeaturesTest {
     @field:TempDir lateinit var projectDir: File
 
     @Test
-    fun `android app opting into demoProdFlavors gets demo and prod`() {
+    fun `android app opting into environmentFlavors gets staging and prod`() {
         val result =
             TestProject(projectDir)
                 .withBuildScript(
                     androidApp(
                         """
                 bkpModule {
-                    features { demoProdFlavors() }
+                    features { environmentFlavors() }
                 }
                 """
                     )
                 )
                 .run()
 
-        assertContains(result.output, "FLAVORS=demo,prod")
+        assertContains(result.output, "FLAVORS=prod,staging")
     }
 
     @Test

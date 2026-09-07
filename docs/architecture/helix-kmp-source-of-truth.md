@@ -3339,9 +3339,11 @@ Current state, qualified on 2026-09-06:
   `module { }` in that argument list makes the list dynamic again; the plugin reports `KOIN-W003`
   and silently falls back to a fail-open pass over whatever it happened to discover, while every
   gate still passes. `KoinApplicationModulesRuleTest` (§21.4) holds the shape.
-- The one runtime value the graph cannot compute for itself, the build flag, enters as a Koin
-  property (`app.isDebug`) rather than as a definition written inside the entry point, which would
-  make the list dynamic. `environmentModule` builds the single `AppEnvironment` from that property.
+- The runtime values the graph cannot compute for itself -- the build flag and the environment --
+  enter as Koin properties (`app.isDebug`, `app.environment`) rather than as definitions written
+  inside the entry point, which would make the list dynamic. `environmentModule` builds the single
+  `AppEnvironment` from those two properties; which deployment each platform selects, and how, is
+  [`environments.md`](environments.md).
   Koin's own logger is the one consumer that exists before the graph does; it is installed one step
   later, from the environment the graph built, so the process keeps one `AppEnvironment` and one
   app `Logger`. The price is Koin's own "loaded N definitions" line, emitted while its logger is
@@ -3475,15 +3477,17 @@ One Kermit `Logger` is configured at the App composition root and flows through 
 ```text
 minimum severity   Verbose in a debug build, Warn otherwise
 tag                the module's own name, applied where the module receives the logger
-iOS writer         Kermit's Xcode-tuned default in debug; OSLog with subsystem = the application id in release
+iOS writer         Kermit's Xcode-tuned default in debug; OSLog with subsystem = the environment's application id in release
 Koin diagnostics   the same logger, on every target
 Features           do not log at all
 ```
 
-`initKoin` requires the entry point's own debug signal. It enters the graph as a Koin property, the
-graph builds the one `AppEnvironment` from it, and Koin's own logger is installed from that
-environment after the modules load, so every verbosity gate (Kermit, Koin, Ktor) derives from one
-decision and one instance. Koin's own "loaded N definitions" line is emitted before that logger
+`initKoin` requires the entry point's own debug signal and its environment. Both enter the graph as
+Koin properties, the graph builds the one `AppEnvironment` from them, and Koin's own logger is
+installed from that environment after the modules load, so every verbosity gate (Kermit, Koin,
+Ktor) derives from one place and one instance. Kermit's minimum severity and Koin's level follow
+the debug flag alone; Ktor's also keeps headers in a staging release, because a staging build
+exists to be diagnosed -- see [`environments.md`](environments.md) §4. Koin's own "loaded N definitions" line is emitted before that logger
 exists; see §18.7.
 
 Tags: a module that owns a logging seam tags the logger in its own entry point (`CommandBridge`,

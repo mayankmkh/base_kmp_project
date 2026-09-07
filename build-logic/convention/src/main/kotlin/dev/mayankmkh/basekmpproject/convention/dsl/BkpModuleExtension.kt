@@ -20,11 +20,11 @@ abstract class BkpModuleExtension @Inject constructor(objects: ObjectFactory) {
  * value to pass and nothing to turn off, so a module either asks for a feature or says nothing.
  *
  * The previous shape was `Property<Boolean>` flags with conventions, which meant
- * `features.flavorsDemoProd.set(true)` in a build script could be either a real request or a no-op
+ * `features.environmentFlavors.set(true)` in a build script could be either a real request or a no-op
  * restatement of the convention, and nothing in the script said which.
  */
 abstract class Features {
-    internal var demoProdFlavorsEnabled = false
+    internal var environmentFlavorsEnabled = false
         private set
 
     internal var composeEnabled = false
@@ -33,11 +33,12 @@ abstract class Features {
     private val composeCallbacks = mutableListOf<() -> Unit>()
 
     /**
-     * Registers `demo` and `prod` product flavors in place of plain `debug`/`release` variants.
-     * Only valid on `bkp.android.app*` modules; the validator rejects it anywhere else.
+     * Registers the `staging` and `prod` product flavors in place of plain `debug`/`release`
+     * variants, each carrying its own `BuildConfig.APP_ENVIRONMENT`. Only valid on
+     * `bkp.android.app*` modules; the validator rejects it anywhere else.
      */
-    fun demoProdFlavors() {
-        demoProdFlavorsEnabled = true
+    fun environmentFlavors() {
+        environmentFlavorsEnabled = true
     }
 
     /** Enables Compose for role plugins where it is an explicit, per-module choice. */

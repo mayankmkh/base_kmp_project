@@ -5,8 +5,10 @@ import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
 import co.touchlab.kermit.koin.KermitKoinLogger
+import dev.mayankmkh.basekmpproject.app.shared.config.BuildEnvironment
 import dev.mayankmkh.basekmpproject.app.shared.config.KermitKtorLogger
 import dev.mayankmkh.basekmpproject.app.shared.config.apiBaseUrl
+import dev.mayankmkh.basekmpproject.app.shared.config.applicationId
 import dev.mayankmkh.basekmpproject.capability.identity.impl.identityCapabilityModule
 import dev.mayankmkh.basekmpproject.capability.posts.impl.postsCapabilityModule
 import dev.mayankmkh.basekmpproject.capability.todos.impl.todosCapabilityModule
@@ -31,6 +33,7 @@ import dev.mayankmkh.basekmpproject.platform.securestorage.secretStores
 import dev.mayankmkh.basekmpproject.storage.database.AppDatabaseDriverProvider
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.http.Url
 import kotlinx.coroutines.CoroutineExceptionHandler
 import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
@@ -53,13 +56,17 @@ import org.koin.plugin.module.dsl.single
  * `KOIN-W003` and silently stops checking typed definitions across the whole graph.
  * `KoinApplicationModulesRuleTest` holds that shape.
  *
- * [isDebug] is the entry point's own build signal and the one runtime value the graph cannot
- * compute for itself, so it enters as a Koin property rather than as a definition declared here.
- * Production PreferenceStores and SecretStores may be built at most once per process, so tests
- * replace those factories through [config].
+ * [isDebug] and [environment] are the entry point's own build signals and the two runtime values
+ * the graph cannot compute for itself, so they enter as Koin properties rather than as definitions
+ * declared here. Production PreferenceStores and SecretStores may be built at most once per
+ * process, so tests replace those factories through [config].
  */
-fun initKoin(isDebug: Boolean, config: KoinAppDeclaration? = null): KoinApplication = startKoin {
-    properties(mapOf(IsDebugProperty to isDebug))
+fun initKoin(
+    isDebug: Boolean,
+    environment: BuildEnvironment,
+    config: KoinAppDeclaration? = null,
+): KoinApplication = startKoin {
+    properties(mapOf(IsDebugProperty to isDebug, EnvironmentProperty to environment))
     modules(
         environmentModule,
         jsonModule,
@@ -86,14 +93,18 @@ fun initKoin(isDebug: Boolean, config: KoinAppDeclaration? = null): KoinApplicat
     // exists, so it is installed one step later rather than from a second [AppEnvironment] built
     // here. The process keeps one environment and one app [Logger]; the price is Koin's own
     // "loaded N definitions" line, which is emitted while its logger is still the empty default.
-    val environment = koin.get<AppEnvironment>()
+    val appEnvironment = koin.get<AppEnvironment>()
     logger(
-        KermitKoinLogger(environment.logger.withTag("koin")).apply { level = environment.koinLevel }
+        KermitKoinLogger(appEnvironment.logger.withTag("koin")).apply {
+            level = appEnvironment.koinLevel
+        }
     )
 }
 
-/** The build signal, carried as a property because a definition here would be a dynamic module. */
+/** The build signals, carried as properties because a definition here would be a dynamic module. */
 internal const val IsDebugProperty: String = "app.isDebug"
+
+internal const val EnvironmentProperty: String = "app.environment"
 
 /** Cancels application work before Koin releases resources in unspecified callback order. */
 fun shutdownKoin() {
@@ -101,16 +112,47 @@ fun shutdownKoin() {
     stopKoin()
 }
 
-/** The one place the build type turns into log verbosity; every gate below reads from here. */
-internal class AppEnvironment(val isDebug: Boolean) {
-    val minSeverity: Severity = if (isDebug) Severity.Verbose else Severity.Warn
+/**
+ * The one place the two build signals turn into configuration; every gate below reads from here.
+ *
+ * [isDebug] answers "was this built for development", [environment] answers "which deployment does
+ * it talk to". They are independent, and a value derived here says which of the two it depends on.
+ */
+internal class AppEnvironment(val isDebug: Boolean, val environment: BuildEnvironment) {
+    /** Storage identity, so the two environments never share a database, a store or a secret. */
+    val applicationId: String = environment.applicationId
+    val apiBaseUrl: Url = environment.apiBaseUrl
+    // Two gates in series, and Kermit's is the outer one: it drops anything below [minSeverity]
+    // no matter what a plugin was told to emit. So a level here that admits HTTP lines is what
+    // makes [ktorLogLevel] mean anything at all -- `AppEnvironmentTest` holds the two together.
+    val minSeverity: Severity =
+        when {
+            isDebug -> Severity.Verbose
+            // A staging release exists to be diagnosed, and `KermitKtorLogger` emits at Debug.
+            environment == BuildEnvironment.Staging -> Severity.Debug
+            else -> Severity.Warn
+        }
     val koinLevel: Level = if (isDebug) Level.DEBUG else Level.WARNING
-    // Headers, never bodies: the plugin buffers bodies to print them, and the sensitive headers are
-    // sanitised inside the client. Release builds log nothing.
-    val ktorLogLevel: LogLevel = if (isDebug) LogLevel.HEADERS else LogLevel.NONE
+    // Never bodies at any level: the plugin has to buffer a body to print it.
+    val ktorLogLevel: LogLevel =
+        when {
+            // A developer's own machine. Headers are worth having here, and the credential-bearing
+            // ones are sanitised inside the client.
+            isDebug -> LogLevel.HEADERS
+            // A shipped artifact, so the call timeline and no headers at all. This costs no failure
+            // diagnostics: `NetworkFailure` carries its own request id and response body, seeded
+            // before the first attempt, so what you debug from survives independently of this gate.
+            // Headers would only add the ones on calls that succeeded, in a build a tester is
+            // holding.
+            environment == BuildEnvironment.Staging -> LogLevel.INFO
+            else -> LogLevel.NONE
+        }
     val logger: Logger =
         Logger(
-            StaticConfig(minSeverity = minSeverity, logWriterList = listOf(appLogWriter(isDebug)))
+            StaticConfig(
+                minSeverity = minSeverity,
+                logWriterList = listOf(appLogWriter(isDebug, applicationId)),
+            )
         )
 }
 
@@ -123,7 +165,7 @@ private val dispatchersModule = module {
 }
 
 private val environmentModule = module {
-    single { AppEnvironment(getProperty(IsDebugProperty)) }
+    single { AppEnvironment(getProperty(IsDebugProperty), getProperty(EnvironmentProperty)) }
     single { get<AppEnvironment>().logger }
 }
 
@@ -160,7 +202,10 @@ private val storesModule = module {
  * `identityCapabilityModule` through App composition.
  */
 private val networkModule = module {
-    single { NetworkConfig(baseUrl = apiBaseUrl, logLevel = get<AppEnvironment>().ktorLogLevel) }
+    single {
+        val environment = get<AppEnvironment>()
+        NetworkConfig(baseUrl = environment.apiBaseUrl, logLevel = environment.ktorLogLevel)
+    }
     // Locale comes from the app language owner and app version from platform build metadata once
     // either is required by the backend; the sample API needs no changing headers today.
     single<DynamicHeaders> { DynamicHeaders.None }
@@ -215,6 +260,6 @@ private val databaseModule = module {
  * Where log lines go on this target. Kermit's `platformLogWriter()` is tuned for local development,
  * so a target may pick a different writer for release builds.
  */
-internal expect fun appLogWriter(isDebug: Boolean): LogWriter
+internal expect fun appLogWriter(isDebug: Boolean, applicationId: String): LogWriter
 
 internal expect fun Scope.createPlatformContext(): PlatformContext

@@ -202,9 +202,9 @@ class BkpValidationGraphPlugin : Plugin<Project> {
         val isAndroidApp = primary.startsWith(BKP_ANDROID_APP)
         val isKmpPrimary = primary.startsWith("bkp.kmp")
 
-        if (!isAndroidApp && extension.features.demoProdFlavorsEnabled) {
+        if (!isAndroidApp && extension.features.environmentFlavorsEnabled) {
             throw GradleException(
-                "${project.path}: demoProdFlavors() is only supported for bkp.android.app* plugins"
+                "${project.path}: environmentFlavors() is only supported for bkp.android.app* plugins"
             )
         }
 

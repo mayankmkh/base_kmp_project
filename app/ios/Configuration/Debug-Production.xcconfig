@@ -1,0 +1,7 @@
+#include "Production.xcconfig"
+
+// The configuration is no longer named literally "Debug", so the Kotlin Gradle plugin cannot infer
+// which Kotlin/Native binary `embedAndSignAppleFrameworkForXcode` should link. This is the
+// documented override. Xcode exports every build setting to the script phase as an environment
+// variable, which is how the plugin reads it.
+KOTLIN_FRAMEWORK_BUILD_TYPE=debug

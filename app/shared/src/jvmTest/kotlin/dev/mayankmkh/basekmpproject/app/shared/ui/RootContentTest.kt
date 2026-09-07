@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import dev.mayankmkh.basekmpproject.app.shared.App
+import dev.mayankmkh.basekmpproject.app.shared.config.BuildEnvironment
 import dev.mayankmkh.basekmpproject.app.shared.di.initKoin
 import dev.mayankmkh.basekmpproject.app.shared.di.processSurfaceOverrides
 import dev.mayankmkh.basekmpproject.app.shared.di.shutdownKoin
@@ -84,7 +85,7 @@ class RootContentTest {
         originalUserHome = System.getProperty("user.home")
         testUserHome = Files.createTempDirectory("base-kmp-navigation-test")
         System.setProperty("user.home", testUserHome.toString())
-        initKoin(isDebug = true) {
+        initKoin(isDebug = true, environment = BuildEnvironment.Staging) {
             modules(
                 processSurfaceOverrides(
                     engine = MockEngine { request -> respondApi(request.url.encodedPath) },

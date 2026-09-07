@@ -5,7 +5,7 @@ plugins {
 
 bkpModule {
     features {
-        demoProdFlavors()
+        environmentFlavors()
     }
 }
 

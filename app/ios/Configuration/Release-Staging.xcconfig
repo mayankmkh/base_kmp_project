@@ -1,0 +1,5 @@
+#include "Staging.xcconfig"
+
+// See Debug-Staging.xcconfig: the configuration name no longer tells the Kotlin Gradle plugin which
+// binary to link, so it is named here.
+KOTLIN_FRAMEWORK_BUILD_TYPE=release

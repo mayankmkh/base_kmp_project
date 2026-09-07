@@ -7,6 +7,12 @@
          otherwise resolve every relative URL against `/details/` -- including the
          `./composeResources/...` fetches Compose issues for drawables and fonts. -->
     <base href="/">
+    <!-- Which backend this page's bundle talks to. The bundle is one artifact served from
+         every deployment, so the page names the environment rather than the build: change
+         this to "staging" to serve a staging page, and have the host page carry the same
+         tag once the app is embedded. Required -- the app refuses to start without it,
+         because a staging page that forgot it would quietly talk to production. -->
+    <meta name="app-environment" content="prod">
     <title>base_kmp_project</title>
     <link type="text/css" rel="stylesheet" href="styles.css">
 </head>

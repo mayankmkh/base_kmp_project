@@ -14,6 +14,12 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleDisplayName</key>
+	<string>$(APP_DISPLAY_NAME)</string>
+	<!-- Which deployment this build talks to, set by the build configuration's xcconfig and read
+	     back by iOSApp.swift. Must match a BuildEnvironment.id in the shared module. -->
+	<key>AppEnvironment</key>
+	<string>$(APP_ENVIRONMENT)</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>

@@ -57,7 +57,7 @@ class BkpAndroidAppPlugin : Plugin<Project> {
                 // variants, which is the last point at which flavors can still be registered, so
                 // plain `afterEvaluate` is not an option.
                 finalizeDsl { applicationExtension ->
-                    if (bkpModule.features.demoProdFlavorsEnabled) {
+                    if (bkpModule.features.environmentFlavorsEnabled) {
                         configureFlavors(applicationExtension)
                     }
                 }

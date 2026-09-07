@@ -37,6 +37,7 @@ import dev.mayankmkh.basekmpproject.app.shared.nav.PostFeedRoute
 import dev.mayankmkh.basekmpproject.app.shared.nav.TodoDetailRoute
 import dev.mayankmkh.basekmpproject.app.shared.nav.rememberAppNavigationState
 import dev.mayankmkh.basekmpproject.app.shared.navigationSavedStateConfiguration
+import dev.mayankmkh.basekmpproject.foundation.runtime.dispatchers.AppDispatchers
 import dev.mayankmkh.basekmpproject.ui.designsystem.theme.BaseKmpProjectTheme
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -55,26 +56,39 @@ import kotlinx.coroutines.test.setMain
 /**
  * The whole app, over its real object graph.
  *
- * Four process-level surfaces are swapped out and nothing else: `user.home` redirects the desktop
- * database, the HTTP engine serves canned responses, and both stored-data factories use memory.
- * Everything between -- Koin, the repositories, SQLDelight, Navigation 3 -- is what ships.
+ * Five process-level surfaces are swapped out and nothing else: `user.home` redirects the desktop
+ * database, the HTTP engine serves canned responses, both stored-data factories use memory, and
+ * database work uses the test dispatcher. Everything between -- Koin, the repositories, SQLDelight,
+ * Navigation 3 -- is what ships.
  */
 @OptIn(ExperimentalTestApi::class)
 class RootContentTest {
     private val dispatcher = UnconfinedTestDispatcher()
+    private lateinit var appDispatchers: AppDispatchers
     private lateinit var originalUserHome: String
     private lateinit var testUserHome: Path
 
     @BeforeTest
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        val productionDispatchers = AppDispatchers()
+        appDispatchers =
+            AppDispatchers(
+                disk = dispatcher,
+                network = productionDispatchers.network,
+                main = productionDispatchers.main,
+                cpu = productionDispatchers.cpu,
+                unconfined = productionDispatchers.unconfined,
+                mainImmediate = productionDispatchers.mainImmediate,
+            )
         originalUserHome = System.getProperty("user.home")
         testUserHome = Files.createTempDirectory("base-kmp-navigation-test")
         System.setProperty("user.home", testUserHome.toString())
         initKoin(isDebug = true) {
             modules(
                 processSurfaceOverrides(
-                    MockEngine { request -> respondApi(request.url.encodedPath) }
+                    engine = MockEngine { request -> respondApi(request.url.encodedPath) },
+                    dispatchers = appDispatchers,
                 )
             )
         }

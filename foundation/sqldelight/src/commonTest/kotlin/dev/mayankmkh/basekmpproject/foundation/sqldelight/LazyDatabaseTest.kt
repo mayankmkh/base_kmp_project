@@ -6,16 +6,22 @@ import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlCursor
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.db.SqlPreparedStatement
+import kotlin.coroutines.ContinuationInterceptor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
@@ -29,7 +35,7 @@ class LazyDatabaseTest {
         val lazyDatabase =
             LazyDatabase(
                 drivers =
-                    SqlDriverProvider {
+                    FakeSqlDriverProvider(driverLane()) {
                         driverRequests += 1
                         releaseDriver.await()
                         FakeSqlDriver
@@ -40,7 +46,7 @@ class LazyDatabaseTest {
                 },
             )
 
-        val callers = List(8) { async { lazyDatabase.get() } }
+        val callers = List(8) { async { lazyDatabase.use { this } } }
         runCurrent()
         releaseDriver.complete(Unit)
         val results = callers.awaitAll()
@@ -55,10 +61,11 @@ class LazyDatabaseTest {
         var opened = false
         val lazyDatabase =
             LazyDatabase(
-                drivers = {
-                    opened = true
-                    FakeSqlDriver
-                },
+                drivers =
+                    FakeSqlDriverProvider(driverLane()) {
+                        opened = true
+                        FakeSqlDriver
+                    },
                 create = { "database" },
             )
         val observation = lazyDatabase.observe { flowOf(this) }
@@ -67,6 +74,43 @@ class LazyDatabaseTest {
         assertEquals("database", observation.first())
         assertTrue(opened)
     }
+
+    @Test
+    fun `use runs the block on the provider's lane rather than the caller's`() = runTest {
+        val lane = driverLane()
+
+        assertSame(lane, lazyDatabaseOn(lane).use { currentDispatcher() })
+    }
+
+    @Test
+    fun `observe collects the query on the provider's lane rather than the caller's`() = runTest {
+        val lane = driverLane()
+
+        val queryLane = lazyDatabaseOn(lane).observe { flow { emit(currentDispatcher()) } }.first()
+
+        assertSame(lane, queryLane)
+    }
+
+    // `runTest` runs the body on its own dispatcher, so a query that comes back carrying this one
+    // can only have got there by switching lanes. Sharing the scheduler keeps that switch ordered.
+    private fun TestScope.driverLane(): CoroutineDispatcher =
+        UnconfinedTestDispatcher(testScheduler)
+
+    private fun lazyDatabaseOn(lane: CoroutineDispatcher) =
+        LazyDatabase(
+            drivers = FakeSqlDriverProvider(lane) { FakeSqlDriver },
+            create = { "database" },
+        )
+}
+
+private suspend fun currentDispatcher(): ContinuationInterceptor? =
+    currentCoroutineContext()[ContinuationInterceptor]
+
+private class FakeSqlDriverProvider(
+    override val dispatcher: CoroutineDispatcher,
+    private val open: suspend () -> SqlDriver,
+) : SqlDriverProvider {
+    override suspend fun driver(): SqlDriver = open()
 }
 
 private object FakeSqlDriver : SqlDriver {

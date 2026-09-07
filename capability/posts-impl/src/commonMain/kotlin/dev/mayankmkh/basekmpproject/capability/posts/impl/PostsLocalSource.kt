@@ -4,7 +4,6 @@ import app.cash.sqldelight.async.coroutines.awaitAsOne
 import dev.mayankmkh.basekmpproject.capability.posts.impl.db.AppDatabase
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.LazyDatabase
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.SqlDriverProvider
-import dev.mayankmkh.basekmpproject.foundation.sqldelight.observe
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.observeList
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.observeOne
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.observeOneOrNull
@@ -37,44 +36,44 @@ internal class PostsLocalSource(drivers: SqlDriverProvider) {
             .distinctUntilChanged()
     }
 
-    suspend fun count(): Long = database.get().postsSchemaQueries.countAll().awaitAsOne()
+    suspend fun count(): Long = database.use { postsSchemaQueries.countAll().awaitAsOne() }
 
     /** Replaces feed membership and order in one transaction without deleting entity rows. */
     suspend fun replaceFeed(posts: List<PostEntity>) {
-        val database = database.get()
         val distinctPosts = posts.distinctBy { it.id }
-        database.transaction {
-            distinctPosts.forEach { post ->
-                database.postsSchemaQueries.upsert(
-                    id = post.id,
-                    author_id = post.authorId,
-                    title = post.title,
-                    body = post.body,
-                )
+        database.use {
+            transaction {
+                distinctPosts.forEach { post ->
+                    postsSchemaQueries.upsert(
+                        id = post.id,
+                        author_id = post.authorId,
+                        title = post.title,
+                        body = post.body,
+                    )
+                }
+                postsSchemaQueries.deleteFeedEntries()
+                distinctPosts.forEachIndexed { index, post ->
+                    postsSchemaQueries.insertFeedEntry(post.id, index.toLong())
+                }
+                postsSchemaQueries.markFeedInitialized()
             }
-            database.postsSchemaQueries.deleteFeedEntries()
-            distinctPosts.forEachIndexed { index, post ->
-                database.postsSchemaQueries.insertFeedEntry(post.id, index.toLong())
-            }
-            database.postsSchemaQueries.markFeedInitialized()
         }
     }
 
     /** Writes a single post without changing feed membership or order. */
     suspend fun upsert(post: PostEntity) {
-        database
-            .get()
-            .postsSchemaQueries
-            .upsert(
+        database.use {
+            postsSchemaQueries.upsert(
                 id = post.id,
                 author_id = post.authorId,
                 title = post.title,
                 body = post.body,
             )
+        }
     }
 
     suspend fun delete(id: String) {
-        database.get().postsSchemaQueries.deleteById(id)
+        database.use { postsSchemaQueries.deleteById(id) }
     }
 }
 

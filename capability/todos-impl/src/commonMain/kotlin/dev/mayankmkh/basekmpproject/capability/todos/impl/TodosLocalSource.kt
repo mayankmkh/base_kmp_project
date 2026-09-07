@@ -8,7 +8,6 @@ import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSort
 import dev.mayankmkh.basekmpproject.capability.todos.impl.db.AppDatabase
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.LazyDatabase
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.SqlDriverProvider
-import dev.mayankmkh.basekmpproject.foundation.sqldelight.observe
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.observeList
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.observeOne
 import dev.mayankmkh.basekmpproject.foundation.sqldelight.observeOneOrNull
@@ -47,27 +46,30 @@ internal class TodosLocalSource(drivers: SqlDriverProvider) {
         todosSchemaQueries.initializationCount().observeOne().map { it > 0L }.distinctUntilChanged()
     }
 
-    suspend fun find(id: TodoId): TodoEntity? =
-        database.get().todosSchemaQueries.selectById(id.value, ::TodoEntity).awaitAsOneOrNull()
+    suspend fun find(id: TodoId): TodoEntity? = database.use {
+        todosSchemaQueries.selectById(id.value, ::TodoEntity).awaitAsOneOrNull()
+    }
 
-    suspend fun allocateLocalId(): TodoId =
-        TodoId(database.get().todosSchemaQueries.nextLocalId().awaitAsOne().max ?: LocalIdStart)
+    suspend fun allocateLocalId(): TodoId = database.use {
+        TodoId(todosSchemaQueries.nextLocalId().awaitAsOne().max ?: LocalIdStart)
+    }
 
     suspend fun replaceFromServer(todos: List<TodoEntity>) {
-        val database = database.get()
-        database.transaction {
-            database.todosSchemaQueries.deleteServerBackedRows()
-            todos.distinctBy { it.id }.forEach { database.todosSchemaQueries.upsert(it) }
-            database.todosSchemaQueries.markInitialized()
+        database.use {
+            transaction {
+                todosSchemaQueries.deleteServerBackedRows()
+                todos.distinctBy { it.id }.forEach { todosSchemaQueries.upsert(it) }
+                todosSchemaQueries.markInitialized()
+            }
         }
     }
 
     suspend fun upsert(todo: TodoEntity) {
-        database.get().todosSchemaQueries.upsert(todo)
+        database.use { todosSchemaQueries.upsert(todo) }
     }
 
     suspend fun delete(id: TodoId) {
-        database.get().todosSchemaQueries.deleteById(id.value)
+        database.use { todosSchemaQueries.deleteById(id.value) }
     }
 }
 

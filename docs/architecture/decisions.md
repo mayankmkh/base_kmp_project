@@ -408,3 +408,34 @@ from leaking into Capability APIs, and gives every failed classification one log
 
 **Revisit when:** Kotlin can express a more precise command envelope without dead branches at
 `Unit` commands, or product evidence shows that refusals need a shared cross-capability contract.
+
+## ADR-45 - The database owner names the lane its statements run on
+
+**Decision:** `SqlDriverProvider` carries a `dispatcher` alongside `driver()`, and `LazyDatabase`
+never hands its generated database to a caller: `use { }` runs a block on that dispatcher and
+`observe { }` is `flowOn` it. `:storage:database` supplies `AppDispatchers.disk`, and
+`AppDatabaseDriverProvider` both creates the driver and resolves the connection behind it on that
+dispatcher before the driver leaves the provider, so a driver is only ever published fully open.
+
+**Why:** capability local sources built their query flows in the collector's context, so on Android
+every statement ran on `Dispatchers.Main.immediate`. Beyond being main-thread disk I/O, it crashed
+the first launch after a clean install: `AndroidSqliteDriver` connects from a `lazy` on its first
+statement, that first statement ran `onCreate`, and the `synchronous()` schema adapter drives the
+asynchronously generated schema through `runBlocking`, whose event loop drained the app's own
+pending main-dispatcher flow continuations. One of them re-entered the same `lazy` -- re-entrant for
+the calling thread -- opened the file a second time and failed `ProcessLock` with
+`OverlappingFileLockException`. The database is one resource with one owner, so the lane is the
+owner's fact rather than something each of a dozen local sources is handed and can forget to apply.
+
+**Alternatives considered:**
+
+- `flowOn` inside the `observeList`/`observeOne` helpers. Rejected: those are `Query` extensions
+  with no owner to ask, and they would still leave the one-shot suspend reads and writes on the
+  caller's lane.
+- Give every local source an `AppDispatchers` constructor parameter. Rejected: it makes a
+  cross-cutting invariant a per-capability convention, and the failure mode of forgetting it is a
+  crash on a path only a clean install reaches.
+
+**Revisit when:** a Capability needs its own durable store on a different lane from the application
+database, at which point the lane belongs to that store's provider rather than to a single shared
+one.

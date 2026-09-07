@@ -953,7 +953,8 @@ Capability-internal source naming:
 - inside `<Name>CapabilityImpl`, raw backends are `<Name>RemoteSource` (one per transport and the
   only class touching the HTTP client) and `<Name>LocalSource` (one per durable store and the only
   class touching SQLDelight); the local source builds its generated database once with
-  `LazyDatabase` over the app's `SqlDriverProvider`;
+  `LazyDatabase` over the app's `SqlDriverProvider` and reaches it only through `LazyDatabase.use`
+  and `LazyDatabase.observe`, which run on the lane the driver's owner named (ADR-45);
 - `<Name>CapabilityImpl` is the only class combining sources and owns DTO/row-to-model mappers;
 - names are role-based and platform-neutral: avoid `Store` (Store5 type, Redux/TCA state
   container), `Service` (Android component, microservice), `Storage` (web `localStorage`), `Cache`
@@ -2599,7 +2600,7 @@ earlier process is shown as is rather than announced as fresh. A Capability buil
 reads `bridge.commit(remoteResult, operation) { persist(it) }` and its logged operations are
 prefixed with the capability's tag. Its local source observes SQLDelight through
 `:foundation:sqldelight`'s `observeList`, `observeOneOrNull` and `observeOne` helpers, and builds its generated database once with `LazyDatabase` over the app's shared
-`SqlDriverProvider`, observing queries through `LazyDatabase.observe`. The app shares its cold platform connectivity monitor once with
+`SqlDriverProvider`, observing queries through `LazyDatabase.observe` and running one-shot reads and writes through `LazyDatabase.use`; neither ever runs SQL on the caller's own dispatcher (ADR-45). The app shares its cold platform connectivity monitor once with
 `ConnectivityMonitor.shared(applicationScope)`, so every coordinator takes
 `connectivityMonitor.reconnects()` directly.
 

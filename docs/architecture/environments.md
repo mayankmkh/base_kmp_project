@@ -65,6 +65,10 @@ name *is* the environment id, and `staging` carries an `applicationIdSuffix` of 
 ./gradlew :app:android:installProdDebug
 ```
 
+`staging` carries `isDefault`, so a fresh checkout and the IDE both start on `stagingDebug`. AGP
+would otherwise pick the alphabetically first flavor, which would point a development build at
+production.
+
 ### iOS
 
 Four build configurations — `Debug-Staging`, `Debug-Production`, `Release-Staging`,

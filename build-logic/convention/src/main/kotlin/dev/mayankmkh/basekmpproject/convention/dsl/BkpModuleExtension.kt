@@ -20,8 +20,8 @@ abstract class BkpModuleExtension @Inject constructor(objects: ObjectFactory) {
  * value to pass and nothing to turn off, so a module either asks for a feature or says nothing.
  *
  * The previous shape was `Property<Boolean>` flags with conventions, which meant
- * `features.environmentFlavors.set(true)` in a build script could be either a real request or a no-op
- * restatement of the convention, and nothing in the script said which.
+ * `features.environmentFlavors.set(true)` in a build script could be either a real request or a
+ * no-op restatement of the convention, and nothing in the script said which.
  */
 abstract class Features {
     internal var environmentFlavorsEnabled = false

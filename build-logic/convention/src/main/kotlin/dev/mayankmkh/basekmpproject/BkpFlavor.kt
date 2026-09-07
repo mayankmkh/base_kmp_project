@@ -17,6 +17,7 @@ enum class BkpFlavor(
     val dimension: FlavorDimension,
     val applicationIdSuffix: String? = null,
     val versionNameSuffix: String? = null,
+    val isDefault: Boolean = false,
 ) {
     staging(
         FlavorDimension.environment,
@@ -24,6 +25,10 @@ enum class BkpFlavor(
         // So a crash report, a bug report screenshot or a Play console entry says which backend the
         // build was talking to without anyone having to check the application id.
         versionNameSuffix = "-staging",
+        // What a fresh checkout selects, and what the IDE offers first. Without this AGP takes the
+        // alphabetically first flavor in the dimension, which is `prod` -- so the default would be
+        // to point a development build at production. Staging is the safe end of that choice.
+        isDefault = true,
     ),
     prod(FlavorDimension.environment),
 }
@@ -59,6 +64,7 @@ fun configureFlavors(
                     if (bkpFlavor.versionNameSuffix != null) {
                         versionNameSuffix = bkpFlavor.versionNameSuffix
                     }
+                    isDefault = bkpFlavor.isDefault
                 }
             }
         }

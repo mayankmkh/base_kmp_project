@@ -29,6 +29,8 @@ class BkpModuleFeaturesTest {
                 .run()
 
         assertContains(result.output, "FLAVORS=prod,staging")
+        // A fresh checkout must not default to the production backend.
+        assertContains(result.output, "DEFAULT_FLAVORS=staging")
     }
 
     @Test
@@ -87,6 +89,11 @@ class BkpModuleFeaturesTest {
         androidComponents {
             finalizeDsl { app ->
                 println("FLAVORS=" + app.productFlavors.map { it.name }.sorted().joinToString(","))
+                println(
+                    "DEFAULT_FLAVORS=" +
+                        app.productFlavors.filter { it.isDefault }.map { it.name }.sorted()
+                            .joinToString(",")
+                )
             }
         }
         """

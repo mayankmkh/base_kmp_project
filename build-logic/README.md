@@ -178,7 +178,10 @@ convention did not.
 | `compose()` | `bkp.kmp.foundation.api` |
 
 `environmentFlavors()` registers the `staging` and `prod` product flavors on an `environment`
-dimension; without it the app stays on plain `debug`/`release`. Each flavor carries its own
+dimension; without it the app stays on plain `debug`/`release`. `staging` is marked `isDefault`, so
+a fresh checkout selects `stagingDebug` rather than pointing a development build at production --
+AGP would otherwise take the alphabetically first flavor in the dimension. A developer's own choice
+in the IDE's Build Variants panel overrides it and is not shared. Each flavor carries its own
 `BuildConfig.APP_ENVIRONMENT`, whose value is the flavor name, and `staging` suffixes the
 application id with `.staging` so both installs sit on one device with separate storage. The two
 axes are independent, so all four variants are meaningful: `stagingDebug`, `stagingRelease`,

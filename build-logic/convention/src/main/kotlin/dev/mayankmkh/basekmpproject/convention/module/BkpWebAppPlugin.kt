@@ -44,11 +44,11 @@ class BkpWebAppPlugin : Plugin<Project> {
      * keeps each variant's sync and bundle adjacent.
      */
     private fun Project.serializeExecutableVariants() {
-        val development = tasks.matching { it.name.isWasmJsVariant("Development") }
+        // `named`, not `matching`: both are live collections, but the predicate only reads the
+        // name, which the container knows without instantiating the task.
+        val development = tasks.named { it.isWasmJsVariant("Development") }
         tasks
-            .matching {
-                it.name.isWasmJsVariant("Production") || it.name == PRODUCTION_DISTRIBUTION
-            }
+            .named { it.isWasmJsVariant("Production") || it == PRODUCTION_DISTRIBUTION }
             .configureEach {
                 mustRunAfter(development)
             }

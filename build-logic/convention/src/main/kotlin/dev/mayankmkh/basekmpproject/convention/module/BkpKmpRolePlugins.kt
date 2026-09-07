@@ -68,8 +68,10 @@ class BkpKmpCapabilityImplPlugin : Plugin<Project> {
             pluginManager.withPlugin("app.cash.sqldelight") {
                 // A contributor sees only its own files, so repo-wide migration numbers look
                 // falsely gapped here. The composed sequence is verified in :storage:database.
+                // `named`, not `matching`: the predicate only reads the name, and SQLDelight's
+                // task type is not on this build's compile classpath to select by.
                 tasks
-                    .matching { it.name.startsWith("verify") && it.name.endsWith("Migration") }
+                    .named { it.startsWith("verify") && it.endsWith("Migration") }
                     .configureEach { enabled = false }
             }
         }

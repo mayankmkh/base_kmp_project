@@ -362,6 +362,11 @@ those module lifecycles, and `verify --fast --affected` selects the same lifecyc
 re-parsing module build scripts. The task graph prints the chosen tier once. Live task collections
 keep tasks registered late by AGP and KMP in the selected tier and remain configuration-cache safe.
 
+Those collections come from `named(Spec<String>)`, never `matching { it.name ... }`. Both are live,
+but `matching` takes a `Spec<Task>` and so has to instantiate every task in the container to ask it
+its name; `named` filters on the name the container already holds. Every tier predicate here reads
+only the name, so the eager form buys nothing -- and `lintJvm` rejects it (`EagerGradleConfiguration`).
+
 ## Tests
 
 ```bash

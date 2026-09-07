@@ -151,12 +151,12 @@ A change is not complete until the verification tier for its blast radius is gre
 Never run a bare `./gradlew build`: it builds fourteen production web bundles and exhausts memory.
 Use `check` plus the targeted assembles above.
 
-`build-logic` is an included build, so no repo-level tier reaches it. Run both of these after
-changing a convention plugin -- `:convention:test` alone leaves the formatting unchecked, and
-`:convention:check`, which would cover it, is red on pre-existing lint:
+`build-logic` is an included build, so no repo-level tier reaches it. It has its own gate, which
+covers the plugin tests, formatting and the plugin-authoring lint in one command. Run it after
+changing a convention plugin:
 
 ```bash
-./gradlew -p build-logic :convention:test :convention:spotlessCheck
+./gradlew -p build-logic :convention:check
 ```
 
 The control plane has its own test, which is deliberately **not** part of `verifyFast` because it

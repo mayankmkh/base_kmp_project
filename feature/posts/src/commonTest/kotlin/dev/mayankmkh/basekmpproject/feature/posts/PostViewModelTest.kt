@@ -99,7 +99,7 @@ class PostViewModelTest {
     }
 
     @Test
-    fun `a durable detail carried into an unsynchronized process is shown, not loaded`() =
+    fun `a durable detail carried into an unsynchronized process is shown rather than loaded`() =
         runMainTest {
             val queries = FakePostsQueries()
             val post = PostsFixtures.post(2)

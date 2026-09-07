@@ -20,7 +20,7 @@ class ResourceObservationTest {
     }
 
     @Test
-    fun `initial is unsynchronized, has no value and is loading its first one`() {
+    fun `initial is unsynchronized -- has no value and is loading its first one`() {
         val observation = ResourceObservation.initial<String>()
 
         assertFalse(observation.hasValue)

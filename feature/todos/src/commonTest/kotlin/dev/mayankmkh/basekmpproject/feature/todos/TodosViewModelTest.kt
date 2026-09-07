@@ -222,7 +222,7 @@ class TodosViewModelTest {
     }
 
     @Test
-    fun `the summary loads until the first synchronization answers, failure included`() =
+    fun `the summary loads until the first synchronization answers -- failure included`() =
         runMainTest {
             val queries = FakeTodosQueries(list = ResourceObservationFixtures.unsynchronized())
             val viewModel = TodoSummaryViewModel(queries)

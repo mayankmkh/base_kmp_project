@@ -45,8 +45,12 @@ plugins {
     alias(libs.plugins.bkp.validation.graph)
 }
 
+// `named`, not `matching`: both tolerate a subproject that registers no such lifecycle -- parent
+// projects without a build script do not -- and both stay live, but `matching` takes a `Spec<Task>`
+// and so instantiates every task in every subproject to ask it its name. Same rule the convention
+// plugins follow; `androidx.lint:lint-gradle` enforces it there but does not see this script.
 val verifyFastModules = subprojects.map { candidate ->
-    candidate.tasks.matching { it.name == "verifyFastModule" }
+    candidate.tasks.named { it == "verifyFastModule" }
 }
 
 val verifyFast =
@@ -61,7 +65,7 @@ val verifyFast =
     }
 
 val verifyFullModules = subprojects.map { candidate ->
-    candidate.tasks.matching { it.name == "verifyFullModule" }
+    candidate.tasks.named { it == "verifyFullModule" }
 }
 
 val verifyFull =

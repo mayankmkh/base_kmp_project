@@ -365,8 +365,14 @@ keep tasks registered late by AGP and KMP in the selected tier and remain config
 ## Tests
 
 ```bash
-./gradlew -p build-logic :convention:test
+./gradlew -p build-logic :convention:test :convention:spotlessCheck
 ```
+
+Both, not just the first. This build is included rather than part of the repo's own task graph, so
+`verifyFast` and `verifyFull` never reach it: `:convention:test` is the only gate anyone runs here,
+and it does not depend on formatting. `:convention:check` would cover both, but it also runs
+`lintJvm`, which fails on pre-existing `EagerGradleConfiguration` findings and so is not usable as
+a routine gate until those are fixed or baselined.
 
 The suite drives the plugins through Gradle TestKit against throwaway single- and multi-module
 projects. `TestProject.withModule` creates nested projects and source fixtures for dependency,

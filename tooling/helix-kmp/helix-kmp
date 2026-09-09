@@ -284,12 +284,12 @@ create_cell() {
     local feature="${1:-}"
     local cell="${2:-}"
     [ -n "$feature" ] && [ -n "$cell" ] ||
-        die "usage: helix-kmp create cell <feature> <CellName> [--capability <name>] [--dry-run]"
+        die "usage: helix-kmp create cell <feature> <CellName> [--capability <name>] [--no-view-model] [--dry-run]"
     shift 2
     require_module_name "$feature"
     require_type_name "$cell"
 
-    local capability=""
+    local capability="" no_view_model=0
     while [ $# -gt 0 ]; do
         case "$1" in
             --capability)
@@ -299,11 +299,22 @@ create_cell() {
                 require_module_name "$capability"
                 ;;
             --capability=*) capability="${1#*=}"; require_module_name "$capability" ;;
+            --no-view-model) no_view_model=1 ;;
             --dry-run) DRY_RUN=1 ;;
             *) die "unknown flag for 'create cell': $1" ;;
         esac
         shift
     done
+
+    # The --capability overlay exists to give the Cell's ViewModel a Queries contract to observe.
+    # With no ViewModel there is nothing to give it: a Cell that observed a Capability from
+    # composition would own the observation it just said it does not own. Pick one.
+    if [ "$no_view_model" = "1" ] && [ -n "$capability" ]; then
+        die "--no-view-model and --capability are mutually exclusive. The capability overlay's only
+       content is a ViewModel that observes that Capability's Queries, so with --no-view-model
+       there is nothing left for it to add. A Cell that observes a Capability owns presentation
+       state and therefore owns a ViewModel; see the source of truth, section 12.15."
+    fi
 
     local module_dir="$REPO_ROOT/feature/$feature"
     [ -d "$module_dir" ] || die "feature/$feature does not exist -- create the feature first"
@@ -319,6 +330,18 @@ create_cell() {
     [ -e "$cell_file" ] && die "${cell}Cell already exists in feature/$feature"
 
     info "create cell $cell in :feature:$feature"
+
+    # A Cell with no ViewModel has no keyed state owner, so it renders neither the identity guard,
+    # the FeatureInstanceKey parameter nor the CellType constant: all three exist to serve one.
+    # Nothing registers in the Feature's Koin module either.
+    if [ "$no_view_model" = "1" ]; then
+        info "  no ViewModel: state stays in the host and in rememberSaveable (source of truth 12.15)"
+        render_tree "$TEMPLATE_ROOT/cell-no-view-model" "$module_dir" \
+            "CELL=$cell" "cell=$cell_camel" "PACKAGE=$package" "PACKAGE_DIR=$package_dir"
+        next_steps ":feature:$feature"
+        return 0
+    fi
+
     render_tree "$TEMPLATE_ROOT/cell" "$module_dir" \
         "CELL=$cell" "cell=$cell_camel" "PACKAGE=$package" "PACKAGE_DIR=$package_dir" \
         "CELL_TYPE=$cell_kebab"
@@ -780,11 +803,16 @@ Usage:
       both implementation(projects.capability.<name>Impl) and
       dependency(project(":capability:<name>-impl")) in storage/database/build.gradle.kts.
 
-  helix-kmp create cell <feature> <CellName> [--capability <name>] [--dry-run]
+  helix-kmp create cell <feature> <CellName> [--capability <name>] [--no-view-model] [--dry-run]
       Adds a Cell -- (id, instanceKey: FeatureInstanceKey, onOutput) -- with its keyed ViewModel,
       stateless Content, Output and tests to an existing Feature, and registers the ViewModel in
       that Feature's Koin module. With --capability, the id is that Capability's typed ID and the
       ViewModel observes its Queries contract.
+      --no-view-model    for a Cell whose state is owned by a Resource, by a platform engine, or by
+                         its own rememberSaveable (source of truth 12.15). Renders Cell, Content and
+                         Output only: no ViewModel, no ViewModel test, no FeatureInstanceKey, no
+                         identity guard, no CellType constant and no Koin registration. Data and
+                         callbacks arrive as parameters. Not combinable with --capability.
 
   helix-kmp verify --fast [--affected] [--base <ref>] [--dry-run]
   helix-kmp verify --full [--dry-run]

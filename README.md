@@ -164,6 +164,7 @@ simulator framework.
 | [`docs/history/helix-adoption-model.md`](docs/history/helix-adoption-model.md) | The retired one-time starter adoption model |
 | [`docs/architecture/helix-adoption-plan.md`](docs/architecture/helix-adoption-plan.md) | How this repository adopted it, phase by phase, with status |
 | [`docs/architecture/adr/0001-helix-adoption.md`](docs/architecture/adr/0001-helix-adoption.md) | Why Helix, what was rejected, and what it costs |
+| [`docs/architecture/adr/0002-platform-view-role.md`](docs/architecture/adr/0002-platform-view-role.md) | Proposed, not adopted: a `platform_view` role for hosting platform views in Compose |
 | [`docs/architecture/exceptions.md`](docs/architecture/exceptions.md) | How to add, expire and remove a rule exception |
 | [`docs/architecture/network.md`](docs/architecture/network.md) | How the shared HTTP client, authentication and retries are assembled |
 | [`docs/architecture/preferences.md`](docs/architecture/preferences.md) | How preferences, documents and secrets are stored on every target |

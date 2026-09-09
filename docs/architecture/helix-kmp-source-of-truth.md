@@ -2412,6 +2412,22 @@ class ApplicationRuntimeScope(
 
 Exact wrapper names may differ; ownership/cancellation semantics are normative.
 
+## 12.15 When a Cell owns a ViewModel
+
+A Cell has a ViewModel only when it owns presentation state that must outlive recomposition or a configuration change. That ownership is the reason the ViewModel exists; it is not a property of being a Cell.
+
+A Cell has none when the state is owned elsewhere:
+
+- a Resource owns it and the Cell observes it;
+- a platform engine owns it (a player's transport state, a map camera, a webview history);
+- the composition owns it, through `remember` or `rememberSaveable`.
+
+The usable test: a ViewModel that would only forward engine or Resource state should not exist.
+
+A Cell without a ViewModel takes no `FeatureInstanceKey`. The key exists to scope a ViewModelStore and a saveable-state slot, so with no ViewModel to scope it names nothing. Such a Cell takes its data and its callbacks as parameters and still reports an Output for what the host must decide.
+
+Which owner each kind of state belongs to is §12.9. How a Cell that does have a ViewModel acquires it is §30.4.
+
 ---
 
 # 13. Capability API and business model
@@ -5231,6 +5247,8 @@ this section holds no rules.
 
 ## 30.4 Canonical Cell + ViewModel acquisition
 
+This section is how a Cell that has a ViewModel acquires it; §12.15 decides whether it has one at all.
+
 Koin Compose is allowed at a **Feature Screen/Cell composition entry** to acquire that presentation owner's ViewModel. It remains forbidden in pure `:ui:*`.
 
 The keyed host installs the keyed `ViewModelStoreOwner` for its subtree; `koinViewModel()` resolves against that current owner.
@@ -5242,10 +5260,8 @@ fun LiveScoreCell(
     instanceKey: FeatureInstanceKey,
     onOutput: (LiveScoreOutput) -> Unit,
 ) {
-    val viewModel: LiveScoreViewModel = koinViewModel(
-        key = instanceKey.value,
-        parameters = { parametersOf(matchId, instanceKey) },
-    )
+    val viewModel: LiveScoreViewModel =
+        featureViewModel(instanceKey, parameters = { parametersOf(matchId) })
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val currentOnOutput by rememberUpdatedState(onOutput)
@@ -5268,6 +5284,7 @@ fun LiveScoreCell(
 
 Why these details are canonical:
 
+- `featureViewModel(instanceKey, parameters)` from `:foundation:presentation` is the acquisition seam. It keys the resolution by the instance key **and** the ViewModel type, so one placement may own more than one state owner, and the ViewModel itself never takes a `FeatureInstanceKey`;
 - current Koin Compose ViewModel resolution accepts a `ParametersDefinition`, so the parameter expression is a lambda;
 - `collectAsStateWithLifecycle()` is available in common lifecycle-compose APIs and stops unnecessary StateFlow collection when the presentation lifecycle is inactive;
 - `rememberUpdatedState` prevents callback identity churn from restarting the Output collector;
@@ -5279,19 +5296,11 @@ Why these details are canonical:
 Koin definition:
 
 ```kotlin
-viewModel { params ->
-    val matchId: MatchId = params.get()
-    val instanceKey: FeatureInstanceKey = params.get()
-
+viewModel { parameters ->
     LiveScoreViewModel(
-        matchId = matchId,
-        instanceKey = instanceKey,
+        matchId = parameters.get(),
         queries = get(),
         followTeam = get(),
-        trace = get<FeatureTraceFactory>().create(
-            feature = "cricket/live-score",
-            instanceKey = instanceKey,
-        ),
     )
 }
 ```
@@ -5423,6 +5432,8 @@ UI module resolves Koin ViewModel
 UI module imports navigation
 Cell imports another Cell implementation
 Cell has no stable FeatureInstanceKey despite multiple instances
+Cell ViewModel only forwards engine or Resource state
+Module carries a role whose responsibilities do not describe it
 Resource identity is a LazyList index
 RouteKey reused as ResourceKey
 UiCommand carries full domain object/resource snapshot
@@ -5438,6 +5449,8 @@ Goldens updated to make a behavioral test failure disappear
 Architecture rule disabled because generator/tooling lacks repair path
 Nested AGENTS/CLAUDE file copied into every Cell with stale duplicated rules
 ```
+
+"Module carries a role whose responsibilities do not describe it" is the general form of the line above it, and the one that matters more. When the dependency matrix leaves a component only one role it can physically sit in, that placement is forced by constraint rather than chosen: record it as a policy gap in an ADR, and do not inherit the role's conventions as if they described the component.
 
 ---
 

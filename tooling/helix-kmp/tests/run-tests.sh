@@ -2,7 +2,7 @@
 #
 # End-to-end test for the helix-kmp control plane (stage P1).
 #
-# Scaffolds a throwaway Capability, two Features and two Cells, compiles and checks them with the
+# Scaffolds a throwaway Capability, two Features and three Cells, compiles and checks them with the
 # repository's own quality gates, then removes every trace. The test fails if `git status --short`
 # is not byte-identical before and after, so a failed run cannot leave sample modules behind.
 #
@@ -96,6 +96,14 @@ expect_file() {
     fi
 }
 
+expect_no_file() {
+    if [ -e "$REPO_ROOT/$1" ]; then
+        fail "$1 must not exist"
+    else
+        log "  ok: no $1"
+    fi
+}
+
 expect_grep() {
     local pattern="$1" file="$2"
     if grep -q "$pattern" "$REPO_ROOT/$file"; then
@@ -143,6 +151,21 @@ expect_cell_shape() {
     expect_grep "contentPadding: PaddingValues = PaddingValues()," "$file"
     expect_grep "check(viewModel.$id == $id)" "$file"
     expect_grep "public const val .*CellType: String = \"$cell_type\"" "$file"
+}
+
+# The shape of a Cell that owns no ViewModel (source-of-truth 12.15). Everything about hosting
+# still holds; the identity guard, the `FeatureInstanceKey` parameter and the `CellType` constant
+# do not, because all three exist to serve a keyed ViewModel. Local UI state is `rememberSaveable`.
+expect_no_view_model_cell_shape() {
+    local file="$1"
+    expect_no_grep "fillMaxSize" "$file"
+    expect_no_grep "verticalScroll" "$file"
+    expect_grep "contentPadding: PaddingValues = PaddingValues()," "$file"
+    expect_no_grep "instanceKey: FeatureInstanceKey" "$file"
+    expect_no_grep "^import .*FeatureInstanceKey$" "$file"
+    expect_no_grep "check(viewModel" "$file"
+    expect_no_grep "CellType" "$file"
+    expect_grep "rememberSaveable" "$file"
 }
 
 # --------------------------------------------------------------------------
@@ -306,6 +329,26 @@ expect_file "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/f
 expect_cell_shape "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/DetailCell.kt" id detail
 expect_cell_shape "feature/posts/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/posts/api/PostDetailCell.kt" postId post-detail
 expect_grep "DetailViewModel" "feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample/api/sampleFeatureModule.kt"
+
+log "create cell sample Preview --no-view-model"
+"$CLI" create cell sample Preview --no-view-model
+PREVIEW_DIR="feature/sample/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/feature/sample"
+expect_file "$PREVIEW_DIR/api/PreviewCell.kt"
+expect_file "$PREVIEW_DIR/api/PreviewOutput.kt"
+expect_file "$PREVIEW_DIR/PreviewContent.kt"
+expect_no_file "$PREVIEW_DIR/PreviewViewModel.kt"
+expect_no_file "feature/sample/src/commonTest/kotlin/dev/mayankmkh/basekmpproject/feature/sample/PreviewViewModelTest.kt"
+expect_no_view_model_cell_shape "$PREVIEW_DIR/api/PreviewCell.kt"
+expect_no_grep "PreviewViewModel" "$PREVIEW_DIR/api/sampleFeatureModule.kt"
+
+# The capability overlay is a Queries-observing ViewModel, so it has nothing to overlay onto a Cell
+# that has no ViewModel. The combination must be refused rather than silently producing one.
+if "$CLI" create cell sample Rejected --no-view-model --capability sample > /dev/null 2>&1; then
+    fail "--no-view-model --capability was accepted"
+else
+    log "  ok: --no-view-model with --capability is refused"
+fi
+expect_no_file "$PREVIEW_DIR/api/RejectedCell.kt"
 
 log "create feature sample-linked --capability sample"
 "$CLI" create feature sample-linked --capability sample

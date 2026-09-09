@@ -6,6 +6,8 @@ an `ADR-NN` reference anywhere in the repository resolves here.
 governance rules these entries follow, and each entry's rule text lives in the section it names.
 Repository-local ADRs are separate and live in [`adr/`](adr/), starting with
 [`adr/0001-helix-adoption.md`](adr/0001-helix-adoption.md).
+[`adr/0002-platform-view-role.md`](adr/0002-platform-view-role.md) is proposed and not adopted;
+nothing in the policy file, the convention plugins or the CLI implements it.
 
 ---
 

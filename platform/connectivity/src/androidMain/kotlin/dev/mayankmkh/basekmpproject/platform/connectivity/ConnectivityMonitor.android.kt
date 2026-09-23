@@ -20,41 +20,41 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 actual fun createConnectivityMonitor(context: PlatformContext): ConnectivityMonitor =
     ConnectivityMonitor {
         callbackFlow {
-                val manager =
-                    context.appContext.getSystemService(Context.CONNECTIVITY_SERVICE)
-                        as? ConnectivityManager
+            val manager =
+                context.appContext.getSystemService(Context.CONNECTIVITY_SERVICE)
+                    as? ConnectivityManager
 
-                if (manager == null) {
-                    // Nothing to watch. Reporting online is the safer default: it costs a fetch
-                    // that may fail, where reporting offline would suppress refreshes forever.
-                    send(true)
-                    awaitClose {}
-                    return@callbackFlow
-                }
+            if (manager == null) {
+                // Nothing to watch. Reporting online is the safer default: it costs a fetch
+                // that may fail, where reporting offline would suppress refreshes forever.
+                send(true)
+                awaitClose {}
+                return@callbackFlow
+            }
 
-                val callback =
-                    object : ConnectivityManager.NetworkCallback() {
-                        override fun onCapabilitiesChanged(
-                            network: Network,
-                            networkCapabilities: NetworkCapabilities,
-                        ) {
-                            trySend(networkCapabilities.hasInternet())
-                        }
-
-                        override fun onLost(network: Network) {
-                            trySend(false)
-                        }
+            val callback =
+                object : ConnectivityManager.NetworkCallback() {
+                    override fun onCapabilitiesChanged(
+                        network: Network,
+                        networkCapabilities: NetworkCapabilities,
+                    ) {
+                        trySend(networkCapabilities.hasInternet())
                     }
 
-                send(manager.hasValidatedNetwork())
-                manager.registerNetworkCallback(
-                    NetworkRequest.Builder()
-                        .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                        .build(),
-                    callback,
-                )
-                awaitClose { manager.unregisterNetworkCallback(callback) }
-            }
+                    override fun onLost(network: Network) {
+                        trySend(false)
+                    }
+                }
+
+            send(manager.hasValidatedNetwork())
+            manager.registerNetworkCallback(
+                NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .build(),
+                callback,
+            )
+            awaitClose { manager.unregisterNetworkCallback(callback) }
+        }
             .distinctUntilChanged()
     }
 

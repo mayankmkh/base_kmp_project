@@ -24,16 +24,16 @@ import platform.darwin.dispatch_get_global_queue
 actual fun createConnectivityMonitor(context: PlatformContext): ConnectivityMonitor =
     ConnectivityMonitor {
         callbackFlow {
-                val monitor = nw_path_monitor_create()
-                nw_path_monitor_set_update_handler(monitor) { path ->
-                    trySend(nw_path_get_status(path) == nw_path_status_satisfied)
-                }
-                nw_path_monitor_set_queue(
-                    monitor,
-                    dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u),
-                )
-                nw_path_monitor_start(monitor)
-                awaitClose { nw_path_monitor_cancel(monitor) }
+            val monitor = nw_path_monitor_create()
+            nw_path_monitor_set_update_handler(monitor) { path ->
+                trySend(nw_path_get_status(path) == nw_path_status_satisfied)
             }
+            nw_path_monitor_set_queue(
+                monitor,
+                dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u),
+            )
+            nw_path_monitor_start(monitor)
+            awaitClose { nw_path_monitor_cancel(monitor) }
+        }
             .distinctUntilChanged()
     }

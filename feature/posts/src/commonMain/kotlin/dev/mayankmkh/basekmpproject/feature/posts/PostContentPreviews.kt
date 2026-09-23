@@ -1,6 +1,7 @@
 package dev.mayankmkh.basekmpproject.feature.posts
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.NonRestartableComposable
 import androidx.compose.ui.tooling.preview.Preview
 import dev.mayankmkh.basekmpproject.ui.designsystem.theme.BaseKmpProjectTheme
 
@@ -41,6 +42,7 @@ internal fun PostFeedOfflinePreview() {
 }
 
 @Composable
+@NonRestartableComposable
 private fun PostsPreview(content: @Composable () -> Unit) {
     BaseKmpProjectTheme(content = content)
 }

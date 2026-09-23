@@ -1,7 +1,7 @@
 [versions]
 # AGP and tools should be updated together
-agp = "9.3.1"
-android-tools = "32.3.1"
+agp = "9.4.1"
+android-tools = "32.4.1"
 android-compileSdk = "37"
 android-minSdk = "24"
 android-targetSdk = "37"
@@ -10,32 +10,32 @@ androidx-activity = "1.13.0"
 androidx-core = "1.19.0"
 # 1.3.0-alphaNN, not stable 1.2.1: the web implementation (`WebLocalStorage`) landed in the alphas,
 # and 1.2.1's wasmJs artifacts are stubs that throw. Drop to the stable line to give up web prefs.
-androidx-datastore = "1.3.0-alpha10"
+androidx-datastore = "1.3.0-alpha11"
 androidx-lifecycle = "2.11.0"
 androidx-lint-gradle = "1.0.0"
 androidx-test-runner = "1.7.0"
-composeMultiplatform = "1.12.0"
+composeMultiplatform = "1.12.1"
 # The standalone material3 train lags Compose Multiplatform; 1.9.0 is its latest stable.
 composeMaterial3 = "1.9.0"
 # Kotlin's Compose Multiplatform Navigation 3 guide recommends this Material adaptive scene port.
-composeMaterial3AdaptiveNavigation3 = "1.3.0-beta02"
+composeMaterial3AdaptiveNavigation3 = "1.3.0-rc01"
 # Android's adaptive navigation guidance recommends NavigationSuiteScaffold for app chrome.
 composeMaterial3AdaptiveNavigationSuite = "1.9.0"
-# Compose Multiplatform 1.12.0 ports Navigation3 UI 1.2.0-alpha02, based on AndroidX
-# Navigation3 1.2.0-alpha04. AndroidX publishes the KMP runtime directly.
-androidx-navigation3 = "1.2.0-alpha04"
-jetbrains-navigation3 = "1.2.0-alpha02"
+# Navigation3 UI 1.2.0-beta01 depends on AndroidX runtime 1.2.0-beta01; rc01 adds a
+# deep-link validation fix. AndroidX publishes the KMP runtime directly.
+androidx-navigation3 = "1.2.0-rc01"
+jetbrains-navigation3 = "1.2.0-beta01"
 navigation3-browser = "1.1.0"
 detekt = "2.0.0-alpha.6"
-# Compiled against `dev.detekt:detekt-core`, so it has to track `detekt` exactly: 0.6.4 <-> alpha.6.
-detektComposeRules = "0.6.4"
-firebaseBom = "34.17.0"
-firebaseCrashlyticsPlugin = "3.0.7"
+# Compiled against `dev.detekt:detekt-core`; the 0.6.6 compatibility matrix specifies alpha.6.
+detektComposeRules = "0.6.6"
+firebaseBom = "34.19.0"
+firebaseCrashlyticsPlugin = "3.0.8"
 firebasePerfPlugin = "2.0.2"
 gmsPlugin = "4.5.0"
 koinBom = "4.2.2"
-koinCompiler = "1.1.0"
-kotlin = "2.4.10"
+koinCompiler = "1.2.1"
+kotlin = "2.4.20"
 kotlinResult = "2.3.1"
 kotlinx-coroutines = "1.11.0"
 # Supplies the `Worker` and `Blob` externals the SQLDelight web-worker driver is handed on
@@ -46,15 +46,17 @@ kotlinxSerialization = "1.11.0"
 jna = "5.19.1"
 # Pinned rather than left to Spotless's bundled default, which would otherwise reformat the whole
 # repository as a side effect of a Spotless version bump.
-ktfmt = "0.63"
-ktor = "3.5.2"
-spotless = "8.9.0"
+ktfmt = "0.64"
+ktor = "3.6.0"
+spotless = "8.10.2"
 # Room is the Android-recommended option but publishes no wasmJs target, so it cannot back a
 # module built for `bkpTargets { default() }`. SQLDelight covers all four platforms.
-sqldelight = "2.2.1"
-touchlabKermit = "2.1.0"
+sqldelight = "2.4.0"
+# Must satisfy the SQLDelight worker's sql.js peer dependency (^1.8.0).
+sqljs = "1.14.2"
+touchlabKermit = "2.2.0"
 truth = "1.4.5"
-turbine = "1.2.0"
+turbine = "1.2.1"
 tink = "1.23.0"
 
 [libraries]

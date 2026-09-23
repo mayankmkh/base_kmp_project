@@ -73,9 +73,9 @@ internal sealed interface DeleteTodoRemoteAnswer {
 internal class TodosRemoteSource(private val client: HttpClient, private val json: Json) {
     suspend fun getTodos(): Result<List<TodoDto>, NetworkFailure> = client.tryCatching {
         get {
-                url { appendPathSegments(TODOS_PATH) }
-                parameter("userId", DEFAULT_OWNER_ID)
-            }
+            url { appendPathSegments(TODOS_PATH) }
+            parameter("userId", DEFAULT_OWNER_ID)
+        }
             .body()
     }
 
@@ -91,9 +91,9 @@ internal class TodosRemoteSource(private val client: HttpClient, private val jso
         client
             .tryCatching<TodoDto> {
                 post {
-                        url { appendPathSegments(TODOS_PATH) }
-                        jsonBody(CreateTodoDto(userId = draft.ownerId, title = draft.title))
-                    }
+                    url { appendPathSegments(TODOS_PATH) }
+                    jsonBody(CreateTodoDto(userId = draft.ownerId, title = draft.title))
+                }
                     .body()
             }
             .map<TodoDto, NetworkFailure, CreateTodoRemoteAnswer> {
@@ -110,9 +110,9 @@ internal class TodosRemoteSource(private val client: HttpClient, private val jso
         client
             .tryCatching<TodoDto> {
                 patch {
-                        url { appendPathSegments(TODOS_PATH, id.toString()) }
-                        jsonBody(CompletionDto(completed))
-                    }
+                    url { appendPathSegments(TODOS_PATH, id.toString()) }
+                    jsonBody(CompletionDto(completed))
+                }
                     .body()
             }
             .toUpdateAnswer()
@@ -124,9 +124,9 @@ internal class TodosRemoteSource(private val client: HttpClient, private val jso
         client
             .tryCatching<TodoDto> {
                 patch {
-                        url { appendPathSegments(TODOS_PATH, id.toString()) }
-                        jsonBody(RenameDto(title))
-                    }
+                    url { appendPathSegments(TODOS_PATH, id.toString()) }
+                    jsonBody(RenameDto(title))
+                }
                     .body()
             }
             .toUpdateAnswer()

@@ -45,7 +45,7 @@ kotlin {
                 implementation(
                     npm("@cashapp/sqldelight-sqljs-worker", libs.versions.sqldelight.get())
                 )
-                implementation(npm("sql.js", "1.8.0"))
+                implementation(npm("sql.js", libs.versions.sqljs.get()))
             }
         }
         jvmTest {

@@ -252,11 +252,10 @@ class PostsCapabilityImplTest {
     private fun MockEngine.requestCounts(): Map<String, Int> =
         requestHistory.map { it.url.encodedPath }.pathCounts()
 
-    private fun List<String>.pathCounts(): Map<String, Int> =
-        groupingBy { path ->
-                path.substringAfterLast("/").takeIf { it.all(Char::isDigit) } ?: "feed"
-            }
-            .eachCount()
+    private fun List<String>.pathCounts(): Map<String, Int> = groupingBy { path ->
+        path.substringAfterLast("/").takeIf { it.all(Char::isDigit) } ?: "feed"
+    }
+        .eachCount()
 
     private companion object {
         val CONFIG = NetworkConfig(baseUrl = Url("https://jsonplaceholder.typicode.com"))

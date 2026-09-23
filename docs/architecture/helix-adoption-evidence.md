@@ -2,8 +2,8 @@
 
 > **Status: frozen.** This is the evidence record for the Helix adoption of 2026-09-02, with
 > follow-up command results appended through 2026-09-06. No new evidence is added to it; an open
-> item that is later closed is marked resolved in place. Work after that date records its evidence
-> in a dated file under [`docs/history/`](../history/), one file per piece of work.
+> item that is later closed is marked resolved in place. Later changes report verification with
+> the change; durable architecture decisions belong in [`decisions.md`](decisions.md).
 
 Evidence contract: master source §22.13. Completion checklist: [§29.7 in
 `../history/helix-adoption-model.md`](../history/helix-adoption-model.md#297-adoption-completion). Plan and per-phase

@@ -1,6 +1,7 @@
 package dev.mayankmkh.basekmpproject.feature.todos
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.NonRestartableComposable
 import androidx.compose.ui.tooling.preview.Preview
 import dev.mayankmkh.basekmpproject.ui.designsystem.theme.BaseKmpProjectTheme
 
@@ -63,6 +64,7 @@ private val SummaryFixture: @Composable () -> Unit = {
 }
 
 @Composable
+@NonRestartableComposable
 private fun TodosPreview(content: @Composable () -> Unit) {
     BaseKmpProjectTheme(content = content)
 }

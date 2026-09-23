@@ -24,9 +24,9 @@ internal class PostsRemoteSource(private val client: HttpClient) {
     suspend fun getPosts(limit: Int = DEFAULT_LIMIT): Result<List<PostDto>, NetworkFailure> =
         client.tryCatching {
             get {
-                    url { appendPathSegments(POSTS_PATH) }
-                    parameter("_limit", limit)
-                }
+                url { appendPathSegments(POSTS_PATH) }
+                parameter("_limit", limit)
+            }
                 .body()
         }
 

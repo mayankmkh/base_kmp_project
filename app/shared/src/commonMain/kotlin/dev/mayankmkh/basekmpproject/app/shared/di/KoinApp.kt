@@ -215,7 +215,10 @@ private val networkModule = module {
         createHttpClient(
             engine = get(),
             config = get(),
-            credentialProvider = get(),
+            credentialProvider =
+                checkNotNull(getOrNull()) {
+                    "identityCapabilityModule must provide CredentialProvider"
+                },
             headers = get(),
             // Constructed here rather than declared as a `single<KtorLogger>`. Ktor's `Logger` and
             // Kermit's share a simple name, and web targets index a definition by simple name

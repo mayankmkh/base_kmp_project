@@ -177,6 +177,9 @@ problem in project code; see ADR-43.
 
 ## ADR-23 - Koin with constructor injection and graph/compiler validation
 
+**Status:** the original Kotlin/Koin version qualification below was superseded by ADR-47 on
+2026-09-22; the DI ownership and runtime verification decision remains.
+
 **Decision:** keep Koin as the DI mechanism while qualified; apply Koin compiler plugin 1.1.0 to
 App, Feature, and Capability Impl roles; use its typed DSL for pure constructor definitions; keep
 the entry point's module list a literal list of module names so the plugin validates the whole
@@ -475,3 +478,25 @@ secrets; without it, side-by-side installs silently share storage on desktop and
 **Revisit when:** a third environment appears that is not simply another host -- one that needs its
 own source set or its own dependency -- or when the app gains a legitimate reason for QA to
 repoint a build without reinstalling it.
+
+## ADR-47 - Scope the Koin KLIB hint gap while upgrading the compiler pair
+
+**Decision:** pin Kotlin 2.4.20 with Koin compiler 1.2.1. Keep the literal module list and
+compile-time graph validation. Bind all Identity contracts to one implementation singleton, and
+use a fail-fast runtime lookup for the one `CredentialProvider` injection that the compiler
+incorrectly rejects on iOS and Wasm. Assert the same instance and credential lifecycle in common
+Identity tests on JVM, Wasm browser and iOS simulator; keep JVM application-root verification.
+
+**Why:** the Koin compiler still omits DSL secondary-binding hints from Native KLIBs
+([issue #113](https://github.com/InsertKoinIO/koin-compiler-plugin/issues/113)); this repository
+also reproduces the diagnostic on Wasm. Static validation of the guarded lookup is absent on every
+target because it is opaque to the compiler, but the runtime graph resolves on all three tested
+targets. The upgrade keeps the rest of Koin's validation rather than disabling `compileSafety`
+for a toolchain-wide false positive. The sibling
+CMS project's local `main` commit `79d33ad` demonstrated the bounded integration pattern.
+
+**Review:** changing this authentication binding requires explicit experienced review under
+[`AGENTS.md`](../../AGENTS.md) before merge.
+
+**Revisit when:** Koin publishes secondary DSL bindings through Native/Wasm KLIBs and the direct
+`get<CredentialProvider>()` call compiles on both targets; remove the guard-based workaround then.

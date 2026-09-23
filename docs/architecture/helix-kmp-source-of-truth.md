@@ -3346,13 +3346,14 @@ Rules:
 - avoid `KoinComponent`/global `get()` in business/data classes;
 - Features depend on interfaces/product types, not implementation selection.
 
-Current state, qualified on 2026-09-06:
+Current state, requalified on 2026-09-22 (ADR-47):
 
 - The entry point's module list is literal. `startKoin` in `KoinApp.kt` names every module, one
   bare identifier per line, and nothing else. That literal list is what the Koin compiler plugin
-  reads: with it, the plugin resolves the whole graph and validates **every typed definition in
-  every module reachable from the entry point**. Any function call, spread, variable, or inline
-  `module { }` in that argument list makes the list dynamic again; the plugin reports `KOIN-W003`
+  reads: with it, the plugin resolves the whole graph and validates typed definitions in modules
+  reachable from the entry point, subject to the cross-module KLIB limitation below. Any function
+  call, spread, variable, or inline `module { }` in that argument list makes the list dynamic again;
+  the plugin reports `KOIN-W003`
   and silently falls back to a fail-open pass over whatever it happened to discover, while every
   gate still passes. `KoinApplicationModulesRuleTest` (§21.4) holds the shape.
 - The runtime values the graph cannot compute for itself -- the build flag and the environment --
@@ -3365,8 +3366,8 @@ Current state, qualified on 2026-09-06:
   app `Logger`. The price is Koin's own "loaded N definitions" line, emitted while its logger is
   still the empty default.
 - What the compiler validates: typed definitions, `single<T>()` and `viewModel<T>()`, across the
-  whole graph. Removing `single<TodosSettingsSource>()` from `todosCapabilityModule` fails
-  `:app:shared:compileKotlinJvm`, verbatim:
+  whole graph. During the original qualification, removing `single<TodosSettingsSource>()` from
+  `todosCapabilityModule` failed `:app:shared:compileKotlinJvm`, verbatim:
 
   ```text
   e: [Koin][KOIN-D001] Missing dependency: dev.mayankmkh.basekmpproject.capability.todos.impl.TodosSettingsSource
@@ -3374,36 +3375,31 @@ Current state, qualified on 2026-09-06:
     in module: dev.mayankmkh.basekmpproject.capability.todos.impl.todosCapabilityModule
   ```
 
-- What it does not validate: anything inside a definition lambda. Plugin 1.1.0 never looks into a
-  lambda body, `single { create(::fn) }` included, so rewriting a lambda in that shape buys
-  nothing. Removing the `HttpClientEngine` definition still compiles clean; `KoinGraphTest` is what
-  fails, verbatim:
-
-  ```text
-  org.koin.test.verify.MissingKoinDefinitionException: Missing definition for '[field:'engine' - type:'io.ktor.client.engine.HttpClientEngine']' in definition '[Singleton: 'io.ktor.client.HttpClient']'.
-  ```
-
-  Runtime parameters (`viewModel { parameters -> ... }`) are outside the compiler's reach for the
-  same reason.
+- What it does not validate: requirements hidden in arbitrary helper functions and one scoped
+  cross-module lookup. Koin compiler 1.2.1 handles direct `get()` calls in supported DSL lambdas,
+  but its DSL secondary-binding hints do not cross Native/Wasm KLIB boundaries reliably
+  ([upstream #113](https://github.com/InsertKoinIO/koin-compiler-plugin/issues/113)).
+  `identityCapabilityModule` binds `IdentityQueries`, `IdentityCommands`, and
+  `CredentialProvider` to the same `IdentityCapabilityImpl` singleton. `networkModule` resolves
+  `CredentialProvider` through a guarded `getOrNull()` that throws if the Identity binding is
+  absent, avoiding the false `KOIN-D002` at that lookup. `IdentityCapabilityModuleTest` runs on
+  JVM, Wasm browser and iOS simulator; `KoinGraphTest` resolves the real app root on JVM.
+  The guarded lookup is not statically checked on any target; compile-time validation remains
+  enabled for the rest of the graph. Runtime parameter values and helper internals continue to
+  need runtime verification.
 - The convention plugins apply the plugin only to `bkp.kmp.app`, `bkp.kmp.feature`, and
   `bkp.kmp.capability.impl`, the roles that own Koin definitions or the application entry point.
   Desktop and web app launchers call `initKoin` but declare no Koin DSL, so their roles do not apply
   it.
-- Koin 1.1.0 does not validate leaf compilations independently: they print
+- Koin 1.2.1 does not validate leaf compilations independently: they print
   `w: [Koin] compile-safety validation skipped -- no Koin entry point in this compilation.` Feature
   and Capability Impl typed definitions publish hints and are checked only when the `:app:shared`
   compilation reaches its `startKoin { }` entry point.
-- One warning remains, on every compilation the plugin touches, verbatim:
-
-  ```text
-  w: Koin compiler plugin: Kotlin 2.4.10 is newer than the newest tested version (2.4.0) — proceeding with the 2.4.0 adapter. If compilation fails, check for a koin-compiler-plugin update. Supported versions: 2.3.20, 2.4.0.
-  ```
-
-  It stays. The plugin offers options to silence it, and silencing a "this toolchain is untested"
-  notice is exactly the wrong trade: the next Kotlin bump is when it matters. Under
-  `-PwarningsAsErrors=true` it is reported as `e:` and fails every module the plugin is applied to.
-  The property is not usable on this repository anyway: `:foundation:resource` already fails it on
-  an unrelated unresolved opt-in marker, so the default builds are the qualified ones.
+- Kotlin 2.4.20 and Koin compiler 1.2.1 are verified together on every supported build target.
+  Kotlin's new power-assert `compilationFilter` is experimental and emits a build-logic compiler
+  warning. `:foundation:resource` still reports an unrelated unresolved coroutines opt-in marker
+  because that API module does not depend on coroutines; the default builds remain the qualified
+  ones. No warning or graph validation was disabled for this upgrade.
 
 Runtime checks stay, because they cover what the compiler cannot. `KoinGraphTest` starts the real
 entry point and reads back the definitions the running instance loaded, so there is no second

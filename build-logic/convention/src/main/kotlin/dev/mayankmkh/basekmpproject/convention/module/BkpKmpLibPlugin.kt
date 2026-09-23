@@ -13,6 +13,7 @@ import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.getByType
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.powerassert.gradle.PowerAssertCompilationFilter
 import org.jetbrains.kotlin.powerassert.gradle.PowerAssertGradleExtension
 
 class BkpKmpLibPlugin : Plugin<Project> {
@@ -38,17 +39,9 @@ class BkpKmpLibPlugin : Plugin<Project> {
             extensions.getByType<PowerAssertGradleExtension>().apply {
                 functions.addAll(POWER_ASSERT_FUNCTIONS)
 
-                // Left empty, the plugin only takes compilations literally named `test` -- which
-                // skips Android, whose compilations under the KMP library plugin are `hostTest`
-                // and `deviceTest`. Naming source sets replaces that rule rather than adding to
-                // it, so every test compilation has to be listed, derived from the target set the
-                // module actually declared.
-                includedSourceSets.addAll(
-                    provider {
-                        kotlin.targets
-                            .flatMap { it.compilations }
-                            .map { it.defaultSourceSet.name }
-                            .filter { it.endsWith("Test") }
+                compilationFilter.set(
+                    PowerAssertCompilationFilter { compilation ->
+                        compilation.defaultSourceSet.name.endsWith("Test")
                     }
                 )
             }

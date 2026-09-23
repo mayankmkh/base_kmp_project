@@ -56,8 +56,10 @@ public class LazyDatabase<D : Any>(
      * intermediate channel beyond the one [kotlinx.coroutines.flow.flowOn] uses to leave the
      * collector's lane.
      */
-    public fun <T> observe(query: D.() -> Flow<T>): Flow<T> =
-        flow { emitAll(get().query()) }.flowOn(drivers.dispatcher)
+    public fun <T> observe(query: D.() -> Flow<T>): Flow<T> = flow {
+        emitAll(get().query())
+    }
+        .flowOn(drivers.dispatcher)
 
     private suspend fun get(): D =
         database

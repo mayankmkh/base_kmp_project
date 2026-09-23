@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@cashapp/sqldelight-sqljs-worker@2.2.1":
-  version "2.2.1"
-  resolved "https://registry.yarnpkg.com/@cashapp/sqldelight-sqljs-worker/-/sqldelight-sqljs-worker-2.2.1.tgz#c71776a9dddfc435d4f1e64317a7039d447ea024"
-  integrity sha512-cj/llgS1T94t7rz63fI7pbi+jJx+vQofCT58KyMZb9XVRuoxb4taB5wbbBa4e/iljiuN5XIGGPFx+5PvtVh3LQ==
+"@cashapp/sqldelight-sqljs-worker@2.4.0":
+  version "2.4.0"
+  resolved "https://registry.yarnpkg.com/@cashapp/sqldelight-sqljs-worker/-/sqldelight-sqljs-worker-2.4.0.tgz#52956a9fd6abf36fb84ec3a9b556afffc70b08c6"
+  integrity sha512-IS23CECBAXKXRAXu82zOqbxiygDOwkq2Z2VkWv/OJIngpv75vbcfhBKb6LhXLqz2oCdNpmFafb1tzYAax6E9XA==
 
 "@js-joda/core@3.2.0":
   version "3.2.0"
@@ -255,10 +255,10 @@ slash@^3.0.0:
   resolved "https://registry.yarnpkg.com/slash/-/slash-3.0.0.tgz#6539be870c165adbd5240220dbe361f1bc4d4634"
   integrity sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==
 
-sql.js@1.8.0:
-  version "1.8.0"
-  resolved "https://registry.yarnpkg.com/sql.js/-/sql.js-1.8.0.tgz#cb45d957e17a2239662fe2f614c9b678990867a6"
-  integrity sha512-3HD8pSkZL+5YvYUI8nlvNILs61ALqq34xgmF+BHpqxe68yZIJ1H+sIVIODvni25+CcxHUxDyrTJUL0lE/m7afw==
+sql.js@1.14.2:
+  version "1.14.2"
+  resolved "https://registry.yarnpkg.com/sql.js/-/sql.js-1.14.2.tgz#01088911d183482b6f961b3563233df69edc9ab5"
+  integrity sha512-3ZGPovObMFrdw79zrUHbfdE/DLIsy8jdNdssmMSQuRAymedU6q84asPt0kgiqrdMYlPegDItiIMfmIXzZnYFcw==
 
 to-regex-range@^5.0.1:
   version "5.0.1"

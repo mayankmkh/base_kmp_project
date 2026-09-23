@@ -4,6 +4,7 @@ import dev.mayankmkh.basekmpproject.capability.identity.api.IdentityCommands
 import dev.mayankmkh.basekmpproject.capability.identity.api.IdentityQueries
 import dev.mayankmkh.basekmpproject.foundation.network.CredentialProvider
 import org.koin.core.module.Module
+import org.koin.dsl.binds
 import org.koin.dsl.module
 import org.koin.plugin.module.dsl.single
 
@@ -15,9 +16,6 @@ import org.koin.plugin.module.dsl.single
  */
 public val identityCapabilityModule: Module = module {
     single<CredentialStore>()
-    single<IdentityCapabilityImpl>()
-    // Aliases expose contracts only; lifecycle hooks belong to implementation definitions.
-    single<IdentityQueries> { get<IdentityCapabilityImpl>() }
-    single<IdentityCommands> { get<IdentityCapabilityImpl>() }
-    single<CredentialProvider> { get<IdentityCapabilityImpl>() }
+    single<IdentityCapabilityImpl>() binds
+        arrayOf(IdentityQueries::class, IdentityCommands::class, CredentialProvider::class)
 }

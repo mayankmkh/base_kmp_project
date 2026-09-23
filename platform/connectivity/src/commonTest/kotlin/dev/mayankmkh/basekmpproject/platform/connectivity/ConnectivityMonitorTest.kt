@@ -17,14 +17,13 @@ class ConnectivityMonitorTest {
         runTest {
             val online = MutableStateFlow(false)
             var upstreamCollections = 0
-            val monitor =
-                ConnectivityMonitor {
-                        flow {
-                            upstreamCollections += 1
-                            emitAll(online)
-                        }
-                    }
-                    .shared(backgroundScope)
+            val monitor = ConnectivityMonitor {
+                flow {
+                    upstreamCollections += 1
+                    emitAll(online)
+                }
+            }
+                .shared(backgroundScope)
 
             val first = async { monitor.isOnline().take(2).toList() }
             val second = async { monitor.isOnline().take(2).toList() }

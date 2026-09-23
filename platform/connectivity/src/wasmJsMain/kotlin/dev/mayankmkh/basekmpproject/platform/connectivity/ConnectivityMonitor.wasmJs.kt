@@ -17,16 +17,16 @@ import org.w3c.dom.events.Event
 actual fun createConnectivityMonitor(context: PlatformContext): ConnectivityMonitor =
     ConnectivityMonitor {
         callbackFlow {
-                val onOnline: (Event) -> Unit = { trySend(true) }
-                val onOffline: (Event) -> Unit = { trySend(false) }
+            val onOnline: (Event) -> Unit = { trySend(true) }
+            val onOffline: (Event) -> Unit = { trySend(false) }
 
-                send(window.navigator.onLine)
-                window.addEventListener(type = "online", callback = onOnline)
-                window.addEventListener(type = "offline", callback = onOffline)
-                awaitClose {
-                    window.removeEventListener(type = "online", callback = onOnline)
-                    window.removeEventListener(type = "offline", callback = onOffline)
-                }
+            send(window.navigator.onLine)
+            window.addEventListener(type = "online", callback = onOnline)
+            window.addEventListener(type = "offline", callback = onOffline)
+            awaitClose {
+                window.removeEventListener(type = "online", callback = onOnline)
+                window.removeEventListener(type = "offline", callback = onOffline)
             }
+        }
             .distinctUntilChanged()
     }

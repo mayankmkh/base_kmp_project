@@ -42,5 +42,5 @@ style:
     # annotations of our own.
     ignoreAnnotated: ['Preview']
 # The `Compose:` ruleset (io.nlopez.compose.rules) is deliberately absent: every entry we had was its
-# shipped default. 36 of its 40 rules are active; `ComposableNestingDepth`, `Material2`,
+# shipped default. 39 of its 43 rules are active; `ComposableNestingDepth`, `Material2`,
 # `PreviewNaming` and `UnstableCollections` are opt-in and stay off. Add a block only to deviate.

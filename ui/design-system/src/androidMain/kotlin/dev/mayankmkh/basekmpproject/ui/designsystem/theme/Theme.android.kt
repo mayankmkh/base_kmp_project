@@ -11,6 +11,9 @@ import androidx.compose.ui.platform.LocalContext
 @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.S)
 internal actual fun supportsDynamicTheming() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
+// The commonMain expect is not read-only; marking only this actual @ReadOnlyComposable would change
+// Compose codegen here and leave the expect/actual annotations asymmetric.
+@Suppress("MissingReadOnlyComposable")
 @Composable
 internal actual fun getDynamicColorScheme(darkTheme: Boolean): ColorScheme {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {

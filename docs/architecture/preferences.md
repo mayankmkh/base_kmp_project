@@ -4,8 +4,8 @@
 - **Owner:** mayankmkh@gmail.com
 - **Roles:** `foundation_runtime` for `:foundation:preferences`, `platform` for
   `:platform:secure-storage`
-- **DataStore:** `androidx.datastore` 1.3.0-alpha10, kept on the alpha line because the web
-  implementation only exists there. Where the DataStore prose docs and the DataStore source
+- **DataStore:** `androidx.datastore` 1.3.0 (stable), the first stable release that ships the
+  web implementation. Where the DataStore prose docs and the DataStore source
   disagree, this document follows the source and says so.
 
 This is the single source for how small persisted state is stored: key-value preferences, one
@@ -256,7 +256,7 @@ The `KSerializer<T>` parameter is format-agnostic, so swapping JSON for CBOR or 
 a change inside `PreferenceStores.openDocument` and a one-time data migration, not an API change. Document
 files use the `.json` suffix so the on-disk format is visible without opening the file.
 
-DataStore alpha10 ships its own `WebSerializer<T>` for kotlinx JSON on web only. The module does not
+DataStore 1.3.0 ships its own `WebSerializer<T>` for kotlinx JSON on web only. The module does not
 use it: it hard-codes `Json.Default`, which has none of the leniency above, and it exists only in
 the web source set.
 
@@ -264,7 +264,7 @@ the web source set.
 
 ### 8.1 What DataStore offers
 
-DataStore has no encryption in its core. Since 1.3.0-alpha07 there is
+DataStore has no encryption in its core. Since 1.3.0-alpha07 (stable since 1.3.0) there is
 `androidx.datastore:datastore-tink`, one class, `AeadSerializer<T>`, which wraps a java.io
 `Serializer<T>` and runs the bytes through a Tink `Aead` with the file name as associated data. A
 decryption failure surfaces as `CorruptionException`, so the corruption handler from §5 turns a lost
@@ -453,8 +453,8 @@ storage and must never change once a build has shipped — see
   test of the whole graph swaps one definition instead of every store.
 - **Registry over silent instance sharing.** Returning the existing store for a duplicate file
   name would merge two Capabilities' key namespaces without either noticing.
-- **Stay on the alpha line.** Stable 1.2.1 has wasmJs artifacts but they throw; `WebLocalStorage`
-  and `datastore-tink` exist only in 1.3.0. Revisit when 1.3.0 is stable.
+- **1.3.0 is the floor.** 1.2.x has wasmJs artifacts but they throw; `WebLocalStorage` and
+  `datastore-tink` exist only from 1.3.0, which is now stable and is what the project uses.
 - **No encryption of preferences.** Preferences hold no secrets by construction; encrypting them
   would spend Keystore operations on every read for nothing.
 - **Open-name registries use compare-and-set.** Graph creation is single-threaded today, but the
@@ -485,7 +485,7 @@ typed keys for `SecretStore` (secrets are strings by nature).
 - DataStore overview and the one-instance rule: https://developer.android.com/topic/libraries/architecture/datastore
 - DataStore release notes, `datastore-tink` in 1.3.0-alpha07, `WebLocalStorage` in 1.3.0-alpha08: https://developer.android.com/jetpack/androidx/releases/datastore
 - `security-crypto` deprecation, 1.1.0-beta01: https://developer.android.com/jetpack/androidx/releases/security
-- `AeadSerializer` source, `datastore-tink` 1.3.0-alpha10 sources jar, `commonMain/androidx/datastore/tink/AeadSerializer.kt`
-- `OkioStorage`, `WebLocalStorage`, `WebSerializer` sources, `datastore-core-okio` 1.3.0-alpha10
+- `AeadSerializer` source, `datastore-tink` 1.3.0 sources jar, `commonMain/androidx/datastore/tink/AeadSerializer.kt`
+- `OkioStorage`, `WebLocalStorage`, `WebSerializer` sources, `datastore-core-okio` 1.3.0
 - Apple File System Programming Guide, where files go in the app sandbox
 - XDG Base Directory Specification

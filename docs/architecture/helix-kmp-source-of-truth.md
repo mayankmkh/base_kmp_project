@@ -3395,7 +3395,7 @@ Current state, requalified on 2026-09-22 (ADR-47):
   `w: [Koin] compile-safety validation skipped -- no Koin entry point in this compilation.` Feature
   and Capability Impl typed definitions publish hints and are checked only when the `:app:shared`
   compilation reaches its `startKoin { }` entry point.
-- Kotlin 2.4.20 and Koin compiler 1.2.1 are verified together on every supported build target.
+- Kotlin 2.4.21 and Koin compiler 1.2.1 are verified together on every supported build target.
   Kotlin's new power-assert `compilationFilter` is experimental and emits a build-logic compiler
   warning. `:foundation:resource` still reports an unrelated unresolved coroutines opt-in marker
   because that API module does not depend on coroutines; the default builds remain the qualified

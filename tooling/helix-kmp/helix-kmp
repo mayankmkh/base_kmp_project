@@ -620,15 +620,18 @@ tasks_for_module() {
     echo "$path:verifyFastModule"
 }
 
-# Changed files vs. the base ref plus everything uncommitted, relative to the repo root.
+# Changed files vs. the base ref plus everything uncommitted, relative to the repo root. Fails,
+# rather than printing nothing, when either git query fails: an empty list means "nothing changed",
+# and a comparison that never ran must not be read that way.
 changed_files() {
-    local base="$1"
+    local base="$1" committed="" uncommitted
+    if [ -n "$base" ]; then
+        committed="$(git -C "$REPO_ROOT" diff --name-only "$base...HEAD")" || return 1
+    fi
+    uncommitted="$(git -C "$REPO_ROOT" status --porcelain)" || return 1
     {
-        if [ -n "$base" ]; then
-            git -C "$REPO_ROOT" diff --name-only "$base...HEAD" 2>/dev/null || true
-        fi
-        git -C "$REPO_ROOT" status --porcelain 2>/dev/null |
-            sed 's/^.\{3\}//; s/^.* -> //'
+        printf '%s\n' "$committed"
+        printf '%s\n' "$uncommitted" | sed 's/^.\{3\}//; s/^.* -> //'
     } | sed '/^$/d' | sort -u
 }
 
@@ -704,8 +707,12 @@ cmd_verify() {
     [ -n "$base" ] || base="$(default_base_ref)"
     info "Helix verification tier: FAST (affected, base: ${base:-<none, working tree only>})"
 
+    if [ -n "$base" ] && ! git -C "$REPO_ROOT" rev-parse --verify --quiet "$base^{commit}" > /dev/null 2>&1; then
+        die "--base '$base' is not a commit in this repository"
+    fi
+
     local files file global=0 modules="" path
-    files="$(changed_files "$base")"
+    files="$(changed_files "$base")" || die "could not list the files changed against ${base:-the working tree}"
     if [ -z "$files" ]; then
         info "No changed files; nothing to verify."
         return 0

@@ -99,6 +99,7 @@ class Repository:
     def refresh(self, no_refresh: bool) -> None:
         if no_refresh:
             return
+        before = self.report_stamp()
         result = subprocess.run(
             [str(self.root / "gradlew"), "checkModuleGraph", "-q"],
             cwd=self.root,
@@ -106,9 +107,19 @@ class Repository:
             capture_output=True,
             check=False,
         )
-        if result.returncode and not self.report_path.exists():
+        # The task writes its report before it fails on rule findings, so a failed run can still
+        # leave a report that is current. One the run did not rewrite is the previous run's: Gradle
+        # never treats a failed task as up to date, so a task that ran wrote the file again.
+        if result.returncode and self.report_stamp() in (None, before):
             detail = (result.stderr or result.stdout).strip()
             raise CliError(f"checkModuleGraph failed before producing a report: {detail}")
+
+    def report_stamp(self) -> tuple[int, int] | None:
+        try:
+            stat = self.report_path.stat()
+        except FileNotFoundError:
+            return None
+        return stat.st_mtime_ns, stat.st_size
 
     def graph(self, no_refresh: bool) -> dict[str, Any]:
         self.refresh(no_refresh)
@@ -633,7 +644,8 @@ def command_context(repo: Repository, args: argparse.Namespace) -> int:
             if path.name.endswith("Fixtures.kt")
         ]
     )
-    adr_source = (repo.root / "docs/architecture/adr/0001-helix-adoption.md").read_text(encoding="utf-8")
+    adr_path = repo.root.joinpath("docs", "architecture", "adr", "0001-helix-adoption.md")
+    adr_source = adr_path.read_text(encoding="utf-8") if adr_path.is_file() else ""
     adr_match = re.search(r"^## Revisit when\s*$\n(.*?)(?=^## |\Z)", adr_source, re.MULTILINE | re.DOTALL)
     adr_lines = [line.strip() for line in adr_match.group(1).splitlines() if line.strip()] if adr_match else []
     role = node.get("role")

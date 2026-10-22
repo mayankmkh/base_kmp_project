@@ -86,6 +86,16 @@ cleanup() {
     fi
 }
 
+# Before the trap, not after it: `cleanup` deletes every SAMPLE_DIRS path, so refusing from inside
+# the trap would delete the very module the refusal is protecting.
+for dir in $SAMPLE_DIRS; do
+    if [ -e "$REPO_ROOT/$dir" ]; then
+        echo "[helix-kmp-tests] refusing to run: $dir already exists" >&2
+        rm -rf "${WORK_DIR:?}"
+        exit 1
+    fi
+done
+
 trap cleanup EXIT INT TERM
 
 expect_file() {
@@ -179,13 +189,6 @@ cp "$AGENTS_FILE" "$AGENTS_BACKUP"
 git -C "$REPO_ROOT" status --short > "$STATUS_BEFORE"
 log "baseline recorded ($(wc -l < "$STATUS_BEFORE" | tr -d ' ') entries in git status --short)"
 
-for dir in $SAMPLE_DIRS; do
-    if [ -e "$REPO_ROOT/$dir" ]; then
-        echo "[helix-kmp-tests] refusing to run: $dir already exists" >&2
-        exit 1
-    fi
-done
-
 # --------------------------------------------------------------------------
 # 1. the CLI's own surface
 # --------------------------------------------------------------------------
@@ -199,6 +202,59 @@ else
     log "  ok: invalid module names are rejected"
 fi
 "$CLI" verify --fast --affected --dry-run > /dev/null || fail "verify --dry-run"
+if "$CLI" verify --fast --affected --base helix-kmp-tests-missing-ref --dry-run > /dev/null 2>&1; then
+    fail "affected verification accepted a base ref that does not exist"
+else
+    log "  ok: affected verification rejects a base ref that does not exist"
+fi
+
+# A copy of this script in a throwaway repository that already has a sample module must refuse
+# without touching it.
+log "checking a refused run leaves an existing sample module alone"
+REFUSAL_REPO="$WORK_DIR/refusal-repo"
+mkdir -p "$REFUSAL_REPO/tooling/helix-kmp/tests" "$REFUSAL_REPO/feature/sample"
+cp "$SCRIPT_DIR/run-tests.sh" "$REFUSAL_REPO/tooling/helix-kmp/tests/run-tests.sh"
+printf 'preexisting user code\n' > "$REFUSAL_REPO/feature/sample/UserCode.kt"
+git init -q "$REFUSAL_REPO"
+REFUSAL_LOG="$WORK_DIR/refusal.log"
+if bash "$REFUSAL_REPO/tooling/helix-kmp/tests/run-tests.sh" > "$REFUSAL_LOG" 2>&1; then
+    fail "the test ran although feature/sample already existed"
+elif ! grep -q 'refusing to run: feature/sample' "$REFUSAL_LOG"; then
+    fail "the copied test stopped for a reason other than the refusal: $(tail -n 3 "$REFUSAL_LOG")"
+elif [ "$(cat "$REFUSAL_REPO/feature/sample/UserCode.kt" 2> /dev/null)" = "preexisting user code" ]; then
+    log "  ok: the refusal kept feature/sample intact"
+else
+    fail "the refusal deleted or changed the existing feature/sample module"
+fi
+
+# A failed graph refresh must not hand back the previous run's report as if it were new, while a
+# report the failing task did write (rule findings fail the task after writing it) stays readable.
+log "checking graph refresh distinguishes a stale report from a freshly failed one"
+for scenario in stale fresh; do
+    fixture="$WORK_DIR/refresh-$scenario"
+    mkdir -p "$fixture/build/reports/helix"
+    printf '{"schema":2,"nodes":[],"edges":[],"findings":[]}\n' > "$fixture/build/reports/helix/module-graph.json"
+    printf '{"schema":2,"nodes":[],"edges":[],"findings":[{"rule":"DEP-ROLE-DENIED","subject":"x"}]}\n' \
+        > "$fixture/new-report.json"
+    if [ "$scenario" = "stale" ]; then
+        printf '#!/bin/sh\necho configuration failed >&2\nexit 1\n' > "$fixture/gradlew"
+    else
+        printf '#!/bin/sh\ncp new-report.json build/reports/helix/module-graph.json\nexit 1\n' \
+            > "$fixture/gradlew"
+    fi
+    chmod +x "$fixture/gradlew"
+    python3 -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import helix_cli
+try:
+    findings = helix_cli.Repository(Path(sys.argv[2])).graph(False)["findings"]
+except helix_cli.CliError:
+    sys.exit(0 if sys.argv[3] == "stale" else 1)
+sys.exit(0 if sys.argv[3] == "fresh" and findings else 1)
+' "$TOOL_DIR/lib" "$fixture" "$scenario" || fail "graph refresh mishandled the $scenario report"
+done
 
 # Isolate the affected-module mapper from unrelated in-flight working-tree edits by putting a
 # minimal Git status producer first on PATH. The real file is still changed and restored here; the
@@ -251,10 +307,12 @@ GALLERY_TEXT="$WORK_DIR/gallery.txt"
 GALLERY_JSON="$WORK_DIR/gallery.json"
 
 "$CLI" graph --json --no-refresh > "$GRAPH_JSON" || fail "graph --json"
-python3 -c 'import json,sys; value=json.load(open(sys.argv[1])); assert value["schema"] == 2; assert len(value["nodes"]) == 24; assert "reverseEdges" in value' "$GRAPH_JSON" || fail "graph JSON shape or node count"
+# Every module included in settings.gradle.kts is a node, and nothing else is: compared as sets
+# rather than as a count, so adding a module does not break the test and a dropped one is named.
+python3 -c 'import json,re,sys; value=json.load(open(sys.argv[1])); assert value["schema"] == 2; included=set(re.findall(r"^    \"(:[^\"]+)\",$", open(sys.argv[2]).read(), re.M)); nodes={node["path"] for node in value["nodes"]}; assert nodes == included, sorted(nodes ^ included); assert "reverseEdges" in value' "$GRAPH_JSON" "$SETTINGS_FILE" || fail "graph JSON shape or node set"
 
 "$CLI" impact :capability:posts-api --json --no-refresh > "$IMPACT_JSON" || fail "impact module"
-python3 -c 'import json,sys; value=json.load(open(sys.argv[1])); assert ":feature:posts" in value["directReverseDependents"]; assert ":app:shared" in value["directReverseDependents"]' "$IMPACT_JSON" || fail "impact module reverse dependents"
+python3 -c 'import json,sys; value=json.load(open(sys.argv[1])); assert ":feature:posts" in value["directReverseDependents"]; assert ":app:shared" in value["directReverseDependents"]; assert ":capability:posts-impl" in value["directReverseDependents"]' "$IMPACT_JSON" || fail "impact module reverse dependents"
 "$CLI" impact capability/posts-api/src/commonMain/kotlin/dev/mayankmkh/basekmpproject/capability/posts/api/PostsCapability.kt --json --no-refresh | grep -q ':capability:posts-api' || fail "impact file resolution"
 "$CLI" impact PostsQueries --json --no-refresh | grep -q ':capability:posts-api' || fail "impact symbol resolution"
 
@@ -433,7 +491,7 @@ cp "$SAMPLE_BUILD_BACKUP" "$SAMPLE_BUILD"
 # 5. removal must restore the tree exactly
 # --------------------------------------------------------------------------
 cleanup
-(cd "$REPO_ROOT" && ./gradlew checkModuleGraph -q) || fail "could not restore the 24-node graph report"
+(cd "$REPO_ROOT" && ./gradlew checkModuleGraph -q) || fail "could not restore the module graph report"
 git -C "$REPO_ROOT" status --short > "$STATUS_AFTER"
 if diff -u "$STATUS_BEFORE" "$STATUS_AFTER"; then
     log "  ok: git status --short is unchanged"

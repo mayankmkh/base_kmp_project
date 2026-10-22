@@ -370,14 +370,12 @@ only the name, so the eager form buys nothing -- and `lintJvm` rejects it (`Eage
 ## Tests
 
 ```bash
-./gradlew -p build-logic :convention:test :convention:spotlessCheck
+./gradlew -p build-logic :convention:check
 ```
 
-Both, not just the first. This build is included rather than part of the repo's own task graph, so
-`verifyFast` and `verifyFull` never reach it: `:convention:test` is the only gate anyone runs here,
-and it does not depend on formatting. `:convention:check` would cover both, but it also runs
-`lintJvm`, which fails on pre-existing `EagerGradleConfiguration` findings and so is not usable as
-a routine gate until those are fixed or baselined.
+This build is included rather than part of the repo's own task graph, so `verifyFast` and
+`verifyFull` never reach it: run `:convention:check` here, which covers the tests, Spotless, and
+`lintJvm`.
 
 The suite drives the plugins through Gradle TestKit against throwaway single- and multi-module
 projects. `TestProject.withModule` creates nested projects and source fixtures for dependency,
@@ -394,6 +392,8 @@ Quality plugins are internal and auto-applied by primary plugins:
 
 - `bkp.quality.style` (Spotless + detekt). Also applied to the root project, which has no sources
   but owns build scripts worth formatting; the plugin skips its detekt half there.
+  The "compiler errors found during analysis" lines from the `detektMain<Target>` tasks are a
+  known detekt 2.0.0-alpha.6 limitation; `BkpQualityStylePlugin.kt` explains why.
 - `bkp.quality.lint` (Android lint when an Android or KMP Android plugin is present)
 
 ## Role dependency baselines

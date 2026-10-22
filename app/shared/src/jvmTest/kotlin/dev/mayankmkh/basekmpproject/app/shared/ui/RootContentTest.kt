@@ -111,8 +111,8 @@ class RootContentTest {
         waitUntilAtLeastOneExists(hasText("First post"), timeoutMillis = 5_000)
         onNodeWithText("First post").performClick()
 
-        // The details screen finds the post the list already cached, so this arrives without a
-        // second request.
+        // The details screen shows the row the list already cached; its own refresh of
+        // `/posts/1` answers with the same post.
         waitUntilAtLeastOneExists(hasText("Post 1"), timeoutMillis = 5_000)
         onNodeWithText("First body").assertIsDisplayed()
     }
@@ -287,6 +287,11 @@ class RootContentTest {
 
         const val TODO_JSON = """{"userId":1,"id":1,"title":"Buy milk","completed":false}"""
 
+        // The single-post answers for `/posts/<id>`; each matches its FEED_JSON entry.
+        const val POST_1_JSON = """{"userId":1,"id":1,"title":"First post","body":"First body"}"""
+
+        const val POST_2_JSON = """{"userId":1,"id":2,"title":"Second post","body":"Second body"}"""
+
         fun io.ktor.client.engine.mock.MockRequestHandleScope.respondFeed() =
             respond(
                 content = FEED_JSON,
@@ -297,6 +302,8 @@ class RootContentTest {
             when {
                 path == "/todos/1" -> respondJson(TODO_JSON)
                 path == "/todos" -> respondJson(TODOS_JSON)
+                path == "/posts/1" -> respondJson(POST_1_JSON)
+                path == "/posts/2" -> respondJson(POST_2_JSON)
                 else -> respondFeed()
             }
 

@@ -79,6 +79,15 @@ class BkpQualityStylePlugin : Plugin<Project> {
                 // Kept so the intent survives until detekt honours it again.
                 ignoredBuildTypes.set(listOf("release"))
             }
+            // The type-resolution tasks (`detektMain<Target>`) log "There were N compiler errors
+            // found during analysis" on every module with expect/actual, and also wherever
+            // kotlinx-serialization's generated `.serializer()` is referenced (for example
+            // :app:shared and :capability:todos-impl). detekt 2.0.0-alpha.6 analyses all
+            // KMP source sets of a compilation as one JVM module (detekt/detekt#9602) and loads no
+            // compiler plugins (detekt/detekt#7531); the multiplatform flags are already forwarded,
+            // so nothing here fixes it. Rules still run, but type-resolution rules on those
+            // declarations may miss or misreport. Re-check when a newer detekt 2 / compose-rules
+            // release lands.
             tasks.withType<Detekt>().configureEach {
                 exclude {
                     it.file.absolutePath.contains("build/")

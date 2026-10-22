@@ -172,7 +172,7 @@ These URLs are evidence references, not architectural dependencies.
 - Compose Multiplatform 1.10 announcement: `https://blog.jetbrains.com/kotlin/2026/01/compose-multiplatform-1-10-0/`
 - AndroidX Compose Runtime releases / retain history: `https://developer.android.com/jetpack/androidx/releases/compose-runtime`
 - AndroidX Compose Runtime retain API / RetainedValuesStore: `https://developer.android.com/reference/kotlin/androidx/compose/runtime/retain/package-summary`
-- SQLDelight 2.2.1 Web Worker driver: `https://sqldelight.github.io/sqldelight/2.2.1/js_sqlite/`
+- SQLDelight 2.4.0 Web Worker driver: `https://sqldelight.github.io/sqldelight/2.4.0/js_sqlite/`
 - Mobile Native Foundation Store releases: `https://github.com/MobileNativeFoundation/Store/releases`
 - Koin compiler plugin: `https://github.com/InsertKoinIO/koin-compiler-plugin`
 - Koin Compose ViewModel docs: `https://insert-koin.io/docs/reference/koin-compose/compose-viewmodel/`

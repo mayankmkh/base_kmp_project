@@ -8,7 +8,6 @@ import org.gradle.api.Project
 import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
-import org.gradle.kotlin.dsl.exclude
 
 class BkpAndroidAppFirebasePlugin : Plugin<Project> {
     override fun apply(target: Project) {
@@ -26,10 +25,11 @@ class BkpAndroidAppFirebasePlugin : Plugin<Project> {
                 val bom = libs.findLibrary("firebase.bom").get()
                 "implementation"(platform(bom))
                 "implementation"(libs.findLibrary("firebase.analytics").get())
-                "implementation"(libs.findLibrary("firebase.performance").get()) {
-                    exclude(group = "com.google.protobuf", module = "protobuf-javalite")
-                    exclude(group = "com.google.firebase", module = "protolite-well-known-types")
-                }
+                // firebase-perf needs the unshaded com.google.protobuf javalite runtime its POM
+                // declares (its generated v1 messages extend GeneratedMessageLite). Tink and
+                // DataStore ship relocated protobuf packages, so there is no conflict and nothing
+                // may exclude it.
+                "implementation"(libs.findLibrary("firebase.performance").get())
                 "implementation"(libs.findLibrary("firebase.crashlytics").get())
             }
 

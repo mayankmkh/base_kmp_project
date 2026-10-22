@@ -7,8 +7,10 @@ import org.gradle.testkit.runner.GradleRunner
 /**
  * A throwaway build for exercising convention plugins and multi-module graph rules.
  *
- * The plugins come from `withPluginClasspath()` rather than a real included build, so nothing is
- * resolved from a repository to run a test. The version catalog is the project's own -- see the
+ * The plugins come from `withPluginClasspath()` rather than a real included build, so their
+ * implementations are never resolved from a repository. A fixture that declares dependencies, such
+ * as [BkpAndroidAppFirebasePluginTest], resolves them from `google()` and `mavenCentral()` and so
+ * needs network access or a warm Gradle cache. The version catalog is the project's own -- see the
  * `bkp.test.versionCatalog` system property in the build script -- so a test fails if a plugin asks
  * for a key the project does not actually have.
  */

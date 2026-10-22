@@ -42,6 +42,11 @@ class BkpWebAppPlugin : Plugin<Project> {
      * the undeclared cross-variant dependency, and without an order the development bundle could be
      * built from production output. Running every production task after every development task
      * keeps each variant's sync and bundle adjacent.
+     *
+     * The two executable links (`compile<Variant>ExecutableKotlinWasmJs`) are ordered the same way.
+     * Both run inside the one Kotlin daemon, and two whole-program Wasm links at once can exceed
+     * its heap; within this module they now run one at a time (other modules' links are not ordered
+     * here).
      */
     private fun Project.serializeExecutableVariants() {
         // `named`, not `matching`: both are live collections, but the predicate only reads the
@@ -54,7 +59,8 @@ class BkpWebAppPlugin : Plugin<Project> {
             }
     }
 
-    private fun String.isWasmJsVariant(variant: String) = startsWith("wasmJs") && variant in this
+    private fun String.isWasmJsVariant(variant: String) =
+        (startsWith("wasmJs") || endsWith("ExecutableKotlinWasmJs")) && variant in this
 
     private companion object {
         /**

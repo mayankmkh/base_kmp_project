@@ -40,6 +40,29 @@ class BkpModuleFeaturesTest {
         assertContains(result.output, "FLAVORS=\n")
     }
 
+    @Test
+    fun `compose opt-in applies Compose to supported KMP roles`() {
+        val result =
+            TestProject(projectDir)
+                .withBuildScript("")
+                .withModule(
+                    ":foundation:compose-contract",
+                    """
+                plugins { id("bkp.kmp.foundation.api") }
+
+                bkpModule { features { compose() } }
+                kotlin { bkpTargets { exception("TestKit keeps feature tests JVM-only") { jvm() } } }
+
+                afterEvaluate {
+                    println("COMPOSE_APPLIED=" + pluginManager.hasPlugin("org.jetbrains.compose"))
+                }
+                """,
+                )
+                .run()
+
+        assertContains(result.output, "COMPOSE_APPLIED=true")
+    }
+
     /**
      * The synchronous half of the [dev.mayankmkh.basekmpproject.convention.dsl.BkpTargets]
      * contract: a target declared inside `exception` has its source sets available to the rest of

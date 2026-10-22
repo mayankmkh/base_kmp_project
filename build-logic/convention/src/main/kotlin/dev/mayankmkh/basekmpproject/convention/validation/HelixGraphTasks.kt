@@ -11,6 +11,8 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.ValueSource
+import org.gradle.api.provider.ValueSourceParameters
 import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
@@ -65,6 +67,29 @@ private data class ArchitectureException(
     val reason: String,
     val expires: LocalDate,
 )
+
+/**
+ * The system property that moves [CurrentDateSource]'s date forward, so a test can show an
+ * exception expiring. It is ignored when it names a day before today: it cannot keep an expired
+ * exception alive.
+ */
+internal const val HELIX_TODAY_PROPERTY = "bkp.helix.today"
+
+/**
+ * Today's date, read when the graph task runs rather than when the build is configured.
+ *
+ * A configuration-cache hit replays the task as it was stored. A date set as a plain value, or
+ * through `providers.provider { }`, is stored with it and comes back unchanged on a later day, so
+ * an expired exception would keep downgrading its findings. A value source wired lazily into the
+ * task is obtained again on every run, and still lands in the task's cache key as an input.
+ */
+abstract class CurrentDateSource : ValueSource<String, ValueSourceParameters.None> {
+    override fun obtain(): String {
+        val today = LocalDate.now()
+        val override = System.getProperty(HELIX_TODAY_PROPERTY)?.let(LocalDate::parse)
+        return maxOf(today, override ?: today).toString()
+    }
+}
 
 @CacheableTask
 abstract class CheckModuleGraphTask : DefaultTask() {
@@ -319,16 +344,14 @@ abstract class CheckModuleGraphTask : DefaultTask() {
                     if (source.isGenerated() || source.isInApiDirectory(node.projectDir)) {
                         return@sourceLoop
                     }
-                    source.readLines().forEachIndexed { index, line ->
-                        if (PUBLIC_TOP_LEVEL.matches(line)) {
-                            findings +=
-                                Finding(
-                                    "FEATURE-PUBLIC-SURFACE-OUTSIDE-API",
-                                    node.path,
-                                    "${source.relativeTo(node.projectDir).invariantSeparatorsPath}:${index + 1} declares public feature surface outside api/",
-                                    "move the declaration under an api/ directory or mark it internal/private",
-                                )
-                        }
+                    publicTopLevelDeclarations(source.readText()).forEach { lineNumber ->
+                        findings +=
+                            Finding(
+                                "FEATURE-PUBLIC-SURFACE-OUTSIDE-API",
+                                node.path,
+                                "${source.relativeTo(node.projectDir).invariantSeparatorsPath}:$lineNumber declares public feature surface outside api/",
+                                "move the declaration under an api/ directory or mark it internal/private",
+                            )
                     }
                 }
             }
@@ -565,10 +588,6 @@ abstract class CheckModuleGraphTask : DefaultTask() {
         private val PACKAGE = Regex("^package\\s+([A-Za-z_][\\w.]*)\\s*$")
         private val IMPORT =
             Regex("^import\\s+([A-Za-z_][\\w.]*(?:\\.\\*)?)(?:\\s+as\\s+\\w+)?\\s*$")
-        private val PUBLIC_TOP_LEVEL =
-            Regex(
-                "^(?:(?:public|expect|actual|open|abstract|final|const|lateinit|inline|suspend|operator|infix|tailrec|external|value)\\s+)*(?:data\\s+class|enum\\s+class|sealed\\s+(?:class|interface)|class|interface|object|fun|val|var|typealias)\\b.*"
-            )
         private val MAIN_SOURCE_DIRECTORY = Regex("^src/[^/]*Main(?:/|$)")
 
         // Structural parents such as `:app` or `:capability` exist as Gradle projects without a

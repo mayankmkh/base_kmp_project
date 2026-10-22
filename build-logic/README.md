@@ -183,7 +183,7 @@ convention did not.
 
 `environmentFlavors()` registers the `staging` and `prod` product flavors on an `environment`
 dimension; without it the app stays on plain `debug`/`release`. `staging` is marked `isDefault`, so
-a fresh checkout selects `stagingDebug` rather than pointing a development build at production --
+a fresh checkout selects `stagingDebug` rather than pointing a development build at production —
 AGP would otherwise take the alphabetically first flavor in the dimension. A developer's own choice
 in the IDE's Build Variants panel overrides it and is not shared. Each flavor carries its own
 `BuildConfig.APP_ENVIRONMENT`, whose value is the flavor name, and `staging` suffixes the
@@ -341,7 +341,10 @@ The source-backed rules (`FEATURE-PUBLIC-SURFACE-OUTSIDE-API` and the peer-impor
 modules' `src` **directories** as task inputs and walk them while the task runs. Handing over a file
 tree resolved at configuration time instead would freeze the file list into the configuration-cache
 entry, and a public declaration added in a brand-new file would go unseen until something else forced
-reconfiguration.
+reconfiguration. `FEATURE-PUBLIC-SURFACE-OUTSIDE-API` reads each top-level declaration whole with a
+token scanner (`TopLevelDeclarations.kt`) rather than matching one line at a time, so annotations,
+modifiers, comments and `;` spread over lines neither hide a public declaration nor flag a private
+one.
 
 ### Architecture exceptions
 
@@ -369,7 +372,7 @@ keep tasks registered late by AGP and KMP in the selected tier and remain config
 Those collections come from `named(Spec<String>)`, never `matching { it.name ... }`. Both are live,
 but `matching` takes a `Spec<Task>` and so has to instantiate every task in the container to ask it
 its name; `named` filters on the name the container already holds. Every tier predicate here reads
-only the name, so the eager form buys nothing -- and `lintJvm` rejects it (`EagerGradleConfiguration`).
+only the name, so the eager form buys nothing — and `lintJvm` rejects it (`EagerGradleConfiguration`).
 
 ## Tests
 

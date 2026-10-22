@@ -39,6 +39,9 @@ class BkpKmpLibPlugin : Plugin<Project> {
             extensions.getByType<PowerAssertGradleExtension>().apply {
                 functions.addAll(POWER_ASSERT_FUNCTIONS)
 
+                // The built-in TESTS filter only matches compilations literally named `test`, which
+                // skips Android KMP's `hostTest` and `deviceTest`. Keep the same semantic test
+                // selection while using Kotlin 2.4's compilation filter API.
                 compilationFilter.set(
                     PowerAssertCompilationFilter { compilation ->
                         compilation.defaultSourceSet.name.endsWith("Test")

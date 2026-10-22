@@ -435,11 +435,18 @@ Recorded, not fixed (follow-ups, none blocks Feature development):
 - Graph validation only follows `api`/`implementation`-style configurations, so a forbidden
   edge declared via `compileOnly`/`runtimeOnly` is not reported.
 - `currentDate` is an `@Input` of the cacheable graph task, so it is never up-to-date across
-  days.
+  days. That is intended. **Clarified 2026-10-22:** the real gap was configuration-cache
+  staleness, and it is fixed: the date now comes from a `ValueSource` obtained on every run, so a
+  reused configuration cache no longer replays the day the build was configured and an exception
+  expires on time; `bkp.helix.today` moves it forward in tests only.
 - `KeyedOwnerHost` reconciles a set diff against remembered known keys in `SideEffect`; lifecycle's
   provider defers a requested clear while an item remains composed and completes it on disposal.
 - `PUBLIC_TOP_LEVEL` matching in the graph task is line-based; a one-line
   `@Composable public fun` would not be detected (ktfmt keeps annotations on their own line).
+  **Resolved 2026-10-22:** the regex is gone; a token scanner (`TopLevelDeclarations.kt`) reads
+  each top-level declaration whole, with its annotations, modifiers and comments across lines,
+  receivers and `=`/`by` expressions, which closes the common line-shape gaps (a few contrived
+  shapes can still go unreported, never falsely reported).
 - `helix-kmp` iterates changed files with unquoted word splitting (paths with spaces).
 - Role→path, rule-ID and verify-tier tables are repeated across `AGENTS.md`, `README.md`,
   `build-logic/README.md` and the adoption plan; `build-logic/README.md` also describes the

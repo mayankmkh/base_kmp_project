@@ -64,7 +64,10 @@ to go green.
 ## Expiring one
 
 On the day after `expires`, `checkModuleGraph` emits `EXC-EXPIRED` against the entry's scope and
-the build fails. There are exactly two legitimate responses:
+the build fails. Expiry is evaluated when `checkModuleGraph` runs, not when the build was
+configured, so a reused configuration cache does not keep an expired entry alive; the
+`bkp.helix.today` system property can move that date forward and exists only for tests. There are
+exactly two legitimate responses:
 
 - **Remove it** -- delete the entry, because the underlying violation is gone. Verify with
   `./gradlew checkModuleGraph`.

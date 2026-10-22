@@ -6,7 +6,6 @@ import dev.mayankmkh.basekmpproject.convention.dsl.BkpModuleExtension
 import dev.mayankmkh.basekmpproject.convention.dsl.BkpTargets
 import dev.mayankmkh.basekmpproject.convention.helix.HelixModuleExtension
 import dev.mayankmkh.basekmpproject.convention.helix.HelixRole
-import java.time.LocalDate
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -45,7 +44,7 @@ class BkpValidationGraphPlugin : Plugin<Project> {
                 description = "Validates the Helix role and main-source project dependency graph."
                 policyFile.set(dependencyPolicy)
                 exceptionsFile.set(exceptionRegistry)
-                currentDate.set(LocalDate.now().toString())
+                currentDate.set(project.providers.of(CurrentDateSource::class.java) {})
                 reportFile.set(
                     project.layout.buildDirectory.file("reports/helix/module-graph.json")
                 )

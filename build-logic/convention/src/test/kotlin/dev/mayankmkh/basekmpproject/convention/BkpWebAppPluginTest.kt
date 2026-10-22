@@ -50,4 +50,31 @@ class BkpWebAppPluginTest {
 
         assertContains(result.output, "wasmJsBrowserDevelopmentRun")
     }
+
+    /**
+     * Both executable links run in the one Kotlin daemon, and two whole-program Wasm links at once
+     * can exceed its heap, so the production link waits for the development one.
+     */
+    @Test
+    fun `production wasm link runs after the development link`() {
+        val result =
+            TestProject(projectDir)
+                .withBuildScript(
+                    """
+            plugins { id("bkp.web.app") }
+
+            gradle.taskGraph.whenReady {
+                val production = tasks.getByName("compileProductionExecutableKotlinWasmJs")
+                val after = production.mustRunAfter.getDependencies(production).map { it.name }
+                println("PRODUCTION_LINK_AFTER=" + after.sorted().joinToString(","))
+            }
+            """
+                )
+                .run("compileProductionExecutableKotlinWasmJs", "--dry-run")
+
+        assertContains(
+            result.output,
+            Regex("PRODUCTION_LINK_AFTER=.*compileDevelopmentExecutableKotlinWasmJs"),
+        )
+    }
 }

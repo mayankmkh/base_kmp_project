@@ -23,6 +23,7 @@ import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
+import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.assign
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
@@ -188,6 +189,13 @@ internal fun Project.configureKotlin() {
     tasks.withType<KotlinNativeLink>().configureEach {
         usesService(nativeLinkThrottle)
     }
+
+    // On macOS a test worker that touches AWT -- a Skia surface, a Compose scene, a font lookup --
+    // registers with the window server as a foreground app: it gets a Dock icon and takes focus
+    // from whatever the developer is doing, once per module on every verify, and once per replayed
+    // commit in a rebase. An agent process keeps its windows and its rendering but takes neither.
+    // Other platforms ignore the property.
+    tasks.withType<Test>().configureEach { systemProperty("apple.awt.UIElement", "true") }
 
     // Treat all Kotlin warnings as errors (disabled by default)
     // Override by setting warningsAsErrors=true in your ~/.gradle/gradle.properties

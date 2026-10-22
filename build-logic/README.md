@@ -148,6 +148,10 @@ that:
   do nothing.
 - **Compose primaries** wire the Compose compiler, the shared Compose bundle, and the tooling
   renderer on the right configuration for the module type.
+- **Test workers are agent processes on macOS** (`apple.awt.UIElement=true` on every `Test` task):
+  a worker that touches AWT, as the Skia and Compose tests do, otherwise registers as a foreground
+  app, takes a Dock icon and steals focus on every verify and every commit a rebase replays. The
+  property keeps its windows and rendering; other platforms ignore it.
 - **AGP 9 has built-in Kotlin**, so `org.jetbrains.kotlin.android` is never applied.
 
 ## `bkpModule` DSL

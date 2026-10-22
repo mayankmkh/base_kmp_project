@@ -436,9 +436,16 @@ Kotlin/Android test dependencies are configured by primary plugin type.
   in those modules and the validator's DSL checks short-circuit for them. The "one primary plugin"
   check still runs. Neither plugin has a consumer yet.
 - The KMP primaries call `withHostTest` and `withDeviceTestBuilder` eagerly, so that `commonTest`
-  gets an Android compilation instead of silently skipping the Android target. AGP creates those
-  compilations once, so a module cannot call either again to refine its own test settings — it
-  fails with an "already created" error. A per-module opt-out would go through `beforeVariants`.
+  gets an Android (host) compilation instead of silently skipping the Android target, and so that an
+  `src/androidDeviceTest` directory is compiled at all. The device-test compilation is outside every
+  source-set tree (`sourceSetTreeName = null`): `commonTest` runs on the Android host, jvm, ios and
+  wasm, never on a device, and `androidDeviceTest` is only for behaviour that needs the Android
+  framework. It gets `androidx.test:runner`, `kotlin-test`, `kotlin-test-junit` and
+  `kotlinx-coroutines-test` from the convention, not from `commonTest`. Keeping `commonTest` off the
+  device also keeps its backtick test names out of D8, which rejects a space in a class name below
+  API 30. AGP creates those compilations once, so a module cannot call either again to refine its
+  own test settings — it fails with an "already created" error. A per-module opt-out would go
+  through `beforeVariants`.
 - There is no test coverage for any of the above.
 - New modules are scaffolded by `tooling/helix-kmp/helix-kmp create`, which renders hand-written
   templates and inserts the module into `settings.gradle.kts`. The templates live in

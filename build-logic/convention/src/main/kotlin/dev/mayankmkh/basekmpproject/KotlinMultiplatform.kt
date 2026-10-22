@@ -142,13 +142,20 @@ internal fun Project.configureKotlinMultiplatformAndroidLibrary(
             // all -- shared tests would run on jvm and ios but silently skip the Android target.
             withHostTest { isIncludeAndroidResources = true }
 
-            // Device tests are opt-in as well. No shared module has instrumented tests today, but
-            // without this an `src/androidDeviceTest` directory added later is simply never
-            // compiled --
-            // no source set, no task, no error. `sourceSetTreeName = "test"` is what puts it under
-            // the
-            // same `commonTest` tree as the host tests.
-            withDeviceTestBuilder { sourceSetTreeName = "test" }
+            // Device tests are opt-in as well; without this an `src/androidDeviceTest` directory is
+            // simply never compiled -- no source set, no task, no error. They are for behaviour
+            // that needs the Android framework (a real SQLite, a Context, the Keystore) and nothing
+            // else. `sourceSetTreeName = null` keeps `androidDeviceTest` out of every source-set
+            // tree, so `commonTest` is not compiled into the device-test APK:
+            // - shared tests already run on the Android host (above), jvm, ios and wasm, so a
+            //   device run of them adds nothing but emulator time;
+            // - below DEX 040 (API 30) D8 rejects a space in a class name, and Kotlin names the
+            //   classes it generates inside a backtick test function after that function, so
+            //   with `minSdk` 24 any module with such a shared test failed to assemble its device
+            //   test APK at all.
+            // Detached from `commonTest`, the source set also loses its test dependencies; they
+            // are added explicitly below.
+            withDeviceTestBuilder { sourceSetTreeName = null }
                 .configure {
                     instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
                     // `targetSdk` has no `defaultConfig` equivalent on a KMP Android library; the
@@ -163,6 +170,12 @@ internal fun Project.configureKotlinMultiplatformAndroidLibrary(
         // The runner named above ships in this artifact and nothing else pulls it in, so without
         // it a device test fails to start.
         "androidDeviceTestImplementation"(libs.findLibrary("androidx.test.runner").get())
+        // The `commonTest` baseline that `androidDeviceTest` no longer inherits, in the shape
+        // `bkp.android.lib` gives its `androidTest`: `kotlin-test` alone is not enough on the JVM,
+        // where its annotations are expectations that only a framework artifact supplies.
+        "androidDeviceTestImplementation"(libs.findLibrary("kotlin.test").get())
+        "androidDeviceTestImplementation"(libs.findLibrary("kotlin.testJunit").get())
+        "androidDeviceTestImplementation"(libs.findLibrary("kotlinx.coroutines.test").get())
     }
 }
 

@@ -3,7 +3,7 @@ package dev.mayankmkh.basekmpproject.platform.securestorage
 import java.io.File
 import java.io.IOException
 
-internal class FileKeysetVault(private val file: File) : KeysetVault {
+internal class FileKeysetVault(val file: File) : KeysetVault {
     override fun read(): String? =
         vaultFileOperation("read", file) { readOwnerOnlyFile(file)?.decodeToString() }
 

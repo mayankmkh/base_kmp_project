@@ -32,7 +32,7 @@ internal actual fun secretStoreOpener(
                 AeadSerializer(aead, MapStringSerializer, name.encodeToByteArray())
             },
         ) {
-            directory.also(::createOwnerOnly).resolve("$name.secrets")
+            directory.also(::createOwnerOnly).resolve("$name$SecretsFileSuffix")
         }
     }
 }
@@ -43,14 +43,19 @@ internal fun encryptedSerializer(
 ): Serializer<Map<String, String>> =
     AeadSerializer(checkedKeysetAead(vault), MapStringSerializer, name.encodeToByteArray())
 
-/** The keyset's AEAD, with Tink's own failures reported as this module's exception. */
+/**
+ * The keyset's AEAD, with Tink's own failures reported as this module's exception; a vault's
+ * [SecretStoreException] passes through as it is.
+ */
 private fun checkedKeysetAead(vault: KeysetVault): Aead {
     try {
         AeadConfig.register()
         return keysetAead(vault)
-    } catch (failure: SecretStoreException) {
-        throw failure
     } catch (failure: GeneralSecurityException) {
+        throw SecretStoreException("Desktop secret keyset initialisation failed.", failure)
+    } catch (failure: IllegalArgumentException) {
+        // Tink's base-64 decoder rejects a damaged key value this way rather than as a security
+        // failure; it is still a keyset that cannot be read.
         throw SecretStoreException("Desktop secret keyset initialisation failed.", failure)
     }
 }

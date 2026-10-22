@@ -500,3 +500,8 @@ CMS project's local `main` commit `79d33ad` demonstrated the bounded integration
 
 **Revisit when:** Koin publishes secondary DSL bindings through Native/Wasm KLIBs and the direct
 `get<CredentialProvider>()` call compiles on both targets; remove the guard-based workaround then.
+
+**Amended 2026-10-22:** `CredentialProvider` is no longer the Identity singleton. It is bound to
+`CredentialStoreProvider`, a separate object over the same credential store, so the client never
+depends on an object that will itself need the client; the common Identity test and `KoinGraphTest`
+assert shared credential state instead of the same instance. The guarded lookup is unchanged.

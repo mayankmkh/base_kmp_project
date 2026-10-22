@@ -129,6 +129,9 @@ the same directory without depending on each other (§4).
 | Desktop JVM | macOS `~/Library/Application Support/<applicationId>/`, Windows `%APPDATA%\<applicationId>\`, Linux `${XDG_CONFIG_HOME:-~/.config}/<applicationId>/` | `<same directory>/<name>.secrets`, encrypted with `datastore-tink`; one application keyset in macOS Keychain, a Windows DPAPI-protected file or Linux libsecret, with an owner-only cleartext file fallback |
 | wasmJs | `localStorage["<applicationId>.<name>.preferences_pb"]` and `localStorage["<applicationId>.<name>.json"]` via `WebLocalStorage` | Memory only |
 
+The desktop SQLDelight database, `app.db` from `:storage:database`, lives in the same per-id
+directory; see [`environments.md`](environments.md) §4.
+
 Android uses the `datastore/` subdirectory that AndroidX's own `dataStoreFile()` uses, so a
 future move to the umbrella artifacts finds the files where it expects them.
 
@@ -340,7 +343,7 @@ message.
 `SecretStoreException` is the failure contract on every platform, not only iOS: the shared
 Android and desktop assembly wraps DataStore's `IOException` in it, with the original as the cause.
 A consumer can therefore treat "secret storage unavailable" as "no value" by catching one type.
-The Identity implementation does not catch it yet.
+The Identity implementation does, and clears nothing when it does (section 9).
 
 **Desktop JVM.** A typed DataStore of `Map<String, String>` in the application directory, encrypted
 by the same `AeadSerializer` and `AES256_GCM` Tink keyset model as Android. One cleartext JSON keyset
@@ -352,14 +355,43 @@ DataStore's IO scope at first use. Resolving the Koin graph does not touch a nat
 On macOS the vault is a Security.framework generic password with service
 `<applicationId>.secure-storage` and account `keyset`. On Windows the keyset is protected for the
 current user with DPAPI and `CRYPTPROTECT_UI_FORBIDDEN`, then the protected blob is written to
-`<applicationDataDirectory>/secure-storage.keyset`. On Linux it is a libsecret password in the
-default collection with attributes `application=<applicationId>` and `purpose=secure-storage`.
-An unavailable native library or Linux Secret Service selects a cleartext
-`<applicationDataDirectory>/secure-storage.keyset` fallback, created `0600` inside the existing
-`0700` directory on POSIX, and logs one warning with the backend's own reason. Once per process,
-because the vault is memoised per application id and every store opened afterwards would otherwise
-repeat it. Once a native store has answered, an error for its item becomes `SecretStoreException`
-and never silently falls back.
+`<applicationDataDirectory>/secure-storage.keyset.dpapi`, a file of its own: shared with the
+cleartext fallback, a DPAPI outage read the blob as a cleartext keyset, and the fallback's first
+write replaced the protected copy with cleartext DPAPI could not unprotect once it loaded again. An
+install from before the split keeps the blob in `secure-storage.keyset`; at vault selection, when
+no `.dpapi` file exists, `moveSharedDpapiKeyset` decides by content rather than by asking DPAPI.
+Only a file that parses as a JSON object is a cleartext keyset, which an earlier outage wrote and
+which stays as the fallback's; anything else is the protected blob and moves to the `.dpapi` file
+once, even while DPAPI is failing, so a transient DPAPI failure cannot leave it behind. The
+fallback applies the same test when it reads: content that is not a cleartext keyset is never
+adopted, the read refuses with `SecretStoreException`, and a move that could not run (an I/O
+failure) is tried again at the next launch. A cleartext keyset damaged on disk fails the same test,
+so on macOS and Linux the read refuses with a message naming the file and leaves it in place, while
+on Windows the move takes it for the protected blob and DPAPI then rejects it. On Linux it is a libsecret password in the default
+collection with attributes `application=<applicationId>` and `purpose=secure-storage`.
+
+The fallback is a cleartext `<applicationDataDirectory>/secure-storage.keyset`, created `0600`
+inside the existing `0700` directory on POSIX. An operating system with no native vault uses it from
+the start. Everywhere else `FallbackKeysetVault` prefers the native backend and moves to the file,
+for the rest of the process, only where that cannot cost a secret. A keyset Tink cannot find is a
+keyset it generates, and secrets under the old one then fail to decrypt and are replaced as
+corrupt, so:
+
+- A cleartext keyset already in the file wins, whatever the native backend holds. The file is written only
+  during an outage before any secret existed, so every secret stored since is under it.
+- A native backend that is unavailable -- its library cannot load, or it reports
+  `KeysetVaultUnavailableException` during a call -- lets the file stand in only while the directory
+  holds no `*.secrets` file. With secrets on disk their keyset is in the native backend, so the read
+  throws `SecretStoreException` and writes nothing, and the keyset and the ciphertext are both
+  there when it returns. A directory that cannot be listed counts as one holding secrets.
+- A write during an outage goes to the file.
+
+Moving to the file logs one warning with the reason. Once per process, because the vault is
+memoised per application id and every store opened afterwards would otherwise repeat it. Once a
+native store has answered, an error for its item becomes `SecretStoreException` and never silently
+falls back. A stored keyset Tink cannot parse is `SecretStoreException` too, including a damaged
+base-64 key value, which Tink may reject with `IllegalArgumentException` rather than a security
+exception.
 
 The OS store holds the Tink keyset itself rather than a key-encryption key. The single-key JSON is
 only a few hundred bytes and fits every backend. Adding a key-encryption key would still require the
@@ -389,6 +421,20 @@ The Identity Koin module resolves the app's `SecretStores` and names its own sto
 the logger stay with the factory. The old plain `credentials.preferences_pb` file is not migrated: the sample app has no
 users, and a token migration would be a Capability concern in a product, written as a one-shot read
 from the old store followed by a delete.
+
+A store that cannot be read right now -- the desktop rule above refusing while the OS vault is down,
+or a Keychain before first unlock -- must not crash the launch or sign the user out. So
+`currentCredential()` answers null with one warning and clears nothing, and the request goes out
+without a credential. Its 401 rejects nothing, since the network judges a 401 by the credential
+the request carried: if the store has recovered by then, the request retries once with the stored
+credential, and otherwise `refreshCredential(null)` clears nothing and the 401 surfaces. A 401 for
+a request that did carry a credential, arriving while the store cannot be read, reaches
+`refreshCredential` with that credential; its compare-and-remove has to read the store first and
+fails, the network counts the failure as `Unavailable`, and the 401 surfaces with the credential
+kept. `observeAuthToken()` waits the failure out with a pause that
+doubles from 1 s up to 30 s and starts again after a good read, and emits nothing meanwhile: the
+token is unknown, not gone, so the session reads as neither signed in nor signed out until the
+store answers.
 
 The ownership table in [`network.md`](network.md) §2 changes its "Credential persistence" row to
 `:platform:secure-storage`.
@@ -432,7 +478,27 @@ storage and must never change once a build has shipped — see
   store opens, opening the same name twice through one factory fails with a message that names it,
   and a store opened with the factory's logger writes its lines under the module's tag. A common
   test opens one name twice through `inMemorySecretStores()`, which registers nothing.
-- `:capability:identity-impl` tests move to `inMemorySecretStore()` unchanged in intent.
+- `:platform:secure-storage` keyset-vault JVM tests for the desktop fallback rule. A keyset found in
+  the file is used, without consulting the OS vault, and reported once. On a pretended Windows the
+  cleartext fallback never writes the `.dpapi` file, a DPAPI outage with the protected keyset and
+  secrets on disk refuses the read and leaves both files alone, and a vault library that cannot
+  load refuses with secrets on disk and starts its keyset in the file on a fresh install. A
+  corrupted cleartext keyset is refused in place with its path in the message, and only the Windows
+  move takes it.
+  `KeysetVaultContinuityTest` restarts a store over one directory: an unavailable OS vault holding
+  the keyset leaves the secrets in place and reads them once it returns, a keyset written to the
+  file during an outage stays in use, secrets survive either keyset outliving the other, a directory
+  that cannot be listed is not taken for one without secrets (skipped where the listing still
+  succeeds, as for root), and a damaged key value is `SecretStoreException` on read and write.
+  `KeysetVaultSequenceTest` runs 120 seeded random sequences of six launches with the vault up,
+  unavailable or refusing, and asserts an acknowledged value is never read back as missing.
+  `DpapiKeysetMoveTest` moves a protected shared keyset to the `.dpapi` file by its content alone
+  (a fake DPAPI only reads the moved blob back), leaves a cleartext one and an existing `.dpapi` file
+  alone, and with DPAPI unavailable moves the blob and then refuses the read without writing.
+- `:capability:identity-impl` tests move to `inMemorySecretStore()` unchanged in intent. A fake
+  store that fails and then recovers proves the credential reads as null, nothing is cleared, the
+  token flow waits 1 + 2 + 4 s through three failures before the kept token arrives, and the session
+  reads as signed in once the store does.
 - Android Keystore and iOS Keychain actuals compile in `check` and are exercised by running the
   apps. Windows DPAPI and Linux libsecret compile on the JVM but need their target operating systems
   for native execution. The project does not run instrumented tests in the routine loop.

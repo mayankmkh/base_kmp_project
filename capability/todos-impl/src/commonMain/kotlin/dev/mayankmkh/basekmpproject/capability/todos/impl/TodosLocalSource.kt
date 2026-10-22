@@ -64,6 +64,30 @@ internal class TodosLocalSource(drivers: SqlDriverProvider) {
         }
     }
 
+    /**
+     * Writes [replacement] (deletes the row when null) only while the row is still [expected] (no
+     * row when null). The read and the write share one transaction, so no write can land between
+     * the check and the replacement. Returns whether it replaced.
+     */
+    suspend fun replaceIfUnchanged(
+        id: TodoId,
+        expected: TodoEntity?,
+        replacement: TodoEntity?,
+    ): Boolean = database.use {
+        transactionWithResult {
+            val unchanged =
+                todosSchemaQueries.selectById(id.value, ::TodoEntity).awaitAsOneOrNull() == expected
+            if (unchanged) {
+                if (replacement == null) {
+                    todosSchemaQueries.deleteById(id.value)
+                } else {
+                    todosSchemaQueries.upsert(replacement)
+                }
+            }
+            unchanged
+        }
+    }
+
     suspend fun upsert(todo: TodoEntity) {
         database.use { todosSchemaQueries.upsert(todo) }
     }

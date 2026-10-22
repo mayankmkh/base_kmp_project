@@ -44,8 +44,6 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.headersOf
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -57,17 +55,16 @@ import kotlinx.coroutines.test.setMain
 /**
  * The whole app, over its real object graph.
  *
- * Five process-level surfaces are swapped out and nothing else: `user.home` redirects the desktop
- * database, the HTTP engine serves canned responses, both stored-data factories use memory, and
- * database work uses the test dispatcher. Everything between -- Koin, the repositories, SQLDelight,
- * Navigation 3 -- is what ships.
+ * Five process-level surfaces are swapped out and nothing else (`processSurfaceOverrides`): the
+ * HTTP engine serves canned responses, both stored-data factories use memory, the application
+ * database is the real schema in a temporary file that the graph's close deletes, and database work
+ * uses the test dispatcher. No test here reaches a per-user data directory on any operating system.
+ * Everything between -- Koin, the repositories, SQLDelight, Navigation 3 -- is what ships.
  */
 @OptIn(ExperimentalTestApi::class)
 class RootContentTest {
     private val dispatcher = UnconfinedTestDispatcher()
     private lateinit var appDispatchers: AppDispatchers
-    private lateinit var originalUserHome: String
-    private lateinit var testUserHome: Path
 
     @BeforeTest
     fun setUp() {
@@ -82,9 +79,6 @@ class RootContentTest {
                 unconfined = productionDispatchers.unconfined,
                 mainImmediate = productionDispatchers.mainImmediate,
             )
-        originalUserHome = System.getProperty("user.home")
-        testUserHome = Files.createTempDirectory("base-kmp-navigation-test")
-        System.setProperty("user.home", testUserHome.toString())
         initKoin(isDebug = true, environment = BuildEnvironment.Staging) {
             modules(
                 processSurfaceOverrides(
@@ -99,8 +93,6 @@ class RootContentTest {
     fun tearDown() {
         shutdownKoin()
         Dispatchers.resetMain()
-        System.setProperty("user.home", originalUserHome)
-        testUserHome.toFile().deleteRecursively()
     }
 
     @Test

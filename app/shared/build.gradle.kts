@@ -83,6 +83,10 @@ kotlin {
                 // Lets the navigation test drive the real object graph without a network: the
                 // `HttpClient` binding is overridden with one on a `MockEngine`.
                 implementation(libs.ktor.client.mock)
+
+                // The application database the tests open is a JDBC SQLite file under the
+                // temporary directory, never the per-user data directory the desktop app uses.
+                implementation(libs.sqldelight.sqlite.driver)
             }
         }
     }

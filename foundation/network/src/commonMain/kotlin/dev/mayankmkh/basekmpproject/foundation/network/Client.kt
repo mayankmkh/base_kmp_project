@@ -25,6 +25,7 @@ import io.ktor.client.utils.unwrapCancellationException
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.takeFrom
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.util.AttributeKey
@@ -127,25 +128,27 @@ private fun HttpClientConfig<*>.installAuthentication(
     credentialProvider: CredentialProvider,
 ) {
     install(Auth) {
-        // One predicate feeds both gates, so a request either carries the base host's credentials
-        // and may be refreshed on 401, or is left alone entirely.
+        // One predicate feeds both gates, so a request either carries the base origin's
+        // credentials and may be refreshed on 401, or is left alone entirely. A 401 from anywhere
+        // else, including a redirect target on another host, scheme or port, keeps its 401.
         reAuthorizeOnResponse { response ->
             response.status == HttpStatusCode.Unauthorized &&
-                requiresCredentials(response.request.attributes, response.request.url.host, config)
+                requiresCredentials(response.request.attributes, response.request.url, config)
         }
         bearer {
-            sendWithoutRequest { requiresCredentials(it.attributes, it.url.host, config) }
+            sendWithoutRequest { requiresCredentials(it.attributes, it.url.build(), config) }
             cacheTokens = false
             nonCancellableRefresh = true
             loadTokens {
                 credentialProvider.currentCredential()?.let { BearerTokens(it, null) }
             }
             refreshTokens {
-                // With Ktor's token cache disabled, oldTokens is reloaded at refresh time rather
-                // than necessarily being the credential rejected on the wire.
+                // The credential the request carried, never `oldTokens`: with the token cache off,
+                // Ktor reloads that at refresh time, so it is whatever is stored now. A request
+                // that went out without one rejects nothing, so its 401 retries with a credential
+                // stored since, or reaches the provider as null, which clears nothing.
                 val rejected =
                     response.request.headers[HttpHeaders.Authorization]?.removePrefix(BearerPrefix)
-                        ?: oldTokens?.accessToken
                 val current = credentialProvider.currentCredential()
                 if (current != null && current != rejected) {
                     return@refreshTokens BearerTokens(current, null)
@@ -172,8 +175,12 @@ private fun HttpClientConfig<*>.installAuthentication(
     }
 }
 
-private fun requiresCredentials(attributes: Attributes, host: String, config: NetworkConfig) =
-    attributes.contains(RequiresAuth) && host.equals(config.baseUrl.host, ignoreCase = true)
+/** The base url's origin only: the same host over plain http or on another port is a stranger. */
+private fun requiresCredentials(attributes: Attributes, url: Url, config: NetworkConfig) =
+    attributes.contains(RequiresAuth) &&
+        url.protocol == config.baseUrl.protocol &&
+        url.host.equals(config.baseUrl.host, ignoreCase = true) &&
+        url.port == config.baseUrl.port
 
 /**
  * The Identity Capability's side of the neutral network inversion (§18.6.1). Foundation network
@@ -184,7 +191,11 @@ public interface CredentialProvider {
     /** The credential to send now, or null when signed out. Cheap: an in-memory read. */
     public suspend fun currentCredential(): String?
 
-    /** Called once per rejected credential. Identity decides what a rejection means. */
+    /**
+     * Called once per rejected credential. [rejected] is the credential the 401 answered, or null
+     * when the request carried none and none is stored now. Identity decides what a rejection
+     * means.
+     */
     public suspend fun refreshCredential(rejected: String?): CredentialRefreshResult
 }
 

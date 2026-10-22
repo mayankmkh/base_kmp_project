@@ -27,7 +27,7 @@ mechanics inside the module.
 | Client assembly, plugin order, engines per target | `:foundation:network` |
 | Base URL, timeouts, log level | `:app:*` supplies a `NetworkConfig` |
 | Values of changing headers | `:app:*` supplies a `DynamicHeaders` snapshot |
-| Current credential and refresh | `:capability:identity-impl` implements `CredentialProvider` |
+| Current credential and refresh | `:capability:identity-impl` implements `CredentialProvider` in an object of its own, not the capability |
 | Credential persistence | `:capability:identity-impl` over `:platform:secure-storage` |
 | Endpoints, DTOs, error-body decoding | Capability implementations |
 | Caching, connectivity, request scheduling | `:foundation:resource*`, `:platform:connectivity`; never this module |
@@ -58,7 +58,7 @@ public fun interface DynamicHeaders {
 public interface CredentialProvider {
     /** The credential to send now, or null when signed out. Cheap: an in-memory read. */
     public suspend fun currentCredential(): String?
-    /** Called once per rejected credential. Identity decides what a rejection means. */
+    /** Once per rejected credential; null when the request carried none. Identity decides. */
     public suspend fun refreshCredential(rejected: String?): CredentialRefreshResult
 }
 
@@ -152,10 +152,17 @@ only custom plugin.
 
 **Redirects.** Ktor's own `HttpRedirect` stays at its defaults: only GET and HEAD are followed, an
 HTTPS to HTTP hop is refused, and a 3xx that is not followed surfaces as `RedirectResponseException`
-under `expectSuccess`. Ktor drops `Authorization` when the authority changes; the redirected builder
-keeps its attributes and re-enters `Auth`, and the base-host predicate (§6) is what stops the token
-from being re-added on the foreign host. Each hop runs `SendingRequest`, so each hop carries its own
-request id.
+under `expectSuccess`. A hop does not run the request pipeline again: `HttpRedirect` copies the
+previous builder, headers and attributes included, and sends it straight down the send pipeline, so
+`sendWithoutRequest` and `loadTokens` are not asked a second time and the hop reuses the header the
+first request carried. What keeps the token off another origin is `HttpRedirect` itself, which
+removes `Authorization` whenever the authority changes. Ktor compares the authority as a string:
+the userinfo, the host (case-sensitively, so a hop that only changes the host's case drops the
+token too) and the port, which is left out when it is the scheme's default. A change from HTTPS to
+HTTP is a downgrade and is refused; an upgrade from HTTP to HTTPS on the default ports leaves the
+authority string unchanged and keeps the header. The hop does pass through `Auth`'s send
+interceptor, so a 401 on it is judged by `reAuthorizeOnResponse` against the hop's own url (§6): a
+401 from a foreign origin never refreshes. Each hop runs `SendingRequest`, so each hop carries its own request id.
 
 On web, every non-standard header costs a CORS preflight and the server must list it in
 `Access-Control-Allow-Headers`. Keep the dynamic set small, prefer standard headers such as
@@ -174,8 +181,8 @@ Settings, and why each one is not the default:
 
 | Setting | Value | Reason |
 | --- | --- | --- |
-| `sendWithoutRequest` | `authenticated()` attribute present and host equals the base host | The prose docs say the default waits for a challenge; the source default is eager. Refresh only fires for requests where this returned true ([KTOR-9732](https://youtrack.jetbrains.com/issue/KTOR-9732)), so it must be true for the API host. The host check also stops a redirect from carrying the token to another host, because `HttpRedirect` sits outside `Auth` and the redirected request re-enters it with the original attributes. |
-| `reAuthorizeOnResponse` | status 401 and `authenticated()` attribute present and same host | Public since 3.1, absent from the docs. Without it any 401 enters the refresh loop, including a wrong-password sign-in response. |
+| `sendWithoutRequest` | `authenticated()` attribute present and the url is the base origin: same scheme, host (case-insensitive) and effective port | The prose docs say the default waits for a challenge; the source default is eager. Refresh only fires for requests where this returned true ([KTOR-9732](https://youtrack.jetbrains.com/issue/KTOR-9732)), so it must be true for the API origin. Comparing the origin rather than the host keeps the token off plain http and other ports on the same host. It is asked once per call, not per redirect hop: a hop reuses the first request's headers and `HttpRedirect` strips `Authorization` across authorities (§5). |
+| `reAuthorizeOnResponse` | status 401 and `authenticated()` attribute present and the responding url is the base origin | Public since 3.1, absent from the docs. Without it any 401 enters the refresh loop, including a wrong-password sign-in response. It reads the url that answered, so a 401 from a redirect target on another origin, or from the base host on another scheme or port, never refreshes. |
 | `cacheTokens` | `false` | The provider's in-memory snapshot is already the cache. A second copy is where stale-token bugs after sign-out or account switch come from. `loadTokens` runs per request, and per request it is a memory read. |
 | `nonCancellableRefresh` | `true` | Cancelling the request that triggered a refresh must not roll back a refresh that succeeded. Available since 3.4.0. |
 | `realm` | `null` | One provider. |
@@ -196,6 +203,24 @@ The refresh call itself, when a real backend exists, goes through the same clien
 strips a caller-set `Authorization` header from marked refresh requests
 ([KTOR-9827](https://youtrack.jetbrains.com/issue/KTOR-9827)) does not apply because the request is
 not marked. Anonymous requests never contend with an in-flight refresh for the same reason.
+
+The client is built with its `CredentialProvider`, so the provider is constructed first and must not
+take the client as a constructor dependency. Identity's provider is therefore deliberately not the
+capability object: `CredentialStoreProvider` depends only on the credential store, while
+`IdentityCapabilityImpl`, which will call the network to sign in, stays off this path. A refresh
+that needs the client reaches it lazily (Koin `inject()` or a `Lazy<HttpClient>`) or through a
+separate client that never sends a credential; a constructor-injected client would close the cycle
+`HttpClient -> CredentialProvider -> HttpClient`.
+
+The rejected credential is the one the request carried, read from its `Authorization` header, and
+never `oldTokens`: with `cacheTokens = false` Ktor fills `oldTokens` by calling `loadTokens` at
+refresh time, so it is the credential stored now, not the one on the wire. A request sent without
+a credential (a store that could not be read yet, or a sign-in that landed while it was in flight)
+therefore rejects nothing. If a credential is stored by the time its 401 arrives, the request
+retries once with it and no refresh runs; otherwise `refreshCredential(null)` runs, which clears
+nothing, and the 401 surfaces. A rejection clears only the credential that was rejected, compared
+and removed under the credential store's write lock, so a late 401 for an older credential never
+ends a newer session.
 
 The plugin is strictly reactive. Ktor has no proactive refresh before expiry
 ([KTOR-6419](https://youtrack.jetbrains.com/issue/KTOR-6419)); if Identity wants one, it refreshes
@@ -333,8 +358,11 @@ Contract tests the module must keep green:
 - base URL merge for a relative path and for `appendPathSegments`; an absolute URL is left alone;
 - dynamic headers are read per request and a request header wins over a default;
 - no `Content-Type` on GET; a fresh `X-Request-Id` on every attempt including retries;
-- token attached only with `authenticated()` and only on the base host; foreign host and anonymous
+- token attached only with `authenticated()` and only on the base origin; foreign host and anonymous
   requests carry no token and a 401 on them never refreshes or retries;
+- the base host over plain http, on the TLS port over plain http, or on another port carries no
+  token, while an upper-case host with the same origin does; a 401 from the base host on another
+  scheme or port never refreshes or retries;
 - refresh then retry once; `Rejected`, `Unavailable` and a throwing provider each return the
   original 401 once; two concurrent 401s refresh once; a credential changed by another caller is
   reused without refresh; after sign-out the next request is anonymous with no invalidation call;
@@ -344,7 +372,9 @@ Contract tests the module must keep green:
   cancellation and unexpected exception; every mapped failure carries a request id and the token
   never appears in the log;
 - a same-host redirect keeps the token and a cross-host redirect drops it, each hop with its own
-  request id; a POST redirect and an HTTPS downgrade are not followed;
+  request id; a redirect to the base host on another port drops the token on the second hop; a 401
+  from a cross-host redirect target never refreshes and its hop carries no token; a POST redirect
+  and an HTTPS downgrade are not followed;
 - every target names an engine; closing the Koin context closes the client.
 
 ## 12. Decisions and rejected alternatives

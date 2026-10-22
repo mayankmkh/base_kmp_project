@@ -8,14 +8,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.ViewModelStoreProvider
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 private const val DefaultHostKey = "default"
 private const val FallbackHostKey = "nearest-owner-fallback"
 private const val ProviderKeyPrefix =
     "dev.mayankmkh.basekmpproject.foundation.presentation.KeyedOwnerHost"
+
+// The ledgers sit in the parent store beside the providers' state, so their keys must never be a
+// provider key. An earlier shape, `"$ProviderKeyPrefix:$hostKey:keys"`, was exactly the provider
+// key of a host named `"$hostKey:keys"`, and two ViewModels of different types under one key
+// failed with a ClassCastException. Every provider key starts with `"$ProviderKeyPrefix:"` and
+// every ledger key with this prefix, whatever the host key.
+private const val LedgerKeyPrefix = "$ProviderKeyPrefix.knownKeys"
+
+/** The keys a [KeyedOwnerHost] has handed out, for as long as their stores live. */
+private class KnownKeys : ViewModel() {
+    val values = mutableSetOf<String>()
+}
 
 private data class KeyedOwnerContext(
     val provider: ViewModelStoreProvider,
@@ -71,7 +85,10 @@ public fun KeyedOwnerHost(
     content: @Composable () -> Unit,
 ) {
     val context = rememberKeyedOwnerContext(hostKey)
-    val knownKeys = remember(context) { mutableSetOf<String>() }
+    // Retained beside the child stores, in the parent store, not in this composition: a host that
+    // leaves composition while its parent lives on must still know which keys it handed out, or a
+    // key dropped while it was away would never be cleared.
+    val knownKeys = viewModel(key = "$LedgerKeyPrefix:$hostKey") { KnownKeys() }.values
 
     SideEffect {
         val activeValues = activeKeys.mapTo(mutableSetOf()) { it.value }

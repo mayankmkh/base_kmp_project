@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
+import android.os.Build
 import dev.mayankmkh.basekmpproject.foundation.runtime.PlatformContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
@@ -13,8 +13,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 /**
  * Follows the default network through `ConnectivityManager`.
  *
- * `registerNetworkCallback` uses an explicit internet-capable request so capability changes drive
- * the monitor. `NET_CAPABILITY_VALIDATED` is the interesting bit: a network can be connected and
+ * `registerDefaultNetworkCallback` reports only the network the app's traffic actually takes, so a
+ * second network -- cellular behind Wi-Fi, say -- dropping cannot read as offline while the default
+ * is still up. `NET_CAPABILITY_VALIDATED` is the interesting bit: a network can be connected and
  * still have no route out, and treating that as online would trigger a refresh that cannot work.
  */
 actual fun createConnectivityMonitor(context: PlatformContext): ConnectivityMonitor =
@@ -34,6 +35,14 @@ actual fun createConnectivityMonitor(context: PlatformContext): ConnectivityMoni
 
             val callback =
                 object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) {
+                        // From API 26 a capabilities callback always follows, and the platform
+                        // documents reading capabilities here as racy; before that none may.
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                            trySend(manager.getNetworkCapabilities(network)?.hasInternet() == true)
+                        }
+                    }
+
                     override fun onCapabilitiesChanged(
                         network: Network,
                         networkCapabilities: NetworkCapabilities,
@@ -41,18 +50,14 @@ actual fun createConnectivityMonitor(context: PlatformContext): ConnectivityMoni
                         trySend(networkCapabilities.hasInternet())
                     }
 
+                    // The default network is gone; a replacement arrives as `onAvailable`.
                     override fun onLost(network: Network) {
                         trySend(false)
                     }
                 }
 
             send(manager.hasValidatedNetwork())
-            manager.registerNetworkCallback(
-                NetworkRequest.Builder()
-                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    .build(),
-                callback,
-            )
+            manager.registerDefaultNetworkCallback(callback)
             awaitClose { manager.unregisterNetworkCallback(callback) }
         }
             .distinctUntilChanged()

@@ -1,5 +1,6 @@
 package dev.mayankmkh.basekmpproject.capability.identity.impl
 
+import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.capability.identity.api.AuthToken
 import dev.mayankmkh.basekmpproject.capability.identity.api.IdentityCommands
 import dev.mayankmkh.basekmpproject.capability.identity.api.IdentityQueries
@@ -16,7 +17,7 @@ import org.koin.dsl.module
 
 class IdentityCapabilityModuleTest {
     @Test
-    fun `all identity contracts share one instance and credential state`() = runTest {
+    fun `the credential provider shares credential state with the capability`() = runTest {
         val application = koinApplication {
             modules(identityCapabilityModule, testSecretStoresModule)
         }
@@ -27,7 +28,8 @@ class IdentityCapabilityModuleTest {
                 checkNotNull(application.koin.getOrNull()) { "CredentialProvider binding missing" }
             val queries: IdentityQueries =
                 checkNotNull(application.koin.getOrNull()) { "IdentityQueries binding missing" }
-            assertSame<Any>(commands, provider)
+            // The provider is a separate object, so the client never depends on the capability;
+            // the queries and the commands stay one instance.
             assertSame<Any>(commands, queries)
 
             commands.signIn(AuthToken("binding-test-token"))
@@ -42,4 +44,5 @@ class IdentityCapabilityModuleTest {
 
 private val testSecretStoresModule = module {
     single<SecretStores> { inMemorySecretStores() }
+    single<Logger> { Logger }
 }

@@ -139,6 +139,45 @@ class ClientTest {
     }
 
     @Test
+    fun `token is withheld from the base host on another scheme or port`() = runTest {
+        val engine = MockEngine { respondOk() }
+        val client = client(engine)
+
+        client.get("http://api.example.com/downgrade") { authenticated() }
+        // The base's own port over plain http: only the scheme tells it apart.
+        client.get("http://api.example.com:443/plain-on-the-tls-port") { authenticated() }
+        client.get("https://api.example.com:8443/other-port") { authenticated() }
+        client.get("https://API.example.com:443/same-origin") { authenticated() }
+
+        assertEquals(
+            listOf(null, null, null, "Bearer first"),
+            engine.requestHistory.map { it.headers[HttpHeaders.Authorization] },
+        )
+    }
+
+    @Test
+    fun `401 from the base host on another scheme or port never refreshes`() = runTest {
+        val provider = FakeCredentialProvider()
+        val engine = MockEngine {
+            respond("unauthorized", HttpStatusCode.Unauthorized, unauthorizedHeaders)
+        }
+        val client = client(engine, provider)
+
+        assertFailsWith<ClientRequestException> {
+            client.get("http://api.example.com/downgrade") { authenticated() }
+        }
+        assertFailsWith<ClientRequestException> {
+            client.get("http://api.example.com:443/plain-on-the-tls-port") { authenticated() }
+        }
+        assertFailsWith<ClientRequestException> {
+            client.get("https://api.example.com:8443/other-port") { authenticated() }
+        }
+
+        assertEquals(3, engine.requestHistory.size)
+        assertEquals(0, provider.refreshCount)
+    }
+
+    @Test
     fun `redirect keeps the token on the base host and drops it across hosts`() = runTest {
         val engine = MockEngine { request ->
             when (request.url.encodedPath) {
@@ -163,6 +202,26 @@ class ClientTest {
         )
         // Every hop is its own wire attempt and gets its own id.
         assertEquals(hops.size, hops.mapNotNull { it.headers[RequestIdHeader] }.toSet().size)
+    }
+
+    /**
+     * A redirect hop does not run the request pipeline again, so `sendWithoutRequest` is not asked
+     * a second time: the hop copies the first request's headers, and dropping the token on another
+     * port is `HttpRedirect`'s cross-authority strip. This pins it.
+     */
+    @Test
+    fun `redirect to the base host on another port drops the token`() = runTest {
+        val engine = MockEngine { request ->
+            if (request.url.port == 443) redirectTo("https://api.example.com:8443/there")
+            else respondOk()
+        }
+
+        client(engine).get("moved") { authenticated() }
+
+        assertEquals(
+            listOf("Bearer first", null),
+            engine.requestHistory.map { it.headers[HttpHeaders.Authorization] },
+        )
     }
 
     @Test
@@ -196,6 +255,26 @@ class ClientTest {
         }
 
         assertEquals(2, engine.requestHistory.size)
+        assertEquals(0, provider.refreshCount)
+    }
+
+    /** The redirect target never received the token, so its 401 says nothing about it. */
+    @Test
+    fun `a 401 from a cross-host redirect target never refreshes`() = runTest {
+        val provider = FakeCredentialProvider()
+        val engine = MockEngine { request ->
+            when (request.url.host) {
+                "api.example.com" -> redirectTo("https://elsewhere.example.com/there")
+                else -> respond("unauthorized", HttpStatusCode.Unauthorized, unauthorizedHeaders)
+            }
+        }
+
+        assertFailsWith<ClientRequestException> {
+            client(engine, provider).get("moved") { authenticated() }
+        }
+
+        assertEquals(2, engine.requestHistory.size)
+        assertNull(engine.requestHistory.last().headers[HttpHeaders.Authorization])
         assertEquals(0, provider.refreshCount)
     }
 
@@ -315,6 +394,48 @@ class ClientTest {
         )
         assertEquals(0, provider.refreshCount)
     }
+
+    /**
+     * The request went out with no credential (a store that could not be read yet, or a sign-in
+     * that landed meanwhile), so its 401 says nothing about the credential stored now: Ktor's
+     * reloaded `oldTokens` must not be taken for the rejected one, or the refresh would clear it.
+     */
+    @Test
+    fun `a 401 for a request sent without a credential retries with the stored one`() = runTest {
+        val provider = SequencedCredentialProvider(null, "first")
+        val engine = MockEngine { request ->
+            when (request.headers[HttpHeaders.Authorization]) {
+                null -> respond("unauthorized", HttpStatusCode.Unauthorized, unauthorizedHeaders)
+                else -> respondOk()
+            }
+        }
+
+        client(engine, provider).get("thing") { authenticated() }
+
+        assertEquals(0, provider.refreshCount)
+        assertEquals(
+            listOf(null, "Bearer first"),
+            engine.requestHistory.map { it.headers[HttpHeaders.Authorization] },
+        )
+    }
+
+    @Test
+    fun `a 401 with no credential sent or stored refreshes once with nothing to reject`() =
+        runTest {
+            val provider = SequencedCredentialProvider(null)
+            val engine = MockEngine {
+                respond("unauthorized", HttpStatusCode.Unauthorized, unauthorizedHeaders)
+            }
+
+            val error =
+                assertFailsWith<ClientRequestException> {
+                    client(engine, provider).get("thing") { authenticated() }
+                }
+
+            assertEquals(HttpStatusCode.Unauthorized, error.response.status)
+            assertEquals(listOf<String?>(null), provider.rejectedCredentials)
+            assertEquals(1, engine.requestHistory.size)
+        }
 
     @Test
     fun `retry is opt in and limited to idempotent methods`() = runTest {
@@ -473,6 +594,25 @@ class ClientTest {
         override suspend fun refreshCredential(rejected: String?): CredentialRefreshResult {
             refreshCount++
             return CredentialRefreshResult.Unavailable
+        }
+    }
+
+    /**
+     * Answers [reads] in order and then keeps answering the last one; a refresh rejects, as
+     * Identity's provider does, without changing what it answers.
+     */
+    private class SequencedCredentialProvider(private vararg val reads: String?) :
+        CredentialProvider {
+        private var read = 0
+        val rejectedCredentials = mutableListOf<String?>()
+        val refreshCount
+            get() = rejectedCredentials.size
+
+        override suspend fun currentCredential(): String? = reads[minOf(read++, reads.lastIndex)]
+
+        override suspend fun refreshCredential(rejected: String?): CredentialRefreshResult {
+            rejectedCredentials += rejected
+            return CredentialRefreshResult.Rejected
         }
     }
 

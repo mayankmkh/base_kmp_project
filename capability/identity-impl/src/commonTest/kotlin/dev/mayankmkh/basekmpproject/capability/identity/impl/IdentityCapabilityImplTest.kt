@@ -1,13 +1,17 @@
 package dev.mayankmkh.basekmpproject.capability.identity.impl
 
 import app.cash.turbine.test
+import co.touchlab.kermit.Logger
 import dev.mayankmkh.basekmpproject.capability.identity.api.AuthToken
 import dev.mayankmkh.basekmpproject.capability.identity.api.SessionState
-import dev.mayankmkh.basekmpproject.foundation.network.CredentialRefreshResult
+import dev.mayankmkh.basekmpproject.platform.securestorage.SecretStore
+import dev.mayankmkh.basekmpproject.platform.securestorage.SecretStores
 import dev.mayankmkh.basekmpproject.platform.securestorage.inMemorySecretStores
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 
 class IdentityCapabilityImplTest {
@@ -44,28 +48,38 @@ class IdentityCapabilityImplTest {
         }
     }
 
+    /** The screen that asked for sign-out may go away mid-way; the device still forgets. */
     @Test
-    fun `rejected refresh clears credential and session`() = runTest {
-        val capability = capability()
+    fun `a sign-out cancelled while the store clears still clears it`() = runTest {
+        val removing = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val real = inMemorySecretStores()
+        val stores =
+            object : SecretStores {
+                override fun open(name: String): SecretStore {
+                    val store = real.open(name)
+                    return object : SecretStore by store {
+                        override suspend fun remove(key: String) {
+                            removing.complete(Unit)
+                            release.await()
+                            store.remove(key)
+                        }
+                    }
+                }
+            }
+        val credentials = CredentialStore(stores, Logger)
+        val capability = IdentityCapabilityImpl(credentials)
         capability.signIn(AuthToken("access"))
 
-        capability.observeSession().test {
-            assertEquals(SessionState.SignedIn, awaitItem())
-            assertEquals(CredentialRefreshResult.Rejected, capability.refreshCredential("access"))
-            assertEquals(SessionState.Anonymous, awaitItem())
-            assertNull(capability.currentCredential())
-            cancelAndIgnoreRemainingEvents()
-        }
+        val signingOut = launch { capability.signOut() }
+        removing.await()
+        signingOut.cancel()
+        release.complete(Unit)
+        signingOut.join()
+
+        assertNull(credentials.getAuthToken())
     }
 
-    @Test
-    fun `credential provider reflects the credential store`() = runTest {
-        val capability = capability()
-
-        assertNull(capability.currentCredential())
-        capability.signIn(AuthToken("access"))
-        assertEquals("access", capability.currentCredential())
-    }
-
-    private fun capability() = IdentityCapabilityImpl(CredentialStore(inMemorySecretStores()))
+    private fun capability() =
+        IdentityCapabilityImpl(CredentialStore(inMemorySecretStores(), Logger))
 }

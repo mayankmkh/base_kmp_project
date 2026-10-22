@@ -185,6 +185,39 @@ class StatefulLazyItemRegressionTest {
     }
 
     @Test
+    fun keyRemovedWhileHostWasAwayIsClearedWhenHostReturns() = runComposeUiTest {
+        val parent = TestOwner()
+        val kept = placementKey("kept")
+        val removed = placementKey("removed-while-away")
+        var hostVisible by mutableStateOf(true)
+        var activeKeys by mutableStateOf(setOf(kept, removed))
+        val cleared = mutableListOf<String>()
+
+        setContent {
+            CompositionLocalProvider(LocalViewModelStoreOwner provides parent) {
+                if (hostVisible) {
+                    KeyedOwnerHost(activeKeys) {
+                        activeKeys.forEach { itemKey ->
+                            StatefulLazyItem(itemKey) {
+                                viewModel { ProbeViewModel { cleared += itemKey.value } }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // The host's keys change while it is beneath the top of the back stack: when it returns,
+        // the key it no longer lists must be retired, though this composition never saw it.
+        runOnIdle { hostVisible = false }
+        runOnIdle {
+            activeKeys = setOf(kept)
+            hostVisible = true
+        }
+        runOnIdle { assertEquals(listOf(removed.value), cleared) }
+    }
+
+    @Test
     fun reorderKeepsIdentityAttachedToKeys() = runComposeUiTest {
         val parent = TestOwner()
         val first = placementKey("one")

@@ -4,14 +4,19 @@ import dev.mayankmkh.basekmpproject.capability.identity.api.AuthToken
 import dev.mayankmkh.basekmpproject.capability.identity.api.IdentityCommands
 import dev.mayankmkh.basekmpproject.capability.identity.api.IdentityQueries
 import dev.mayankmkh.basekmpproject.capability.identity.api.SessionState
-import dev.mayankmkh.basekmpproject.foundation.network.CredentialProvider
-import dev.mayankmkh.basekmpproject.foundation.network.CredentialRefreshResult
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
+/**
+ * The session as the product sees it. The network's `CredentialProvider` is
+ * [CredentialStoreProvider], a separate object over the same [CredentialStore], so this class can
+ * call the network without the client depending on it.
+ */
 internal class IdentityCapabilityImpl(private val credentials: CredentialStore) :
-    IdentityQueries, IdentityCommands, CredentialProvider {
+    IdentityQueries, IdentityCommands {
 
     override fun observeSession(): Flow<SessionState> =
         credentials
@@ -25,16 +30,8 @@ internal class IdentityCapabilityImpl(private val credentials: CredentialStore) 
         credentials.setAuthToken(token.value)
     }
 
+    /** The screen that asked may go away mid-way; the device still forgets the credential. */
     override suspend fun signOut() {
-        credentials.removeAuthToken()
-    }
-
-    override suspend fun currentCredential(): String? = credentials.getAuthToken()
-
-    override suspend fun refreshCredential(rejected: String?): CredentialRefreshResult {
-        // A real refresh would call the token endpoint through the same client without marking the
-        // request `authenticated()`, so it never enters the credential refresh loop.
-        signOut()
-        return CredentialRefreshResult.Rejected
+        withContext(NonCancellable) { credentials.removeAuthToken() }
     }
 }

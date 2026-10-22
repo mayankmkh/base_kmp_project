@@ -24,12 +24,15 @@ import dev.mayankmkh.basekmpproject.foundation.resource.runtime.observations
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import dev.mayankmkh.basekmpproject.platform.connectivity.reconnects
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 internal class TodosCapabilityImpl(
     private val remoteSource: TodosRemoteSource,
@@ -95,11 +98,15 @@ internal class TodosCapabilityImpl(
                 completed = 0,
                 localCreated = 1,
             )
-        localSource.upsert(optimistic)
+        val answer =
+            localSource.revertingOnCancel(id, expected = optimistic, previous = null) {
+                localSource.upsert(optimistic)
+                remoteSource.createTodo(draft.copy(title = optimistic.title))
+            }
         return bridge.toOutcome(
-            remoteSource.createTodo(draft.copy(title = optimistic.title)),
+            answer,
             operation = "create",
-            onFailure = { localSource.delete(id) },
+            onFailure = { withContext(NonCancellable) { localSource.delete(id) } },
         ) { answer ->
             when (answer) {
                 is CreateTodoRemoteAnswer.Created -> {
@@ -108,7 +115,7 @@ internal class TodosCapabilityImpl(
                     CreateTodoResult.Created(id)
                 }
                 is CreateTodoRemoteAnswer.InvalidInput -> {
-                    localSource.delete(id)
+                    withContext(NonCancellable) { localSource.delete(id) }
                     CreateTodoResult.InvalidInput(answer.violations)
                 }
             }
@@ -146,11 +153,15 @@ internal class TodosCapabilityImpl(
 
     override suspend fun deleteTodo(id: TodoId): Outcome<DeleteTodoResult> {
         val previous = localSource.find(id) ?: return Outcome.Completed(DeleteTodoResult.NotFound)
-        localSource.delete(id)
+        val answer =
+            localSource.revertingOnCancel(id, expected = null, previous = previous) {
+                localSource.delete(id)
+                remoteSource.deleteTodo(id.value)
+            }
         return bridge.toOutcome(
-            remoteSource.deleteTodo(id.value),
+            answer,
             operation = "delete",
-            onFailure = { localSource.upsert(previous) },
+            onFailure = { withContext(NonCancellable) { localSource.upsert(previous) } },
         ) { answer ->
             when (answer) {
                 DeleteTodoRemoteAnswer.Deleted -> DeleteTodoResult.Deleted
@@ -178,11 +189,15 @@ private suspend fun TodosLocalSource.updateTodo(
 ): Outcome<UpdateTodoResult> {
     val previous = find(id) ?: return Outcome.Completed(UpdateTodoResult.NotFound)
     val optimistic = transform(previous)
-    upsert(optimistic)
+    val answer =
+        revertingOnCancel(id, expected = optimistic, previous = previous) {
+            upsert(optimistic)
+            send()
+        }
     return bridge.toOutcome(
-        send(),
+        answer,
         operation = operation,
-        onFailure = { upsert(previous) },
+        onFailure = { withContext(NonCancellable) { upsert(previous) } },
     ) { answer ->
         when (answer) {
             is UpdateTodoRemoteAnswer.Updated -> {
@@ -195,12 +210,51 @@ private suspend fun TodosLocalSource.updateTodo(
                 UpdateTodoResult.NotFound
             }
             is UpdateTodoRemoteAnswer.InvalidInput -> {
-                upsert(previous)
+                withContext(NonCancellable) { upsert(previous) }
                 UpdateTodoResult.InvalidInput(answer.violations)
             }
         }
     }
 }
+
+/**
+ * Runs an optimistic command's local write and request and, if the caller is cancelled before an
+ * answer, puts the row back as [previous] (no row when null), reconciling the unconfirmed write as
+ * a failure would.
+ *
+ * The optimistic write belongs inside [send]: its `withContext` onto the database lane can hand
+ * back a cancellation after the row was committed, and a write outside this guard would then stay
+ * behind. When the write never landed, the row is not [expected] and the revert does nothing.
+ *
+ * Only while the row is still exactly [expected], the optimistic value this command wrote (null: no
+ * row), checked and replaced in one transaction: a newer edit made meanwhile is the user's latest
+ * word and is left alone. For a create, [expected] is the unconfirmed optimistic row itself, so
+ * equality also means it is still tagged as a local create and nothing has edited or confirmed it
+ * since. A request the server did apply before the cancellation is undone locally until the next
+ * sync brings it back, which is acceptable here.
+ *
+ * The cancellation is always what propagates. A revert that fails itself, for example because the
+ * database driver is already closed at shutdown, is attached to it as a suppressed exception.
+ *
+ * Without this a cancelled create, typically a ViewModel scope ending as the user leaves the
+ * screen, would leave its optimistic row behind for good: neither sync removes a local create.
+ */
+internal suspend inline fun <T> TodosLocalSource.revertingOnCancel(
+    id: TodoId,
+    expected: TodoEntity?,
+    previous: TodoEntity?,
+    send: () -> T,
+): T =
+    try {
+        send()
+    } catch (cancellation: CancellationException) {
+        try {
+            withContext(NonCancellable) { replaceIfUnchanged(id, expected, previous) }
+        } catch (@Suppress("TooGenericExceptionCaught") revertFailure: Exception) {
+            cancellation.addSuppressed(revertFailure)
+        }
+        throw cancellation
+    }
 
 private suspend fun syncTodos(
     remoteSource: TodosRemoteSource,

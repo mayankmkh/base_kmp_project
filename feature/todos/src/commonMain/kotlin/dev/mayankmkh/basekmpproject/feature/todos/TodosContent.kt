@@ -3,10 +3,12 @@ package dev.mayankmkh.basekmpproject.feature.todos
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -37,6 +39,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import base_kmp_project.feature.todos.generated.resources.Res
 import base_kmp_project.feature.todos.generated.resources.cancel
@@ -46,6 +51,7 @@ import base_kmp_project.feature.todos.generated.resources.delete
 import base_kmp_project.feature.todos.generated.resources.delete_todo_question
 import base_kmp_project.feature.todos.generated.resources.hide_completed
 import base_kmp_project.feature.todos.generated.resources.input_invalid
+import base_kmp_project.feature.todos.generated.resources.new_todo
 import base_kmp_project.feature.todos.generated.resources.nothing_here_yet
 import base_kmp_project.feature.todos.generated.resources.owner
 import base_kmp_project.feature.todos.generated.resources.refresh
@@ -64,6 +70,9 @@ import dev.mayankmkh.basekmpproject.ui.designsystem.Centred
 import dev.mayankmkh.basekmpproject.ui.designsystem.Failure
 import org.jetbrains.compose.resources.stringResource
 
+/** A 56 dp floating action button plus its two 16 dp margins. */
+private val FabClearance = 88.dp
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TodoListContent(
@@ -79,7 +88,14 @@ internal fun TodoListContent(
         topBar = { TodoListTopBar(sortExpanded, { sortExpanded = it }, onAction) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            FloatingActionButton(onClick = { onAction(TodoListAction.Create) }) { Text("+") }
+            val newTodo = stringResource(Res.string.new_todo)
+            FloatingActionButton(
+                onClick = { onAction(TodoListAction.Create) },
+                modifier = Modifier.semantics { contentDescription = newTodo },
+            ) {
+                // The glyph is decoration; the button's description names the action.
+                Text("+", Modifier.clearAndSetSemantics {})
+            }
         },
     ) { padding ->
         TodoListBody(state, onAction, summary, Modifier.padding(padding))
@@ -157,7 +173,8 @@ private fun TodoListBody(
                     Modifier.fillMaxSize(),
                 )
             else ->
-                LazyColumn {
+                // Room for the create button, or the last row's Delete sits under it.
+                LazyColumn(contentPadding = PaddingValues(bottom = FabClearance)) {
                     item {
                         summary()
                         FilterChip(
@@ -307,8 +324,12 @@ internal fun TodoEditorContent(
             onClick = { onAction(TodoEditorAction.Submit) },
             enabled = !state.isSubmitting,
         ) {
-            if (state.isSubmitting) CircularProgressIndicator()
-            else Text(stringResource(Res.string.create))
+            // Sized to the label's line, so the button does not grow while submitting.
+            if (state.isSubmitting) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                Text(stringResource(Res.string.create))
+            }
         }
     }
 }

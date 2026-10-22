@@ -439,8 +439,13 @@ Recorded, not fixed (follow-ups, none blocks Feature development):
   staleness, and it is fixed: the date now comes from a `ValueSource` obtained on every run, so a
   reused configuration cache no longer replays the day the build was configured and an exception
   expires on time; `bkp.helix.today` moves it forward in tests only.
-- `KeyedOwnerHost` reconciles a set diff against remembered known keys in `SideEffect`; lifecycle's
+- `KeyedOwnerHost` reconciles a set diff against its known-keys ledger in `SideEffect`; lifecycle's
   provider defers a requested clear while an item remains composed and completes it on disposal.
+  **Resolved 2026-10-22:** the ledger was a plain `remember`, lost whenever the host left
+  composition while its child stores lived on in the parent, so a key dropped meanwhile was never
+  cleared and its ViewModels and saved state leaked. It is now a ViewModel retained in the parent
+  store beside those child stores, under a `<prefix>.knownKeys:<hostKey>` key that no provider key
+  can take; a regression test and a seeded churn test (`KeyedOwnerHostChurnTest`) pin it.
 - `PUBLIC_TOP_LEVEL` matching in the graph task is line-based; a one-line
   `@Composable public fun` would not be detected (ktfmt keeps annotations on their own line).
   **Resolved 2026-10-22:** the regex is gone; a token scanner (`TopLevelDeclarations.kt`) reads

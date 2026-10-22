@@ -2960,6 +2960,9 @@ write optimistic owned state
 
 The optimistic state still has one authoritative owner.
 
+A caller cancelled before the confirmation arrives reconciles like a failure: the optimistic write is
+rolled back under `NonCancellable`, unless a newer edit has already replaced it.
+
 ## 16.3 Durable outbox
 
 Use only when user intent must survive:
@@ -3381,8 +3384,9 @@ Current state, requalified on 2026-09-22 (ADR-47):
   cross-module lookup. Koin compiler 1.2.1 handles direct `get()` calls in supported DSL lambdas,
   but its DSL secondary-binding hints do not cross Native/Wasm KLIB boundaries reliably
   ([upstream #113](https://github.com/InsertKoinIO/koin-compiler-plugin/issues/113)).
-  `identityCapabilityModule` binds `IdentityQueries`, `IdentityCommands`, and
-  `CredentialProvider` to the same `IdentityCapabilityImpl` singleton. `networkModule` resolves
+  `identityCapabilityModule` binds `IdentityQueries` and `IdentityCommands` to one
+  `IdentityCapabilityImpl` singleton and `CredentialProvider` to a separate
+  `CredentialStoreProvider` over the same credential store. `networkModule` resolves
   `CredentialProvider` through a guarded `getOrNull()` that throws if the Identity binding is
   absent, avoiding the false `KOIN-D002` at that lookup. `IdentityCapabilityModuleTest` runs on
   JVM, Wasm browser and iOS simulator; `KoinGraphTest` resolves the real app root on JVM.

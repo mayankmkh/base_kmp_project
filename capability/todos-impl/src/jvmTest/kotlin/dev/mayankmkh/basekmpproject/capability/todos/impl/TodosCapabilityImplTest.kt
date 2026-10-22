@@ -1,5 +1,8 @@
 package dev.mayankmkh.basekmpproject.capability.todos.impl
 
+import app.cash.sqldelight.db.QueryResult
+import app.cash.sqldelight.db.SqlDriver
+import app.cash.sqldelight.db.SqlPreparedStatement
 import co.touchlab.kermit.Logger
 import com.github.michaelbull.result.fold
 import dev.mayankmkh.basekmpproject.capability.todos.api.CreateTodoResult
@@ -9,6 +12,7 @@ import dev.mayankmkh.basekmpproject.capability.todos.api.TodoId
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSettings
 import dev.mayankmkh.basekmpproject.capability.todos.api.TodoSort
 import dev.mayankmkh.basekmpproject.capability.todos.api.UpdateTodoResult
+import dev.mayankmkh.basekmpproject.capability.todos.impl.db.AppDatabase
 import dev.mayankmkh.basekmpproject.foundation.network.NetworkConfig
 import dev.mayankmkh.basekmpproject.foundation.network.createHttpClient
 import dev.mayankmkh.basekmpproject.foundation.preferences.inMemoryPreferenceStores
@@ -16,6 +20,8 @@ import dev.mayankmkh.basekmpproject.foundation.resource.Outcome
 import dev.mayankmkh.basekmpproject.foundation.resource.ProblemKind
 import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
+import dev.mayankmkh.basekmpproject.testkit.asProvider
+import dev.mayankmkh.basekmpproject.testkit.inMemorySqliteDriver
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.toByteArray
@@ -25,11 +31,19 @@ import io.ktor.http.Url
 import io.ktor.http.headersOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -197,6 +211,142 @@ class TodosCapabilityImplTest {
         }
 
     @Test
+    fun `a delete cancelled before the server answers puts the row back`() =
+        runTest(dispatcher) {
+            val local = createInMemoryTodosLocalSource()
+            val row = entity(1)
+            local.upsert(row)
+            val server = GatedServer()
+            val capability = capability(server.engine, local)
+
+            val deleting = async { capability.deleteTodo(TodoId(1)) }
+            server.entered.await()
+            deleting.cancelAndJoin()
+
+            assertEquals(row, local.find(TodoId(1)))
+            server.release()
+            capability.close()
+        }
+
+    @Test
+    fun `an update cancelled before the server answers puts the row back`() =
+        runTest(dispatcher) {
+            val local = createInMemoryTodosLocalSource()
+            val row = entity(1, completed = 0)
+            local.upsert(row)
+            val server = GatedServer()
+            val capability = capability(server.engine, local)
+
+            val completing = async { capability.setCompleted(TodoId(1), completed = true) }
+            server.entered.await()
+            completing.cancelAndJoin()
+
+            assertEquals(row, local.find(TodoId(1)))
+            server.release()
+            capability.close()
+        }
+
+    /**
+     * Neither sync removes a local create, so a create whose caller left before the server answered
+     * would otherwise stay behind as a row nothing confirms and nothing reconciles.
+     */
+    @Test
+    fun `a create cancelled before the server answers leaves no row`() =
+        runTest(dispatcher) {
+            val local = createInMemoryTodosLocalSource()
+            val server = GatedServer()
+            val capability = capability(server.engine, local)
+
+            val creating = async { capability.createTodo(TodoDraft("Unconfirmed", ownerId = 7)) }
+            server.entered.await()
+            creating.cancelAndJoin()
+
+            assertEquals(emptyList(), local.observeTodos(TodoSettings()).first())
+            server.release()
+            capability.close()
+        }
+
+    /**
+     * A cancellation can arrive while the optimistic write is still on the database lane: the row
+     * is committed, yet the write's own `withContext` hands the cancellation back instead of
+     * returning. The revert must still cover that row, or a create stays behind and a delete stays
+     * applied.
+     */
+    @Test
+    fun `a cancellation landing with the optimistic write still reverts it`() =
+        runTest(dispatcher) {
+            val driver = CancellingDriver(inMemorySqliteDriver(AppDatabase.Schema))
+            val local = TodosLocalSource(driver.asProvider())
+            val row = entity(1)
+            local.upsert(row)
+            val server = GatedServer()
+            val capability = capability(server.engine, local)
+
+            lateinit var creating: Job
+            driver.onNextWrite = { creating.cancel() }
+            async {
+                creating = coroutineContext.job
+                capability.createTodo(TodoDraft("Unconfirmed", ownerId = 7))
+            }
+                .join()
+
+            lateinit var deleting: Job
+            driver.onNextWrite = { deleting.cancel() }
+            async {
+                deleting = coroutineContext.job
+                capability.deleteTodo(TodoId(1))
+            }
+                .join()
+
+            assertTrue(creating.isCancelled)
+            assertTrue(deleting.isCancelled)
+            assertEquals(listOf(row), local.observeTodos(TodoSettings()).first())
+            server.release()
+            capability.close()
+        }
+
+    /**
+     * A revert that cannot run, such as one reaching a driver already closed at shutdown, must not
+     * replace the cancellation: the caller's scope is ending, and the failure travels with it.
+     */
+    @Test
+    fun `a revert that fails keeps the cancellation and carries the failure`() = runTest {
+        val driver = inMemorySqliteDriver(AppDatabase.Schema)
+        val local = TodosLocalSource(driver.asProvider())
+        local.upsert(entity(1))
+        driver.close()
+        val cancellation = CancellationException("caller left")
+
+        val thrown =
+            assertFailsWith<CancellationException> {
+                local.revertingOnCancel(TodoId(1), expected = null, previous = entity(1)) {
+                    throw cancellation
+                }
+            }
+
+        assertSame(cancellation, thrown)
+        assertEquals(1, thrown.suppressed.size)
+    }
+
+    @Test
+    fun `a cancelled update leaves a newer edit alone`() =
+        runTest(dispatcher) {
+            val local = createInMemoryTodosLocalSource()
+            local.upsert(entity(1, title = "before"))
+            val server = GatedServer()
+            val capability = capability(server.engine, local)
+
+            val renaming = async { capability.renameTodo(TodoId(1), "optimistic") }
+            server.entered.await()
+            local.upsert(entity(1, title = "newer"))
+            renaming.cancelAndJoin()
+
+            assertEquals("newer", local.find(TodoId(1))?.title)
+            server.release()
+            capability.close()
+        }
+
+    @Test
     fun `settings are applied by SQL queries`() = runTest {
         val local = createInMemoryTodosLocalSource()
         local.replaceFromServer(
@@ -267,6 +417,37 @@ class TodosCapabilityImplTest {
             ),
             JSON,
         )
+
+    /** A server that holds every request until [release], so a caller can be cancelled mid-call. */
+    private class GatedServer {
+        val entered = CompletableDeferred<Unit>()
+        private val gate = CompletableDeferred<Unit>()
+        val engine = MockEngine {
+            entered.complete(Unit)
+            gate.await()
+            respond("down", HttpStatusCode.InternalServerError)
+        }
+
+        fun release() {
+            gate.complete(Unit)
+        }
+    }
+
+    /** Runs [onNextWrite] once, right after the next write statement has committed. */
+    private class CancellingDriver(private val delegate: SqlDriver) : SqlDriver by delegate {
+        var onNextWrite: (() -> Unit)? = null
+
+        override fun execute(
+            identifier: Int?,
+            sql: String,
+            parameters: Int,
+            binders: (SqlPreparedStatement.() -> Unit)?,
+        ): QueryResult<Long> {
+            val result = delegate.execute(identifier, sql, parameters, binders)
+            onNextWrite?.also { onNextWrite = null }?.invoke()
+            return result
+        }
+    }
 
     private fun entity(
         id: Long,

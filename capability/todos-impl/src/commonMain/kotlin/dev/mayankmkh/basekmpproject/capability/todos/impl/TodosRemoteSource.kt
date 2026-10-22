@@ -30,11 +30,15 @@ internal data class TodoDto(
     val completed: Boolean,
 )
 
+/**
+ * Every field is required: the shared `Json` does not encode defaults, and the server echoes the
+ * request body as the created todo, so a defaulted field would be missing from the response.
+ */
 @Serializable
 private data class CreateTodoDto(
     val userId: Long,
     val title: String,
-    val completed: Boolean = false,
+    val completed: Boolean,
 )
 
 @Serializable private data class CompletionDto(val completed: Boolean)
@@ -92,7 +96,13 @@ internal class TodosRemoteSource(private val client: HttpClient, private val jso
             .tryCatching<TodoDto> {
                 post {
                     url { appendPathSegments(TODOS_PATH) }
-                    jsonBody(CreateTodoDto(userId = draft.ownerId, title = draft.title))
+                    jsonBody(
+                        CreateTodoDto(
+                            userId = draft.ownerId,
+                            title = draft.title,
+                            completed = false,
+                        )
+                    )
                 }
                     .body()
             }

@@ -219,7 +219,9 @@ private suspend fun syncTodo(
 ): Outcome<Unit> =
     bridge.commit(remoteSource.getTodo(id.value), "detail.refresh") { todo ->
         if (todo == null) {
-            localSource.delete(id)
+            // A local create is owned locally until the list sync reconciles it, exactly as
+            // `replaceFromServer` keeps it, so only a server row's 404 confirms an absence.
+            if (localSource.find(id)?.localCreated == 0L) localSource.delete(id)
         } else {
             val localCreated = localSource.find(id)?.localCreated ?: 0
             localSource.upsert(todo.toEntity(id, localCreated))

@@ -2610,6 +2610,8 @@ drops unchanged emissions and wraps the result in `observing` for the same key, 
 hands over its value flow and never repeats the mapping. A confirmed detail 404 is an endpoint
 answer: the implementation removes the local row and completes the sync. The resulting
 `ResourceObservation(value = null, operation = Idle)` is confirmed absent, exposed by `isAbsent`.
+A row the Capability created locally is the exception: it stays owned locally until the list sync
+reconciles it, so a 404 for it completes the sync and keeps the row.
 A clean ledger stays `Unsynchronized` until an attempt succeeds, so a durable value written by an
 earlier process is shown as is rather than announced as fresh. A Capability builds one
 `CommandBridge(logger, "<capability>")` and routes every command through it, so its sync function

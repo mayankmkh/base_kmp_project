@@ -18,6 +18,7 @@ import dev.mayankmkh.basekmpproject.foundation.runtime.ApplicationRuntimeScope
 import dev.mayankmkh.basekmpproject.platform.connectivity.ConnectivityMonitor
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.toByteArray
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
@@ -32,6 +33,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 
 class TodosCapabilityImplTest {
     private val dispatcher = UnconfinedTestDispatcher()
@@ -123,6 +127,33 @@ class TodosCapabilityImplTest {
         }
 
     @Test
+    fun `create sends completed explicitly and decodes the echoed todo`() =
+        runTest(dispatcher) {
+            val sentBodies = mutableListOf<String>()
+            // JSONPlaceholder answers a create with the request body plus a new id, so a field the
+            // request omits is missing from the response the client then has to decode.
+            val engine = MockEngine { request ->
+                val sent = request.body.toByteArray().decodeToString().also(sentBodies::add)
+                val echoed =
+                    JsonObject(
+                        Json.parseToJsonElement(sent).jsonObject + ("id" to JsonPrimitive(201))
+                    )
+                respond(
+                    echoed.toString(),
+                    HttpStatusCode.Created,
+                    headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            }
+            val capability = capability(engine)
+
+            val result = capability.createTodo(TodoDraft("Echoed todo", ownerId = 1))
+
+            assertTrue(""""completed":false""" in sentBodies.single(), sentBodies.single())
+            assertIs<CreateTodoResult.Created>(assertIs<Outcome.Completed<*>>(result).value)
+            capability.close()
+        }
+
+    @Test
     fun `refresh keeps local creates and replaces server rows`() = runTest {
         val local = createInMemoryTodosLocalSource()
         local.upsert(entity(1, title = "stale"))
@@ -146,6 +177,22 @@ class TodosCapabilityImplTest {
 
             assertEquals(Outcome.Completed(Unit), outcome)
             assertEquals(null, local.find(TodoId(404)))
+            capability.close()
+        }
+
+    @Test
+    fun `a 404 item refresh keeps a local create and completes`() =
+        runTest(dispatcher) {
+            val local = createInMemoryTodosLocalSource()
+            val created = entity(1_000_000, localCreated = 1)
+            local.upsert(created)
+            val capability =
+                capability(MockEngine { respond("{}", HttpStatusCode.NotFound) }, local)
+
+            val outcome = capability.refreshTodo(TodoId(1_000_000))
+
+            assertEquals(Outcome.Completed(Unit), outcome)
+            assertEquals(created, local.find(TodoId(1_000_000)))
             capability.close()
         }
 

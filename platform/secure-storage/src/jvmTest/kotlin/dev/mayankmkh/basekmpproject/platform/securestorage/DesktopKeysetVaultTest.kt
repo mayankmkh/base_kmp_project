@@ -6,6 +6,8 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlinx.coroutines.CoroutineScope
@@ -47,6 +49,17 @@ class DesktopKeysetVaultTest {
         assertNull(swapped.get("token"))
         assertEquals(1, vault.writes)
         swappedScope.coroutineContext[Job]?.cancelAndJoin()
+    }
+
+    @Test
+    fun `a malformed stored keyset surfaces as SecretStoreException`() {
+        val vault = InMemoryKeysetVault()
+        encryptedSerializer("credentials", vault)
+        val valid = assertNotNull(vault.json)
+        vault.json = valid.replace(Regex("\"status\"\\s*:\\s*\"ENABLED\""), "\"status\": null")
+        assertNotEquals(valid, vault.json)
+
+        assertFailsWith<SecretStoreException> { encryptedSerializer("credentials", vault) }
     }
 
     private fun encryptedStore(

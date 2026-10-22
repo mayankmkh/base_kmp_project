@@ -194,7 +194,9 @@ class RootContentTest {
             App(backStack = backStack)
         }
 
-        waitUntilAtLeastOneExists(hasText("Todo 1"), timeoutMillis = 5_000)
+        // Wall-clock headroom for cold-JVM Compose and feature initialisation, which the test clock
+        // does not advance; this integration test has exceeded 5 s on a cold JVM.
+        waitUntilAtLeastOneExists(hasText("Todo 1"), timeoutMillis = 30_000)
         onNodeWithText("Back").performClick()
 
         waitUntilAtLeastOneExists(hasText("Buy milk"), timeoutMillis = 5_000)

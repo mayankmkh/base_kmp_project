@@ -128,13 +128,11 @@ tasks {
         useJUnitPlatform()
         // The synthetic projects apply the real version catalog rather than a stub, so a test fails
         // when a plugin asks for a key the project does not actually have.
-        systemProperty(
-            "bkp.test.versionCatalog",
-            isolated.rootProject.projectDirectory
-                .file("../gradle/libs.versions.toml")
-                .asFile
-                .absolutePath,
-        )
+        val versionCatalog =
+            isolated.rootProject.projectDirectory.file("../gradle/libs.versions.toml")
+        systemProperty("bkp.test.versionCatalog", versionCatalog.asFile.absolutePath)
+        // The fixtures apply the real catalog, so a catalog edit must invalidate the test results.
+        inputs.file(versionCatalog).withPathSensitivity(PathSensitivity.NONE)
     }
 }
 

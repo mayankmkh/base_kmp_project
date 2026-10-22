@@ -61,11 +61,21 @@ private fun keysetAead(vault: KeysetVault): Aead =
         val stored = vault.read()
         val handle =
             if (stored == null) {
-                KeysetHandle.generateNew(KeyTemplates.get("AES256_GCM")).also {
-                    vault.write(TinkJsonProtoKeysetFormat.serializeKeyset(it, access))
-                }
+                KeysetHandle.generateNew(
+                        KeyTemplates.get("AES256_GCM").toParameters(),
+                        RegistryConfiguration.get(),
+                    )
+                    .also {
+                        vault.write(
+                            TinkJsonProtoKeysetFormat.serializeKeyset(
+                                it,
+                                RegistryConfiguration.get(),
+                                access,
+                            )
+                        )
+                    }
             } else {
-                TinkJsonProtoKeysetFormat.parseKeyset(stored, access)
+                TinkJsonProtoKeysetFormat.parseKeyset(stored, RegistryConfiguration.get(), access)
             }
         handle.getPrimitive(RegistryConfiguration.get(), Aead::class.java)
     }

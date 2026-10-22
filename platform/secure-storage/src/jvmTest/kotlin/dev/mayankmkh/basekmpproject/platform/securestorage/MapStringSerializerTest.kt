@@ -107,7 +107,10 @@ class MapStringSerializerTest {
 
     private fun aead(): Aead {
         AeadConfig.register()
-        return KeysetHandle.generateNew(KeyTemplates.get("AES256_GCM"))
+        return KeysetHandle.generateNew(
+                KeyTemplates.get("AES256_GCM").toParameters(),
+                RegistryConfiguration.get(),
+            )
             .getPrimitive(RegistryConfiguration.get(), Aead::class.java)
     }
 

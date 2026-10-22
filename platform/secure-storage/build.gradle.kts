@@ -38,7 +38,7 @@ kotlin {
                 implementation(libs.touchlab.kermit)
             }
         }
-        val jvmAndAndroidMain by getting {
+        getByName("jvmAndAndroidMain") {
             dependencies {
                 implementation(libs.androidx.datastore.core)
                 implementation(libs.kotlinx.serialization.json)

@@ -47,6 +47,19 @@ Plus, outside the runtime graph:
 | `config/helix/` | The dependency policy and the exception registry |
 | `docs/architecture/` | The master source, the adoption plan, the ADRs |
 
+## Prerequisites
+
+- JDK 21. The Gradle daemon toolchain is pinned in `gradle/gradle-daemon-jvm.properties`, and
+  Gradle can auto-provision it.
+- The Android SDK with platform 37 (`compileSdk`), its path set as `sdk.dir` in the ignored
+  `local.properties`.
+- Python 3 and Bash for `tooling/helix-kmp/helix-kmp`.
+- For iOS: macOS with Xcode and an iOS Simulator runtime for the 18.2 deployment target
+  (`IPHONEOS_DEPLOYMENT_TARGET` in `app/ios/iosApp.xcodeproj`).
+
+Run `./gradlew help` once after checkout to download the Gradle distribution and validate the
+local toolchains.
+
 ## Verifying
 
 ```bash
@@ -59,6 +72,15 @@ Do **not** run a bare `./gradlew build`. It builds fourteen production web bundl
 which nothing consumes, and exhausts memory. Use `check` plus the targeted assembles above.
 
 If the formatter disagrees with you, `./gradlew <module>:spotlessApply`.
+
+To run the shared app's tests on one target:
+
+```bash
+./gradlew :app:shared:testAndroidHostTest     # Android host tests
+./gradlew :app:shared:jvmTest                 # Desktop/JVM tests
+./gradlew :app:shared:wasmJsTest              # Web/Wasm tests
+./gradlew :app:shared:iosSimulatorArm64Test   # iOS Simulator tests (macOS)
+```
 
 ## Adding a Feature or a Capability
 
@@ -128,8 +150,10 @@ command layer.
 ## Running it
 
 ```bash
-./gradlew :app:android:installProdDebug                 # Android, on a connected device or emulator
+./gradlew :app:android:installStagingDebug              # Android staging (the default flavor), on a device or emulator
+./gradlew :app:android:installProdDebug                 # Android production
 ./gradlew :app:desktop:run                              # Desktop (JVM)
+./gradlew :app:desktop:hotRun --auto                    # Desktop with Compose Hot Reload
 ./gradlew :app:web:wasmJsBrowserDevelopmentRun          # Web, dev server with hot reload
 ./gradlew :app:desktop:packageDistributionForCurrentOS  # Desktop installer (dmg / msi / deb)
 ```
@@ -145,6 +169,12 @@ the `iosApp-Staging` or `iosApp-Production` scheme, and run (the target links `-
 SQLDelight native driver).
 Nothing in the Gradle loop above builds iOS except `./gradlew verifyFull`, which links the
 simulator framework.
+
+## Contributing
+
+Fill in [`.github/pull_request_template.md`](.github/pull_request_template.md): say which platforms
+the change touches and run `./gradlew verifyFast`, plus `./gradlew verifyFull` when a platform,
+runtime or packaging seam moved (see [Verifying](#verifying)).
 
 ## Architecture documentation
 

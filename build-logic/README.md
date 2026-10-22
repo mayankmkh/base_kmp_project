@@ -417,6 +417,15 @@ No role plugin adds project-to-project dependencies; every module names its own.
 
 Configured centrally in `SharedCompose.kt` for compose-enabled primary plugins.
 
+A root `compose_compiler_config.conf` is picked up when present: `SharedCompose.kt` adds it to the
+Compose compiler's `stabilityConfigurationFiles` only if the file exists, so none ships today. List
+only types that are genuinely immutable and come from modules the Compose compiler does not
+process, and only after a compiler report (`-PenableComposeCompilerReports=true`, written to the
+root `build/<module path>/compose-reports`) shows the cost. Under strong skipping an unstable parameter still skips,
+just by instance identity rather than `equals`, so an entry buys little unless a fresh-but-equal
+instance arrives on every recomposition -- and a type that is not actually immutable makes the
+compiler skip a recomposition it needed.
+
 ### Test bundle
 
 Kotlin/Android test dependencies are configured by primary plugin type.

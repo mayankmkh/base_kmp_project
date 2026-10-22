@@ -1,0 +1,9 @@
+<resources>
+    <!-- Overrides `main`'s name so a staging install is not a second identical icon beside the
+         production one; matches the iOS staging display name (`Staging.xcconfig`).
+
+         A flavor source-set override rather than `resValue("string", "app_name", ...)` in the
+         build script: `main` already declares `app_name` in strings.xml, and a generated resValue
+         with the same name clashes with it as a duplicate resource. -->
+    <string name="app_name">Base KMP Android App Staging</string>
+</resources>

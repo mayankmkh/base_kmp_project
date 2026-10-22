@@ -16,9 +16,12 @@ fun main() {
     // Compose Desktop has no flavors, so the environment travels as a system property the build
     // script pins on both the `run` task and every packaged launcher's JVM arguments. A build that
     // said nothing is a production build; nothing here silently downgrades to staging.
-    val environmentId = System.getProperty(EnvironmentProperty) ?: BuildEnvironment.Production.id
+    val environment =
+        BuildEnvironment.fromId(
+            System.getProperty(EnvironmentProperty) ?: BuildEnvironment.Production.id
+        )
 
-    initKoin(isDebug = isDebug, environment = BuildEnvironment.fromId(environmentId))
+    initKoin(isDebug = isDebug, environment = environment)
 
     application {
         Window(
@@ -26,12 +29,20 @@ fun main() {
                 shutdownKoin()
                 exitApplication()
             },
-            title = "base_kmp_project",
+            // Matches the iOS display name and the Android launcher label: a staging window says
+            // so, so it is never mistaken for production when both are open side by side.
+            title =
+                when (environment) {
+                    BuildEnvironment.Staging -> "$WindowTitle Staging"
+                    BuildEnvironment.Production -> WindowTitle
+                },
         ) {
             App()
         }
     }
 }
+
+private const val WindowTitle = "base_kmp_project"
 
 /** Set by `app/desktop/build.gradle.kts`; the name is duplicated there and nowhere else. */
 private const val EnvironmentProperty = "bkp.environment"

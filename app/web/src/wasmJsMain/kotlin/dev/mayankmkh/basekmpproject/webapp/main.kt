@@ -34,13 +34,19 @@ fun main() {
 /**
  * The web build has no flavors and no build configurations: one bundle is served from every
  * deployment, and which one it is belongs to the page that mounts it, not to webpack. The host page
- * declares it, and a page that declares nothing is a production page.
+ * declares it, and a page that declares nothing stops the app rather than defaulting: any default
+ * would have to be production, and the page likelier to forget the tag is a staging one. An
+ * unrecognised value fails in [BuildEnvironment.fromId].
  *
  * `<meta name="app-environment" content="staging">`
  */
 private fun hostPageEnvironmentId(): String =
     document.querySelector("meta[name=\"$EnvironmentMetaName\"]")?.getAttribute("content")?.takeIf {
         it.isNotBlank()
-    } ?: BuildEnvironment.Production.id
+    }
+        ?: error(
+            "<meta name=\"$EnvironmentMetaName\"> is missing or blank; " +
+                "the host page must declare the environment"
+        )
 
 private const val EnvironmentMetaName = "app-environment"

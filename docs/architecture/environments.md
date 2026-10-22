@@ -130,6 +130,9 @@ likelier to forget the tag is a staging one — which would put testers on real 
 nothing to indicate it. Refusing to start is the cheaper failure. This is the one value a host page
 embedding the bundle has to supply.
 
+Since 2026-10-22 the entry point enforces this: a missing or blank tag stops `main` with an error
+naming the tag, where it used to fall back to production silently.
+
 ## 4. What differs between them
 
 | | Staging | Production |
@@ -137,6 +140,8 @@ embedding the bundle has to supply.
 | API base URL | the staging host | the production host |
 | Application id / bundle id / package name | suffixed `.staging` | bare |
 | iOS display name | `… Staging` | unchanged |
+| Android launcher label | `… Staging` (`app/android/src/staging/res/values/strings.xml`) | unchanged |
+| Desktop window title | `… Staging` (`app/desktop/.../main.kt`) | unchanged |
 | Ktor log level in a *release* build | `INFO` — method, URL, status | `NONE` |
 | Kermit minimum severity in a *release* build | `Debug` | `Warn` |
 
@@ -146,6 +151,12 @@ in `apiBaseUrl` name it today. A fork replaces those two lines and nothing else.
 Storage identity is the load-bearing difference. Both environments must be installable side by side
 and must never read each other's databases, preferences or secrets, so the suffix runs all the way
 through `PlatformContext` to the file names — see [`preferences.md`](preferences.md) §10.
+
+On desktop the database follows the same id: `app.db` lives in
+`applicationDataDirectory(applicationId)`, beside that id's preferences and secrets. It used to be
+one `~/.base_kmp_project/app.db` for every id, so staging and production shared SQL data. The first
+id to open after the upgrade moves that file, with any journal, into its own directory once,
+because it may hold local writes not yet synced; the other id starts empty.
 
 The logging difference is deliberate: a staging release exists to be diagnosed, and its traffic is
 not a user's. It logs the call timeline -- method, URL, status -- and no headers, because it is a
